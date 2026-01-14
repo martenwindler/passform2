@@ -1,14 +1,9 @@
 import os
 
 def create_boilerplate():
-    # 1. Wo bin ich? (...\BIBA\passform2\utils)
     utils_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # 2. Gehe eine Ebene hoch (...\BIBA\passform2)
     parent_dir = os.path.abspath(os.path.join(utils_dir, ".."))
     
-    # 3. Gehe in den Workspace und dort in src
-    # Falls dein Ordner exakt 'passform2_ws' heißt:
     ws_name = "passform2_ws"
     src_path = os.path.join(parent_dir, ws_name, "src")
 
@@ -16,14 +11,25 @@ def create_boilerplate():
 
     if not os.path.exists(src_path):
         print(f"FEHLER: Der Ordner '{src_path}' wurde nicht gefunden.")
-        print("Bitte prüfe, ob 'passform2_ws' direkt neben dem 'utils'-Ordner liegt.")
         return
 
     packages = [d for d in os.listdir(src_path) if os.path.isdir(os.path.join(src_path, d))]
 
     for pkg in packages:
         pkg_path = os.path.join(src_path, pkg)
-        print(f"Paket gefunden: {pkg}")
+        print(f"Verarbeite Paket: {pkg}")
+
+        # REKURSIVES LÖSCHEN von 'placeholder' Dateien
+        for root, dirs, files in os.walk(pkg_path):
+            if "placeholder" in files:
+                target = os.path.join(root, "placeholder")
+                try:
+                    os.remove(target)
+                    # Relativen Pfad für schönere Ausgabe berechnen
+                    rel_path = os.path.relpath(target, pkg_path)
+                    print(f"  [-] Gelöscht: {rel_path}")
+                except Exception as e:
+                    print(f"  [!] Fehler beim Löschen von {target}: {e}")
 
         # Erstelle die Standard-Struktur
         for folder in ["resource", "launch", "config", pkg]:
@@ -52,6 +58,16 @@ def create_boilerplate():
                 f.write(f"        Node(package='{pkg}', executable='main', name='{pkg}_node')\n")
                 f.write("    ])\n")
             print(f"  [+] Launch Template")
+
+        # Standard Config-Datei erstellen
+        config_file = os.path.join(pkg_path, "config", "params.yaml")
+        if not os.path.exists(config_file):
+            with open(config_file, 'w') as f:
+                f.write(f"{pkg}_node:\n")
+                f.write("  ros__parameters:\n")
+                f.write("    update_rate: 1.0\n")
+                f.write("    log_level: 'info'\n")
+            print(f"  [+] Config-Template erstellt: params.yaml")
 
     print("\nFertig!")
 

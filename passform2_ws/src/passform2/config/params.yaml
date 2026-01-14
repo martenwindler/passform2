@@ -1,0 +1,4 @@
+passform2_node:
+  ros__parameters:
+    update_rate: 1.0
+    log_level: 'info'
