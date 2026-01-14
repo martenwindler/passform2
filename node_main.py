@@ -1,3 +1,6 @@
+import rclpy
+from rclpy.node import Node
+
 class PassformManager(Node):
     def __init__(self):
         super().__init__('passform_manager')
