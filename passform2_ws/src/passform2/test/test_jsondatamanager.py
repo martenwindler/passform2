@@ -1,13 +1,11 @@
 import pytest
 import os
 import json
-from passform2 import JSONDataManager
+from passform2.JSONDataManager import JSONDataManager 
 
 @pytest.fixture
 def temp_db(tmp_path):
     file_path = tmp_path / "test_data.json"
-    with open(file_path, 'w') as f:
-        json.dump([], f)
     return JSONDataManager(str(file_path))
 
 def test_create(temp_db):

@@ -3,13 +3,22 @@ import os
 
 class JSONDataManager:
     def __init__(self, file_name="config.json"):
-        self.filename = file_name
+        if os.path.isabs(file_name):
+            self.filename = file_name
+        else:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            ws_root = os.path.abspath(os.path.join(current_dir, "..", "..", ".."))
+            self.filename = os.path.join(ws_root, "data", file_name)
+        
         self.ensure_file_exists()
 
-        def ensure_file_exists(self):
-            if not os.path.isfile(self.filename):
-                with open(self.filename, 'w') as f:
-                    json.dump({}, f)
+    def ensure_file_exists(self):
+        os.makedirs(os.path.dirname(self.filename), exist_ok=True)
+        
+        if not os.path.isfile(self.filename):
+            with open(self.filename, 'w') as f:
+                json.dump([], f) 
+            print(f"Datenbank neu erstellt unter: {self.filename}")
 
         def _read_all(self):
             with open(self.filename, 'r') as f:
