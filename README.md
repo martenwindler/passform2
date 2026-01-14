@@ -9,4 +9,21 @@ passform2_ws/
 │   ├── passform_agent_backend/   # Backend
 │   ├── passform_agent_frontend/  # Frontend
 │   └── passform2_rfid/           # RFID
-└── ...                           # Other
+└──                               # Other
+```
+Build.
+```text
+make build
+```
+
+Build and start directly.
+```text
+make all
+```
+
+Start, when already built.
+```text
+make run
+```
+
+tbc/tbd.
