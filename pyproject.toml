@@ -9,6 +9,8 @@ dependencies = [
     "setuptools",
     "rclpy",
     "loguru",
+    "netifaces",
+    "zeroconf"
 ]
 
 [project.optional-dependencies]
