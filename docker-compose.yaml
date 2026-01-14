@@ -1,0 +1,8 @@
+services:
+  passform_manager:
+    build: .
+    container_name: passform2_container
+    network_mode: "host"
+    volumes:
+      - ./config.json:/app/config.json
+    restart: always
