@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "passform2"
+version = "0.1.0"
+description = "ROS2 Projekt passform2"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+dependencies = [
+    "setuptools",
+    "rclpy",
+]
+
+[project.scripts]
+manager = "passform2.manager_node:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["passform2*"]
+
+[tool.setuptools.data-files]
+"share/ament_index/resource_index/packages" = ["resource/passform2"]
+"share/passform2" = ["package.xml"]
