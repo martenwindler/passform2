@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.swo
+*.zip
+*.tar.gz
+*.egg-info
+.DS_Store
+.git
+.gitignore

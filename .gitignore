@@ -7,7 +7,7 @@ __pycache__/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
+# Makefile
 *.so
 *.a
 *.o
@@ -51,3 +51,14 @@ ament_index/
 # Ignore tags and ctags
 tags
 TAGS
+
+# 
+**/**/docs/**/**
+
+#
+*.jpg
+*.png
+*.drawio
+*.stl
+*.urdf
+*.dae

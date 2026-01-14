@@ -1,0 +1,10 @@
+# Standardmäßig alle Textdateien auf LF erzwingen
+* text eol=lf
+
+# Spezielle Binärdateien davon ausschließen
+*.jpg binary
+*.png binary
+*.drawio binary
+*.stl binary
+*.urdf binary
+*.dae binary
