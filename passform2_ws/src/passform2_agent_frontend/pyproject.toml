@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "passform_agent_frontend"
+version = "0.1.0"
+description = "Web-based frontend visualization for the passform2 ecosystem"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+dependencies = [
+    "setuptools",
+    "rclpy",
+    "flask",
+    "jinja2"
+]
+
+[project.scripts]
+frontend = "passform_agent_frontend.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["passform_agent_frontend*"]
+
+[tool.setuptools.data-files]
+"share/ament_index/resource_index/packages" = ["resource/passform_agent_frontend"]
+"share/passform_agent_frontend" = ["package.xml"]
+"share/passform_agent_frontend/launch" = ["launch/frontend_launch.py"]
+"share/passform_agent_frontend/static" = ["static/*"]
+"share/passform_agent_frontend/templates" = ["templates/*"]
