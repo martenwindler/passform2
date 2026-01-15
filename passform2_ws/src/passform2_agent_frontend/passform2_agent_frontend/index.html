@@ -1,13 +1,429 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passform 2.0 | Control Console</title>
+    <style>
+        /* --- BASIS & LAYOUT --- */
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            overflow: hidden;
+            background-color: #f0f2f5;
+        }
+
+        .app-layout {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* --- NAVBAR: Dunkelblau & Zentriert --- */
+        .navbar.blue-look {
+            height: 60px;
+            background-color: #1a365d;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 100;
+            position: relative;
+        }
+
+        .navbar-section { display: flex; align-items: center; gap: 15px; }
+        
+        .navbar-center {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .navbar-logo { height: 35px; }
+        .navbar-title { font-weight: 600; font-size: 1.1rem; letter-spacing: 0.5px; }
+
+        .btn-icon-sidebar {
+            background: transparent; border: none; color: white;
+            font-size: 1.6rem; cursor: pointer;
+        }
+
+        /* --- CONTENT & SIDEBAR --- */
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+        }
+
+        three-grid-scene {
+            flex: 1;
+            display: block;
+            min-width: 0;
+        }
+
+        .sidebar {
+            width: 320px;
+            min-width: 320px;
+            background-color: #f8fafc; /* Sehr helles Grau */
+            border-left: 1px solid #cbd5e0;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* --- SIDEBAR SEKTIONEN & BUTTONS --- */
+        .sidebar-section h2, .sidebar-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: #4a5568;
+            letter-spacing: 1px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 5px;
+        }
+
+        .sidebar-actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        button {
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary { background-color: #3182ce; color: white; border: none; }
+        .btn-primary:hover { background-color: #2b6cb0; }
+
+        .btn-secondary { background-color: #edf2f7; color: #2d3748; border: 1px solid #cbd5e0; }
+        .btn-secondary:hover { background-color: #e2e8f0; }
+
+        .btn-danger { background-color: #feb2b2; color: #9b2c2c; border: none; }
+        .btn-danger:hover { background-color: #fc8181; }
+
+        .btn-sidebar-primary { background-color: #3182ce; color: white; width: 100%; border: none; }
+        .btn-disabled { background-color: #e2e8f0; color: #a0aec0; cursor: not-allowed; width: 100%; border: none; }
+
+        /* --- AGENTEN & LISTE --- */
+        .agent-list { list-style: none; padding: 0; margin: 0; }
+        .agent-item {
+            background: white;
+            border: 1px solid #e2e8f0;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .agent-info { display: flex; flex-direction: column; }
+        .agent-label { font-weight: bold; font-size: 0.9rem; color: #2d3748; }
+        .agent-coords { font-size: 0.75rem; color: #718096; }
+
+        .btn-icon-delete { background: none; border: none; color: #a0aec0; font-size: 1.2rem; padding: 0 5px; }
+        .btn-icon-delete:hover { color: #e53e3e; }
+
+        /* --- LOGS & STATUS --- */
+        .log-container {
+            background: #1a202c; /* Logs bleiben dunkel für besseren Kontrast */
+            color: #edf2f7;
+            border-radius: 4px;
+            padding: 10px;
+            height: 120px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+        }
+
+        .log-entry { border-bottom: 1px solid #2d3748; padding: 2px 0; }
+        .status-pill { background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.2); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; display: inline-block; }
+
+        /* --- MODALS --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 2000;
+        }
+        .modal-content {
+            background: white; padding: 25px; border-radius: 8px; min-width: 280px;
+            display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        /* --- NAVBAR BUTTONS (Passend zum Status-Pill Look) --- */
+        .btn-mode-switch, .btn-view-toggle {
+            background: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 6px 16px;
+            border-radius: 20px; /* Pill-Form wie die Status-Anzeige */
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .btn-mode-switch:hover, .btn-view-toggle:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #63b3ed;
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .btn-mode-switch:active, .btn-view-toggle:active {
+            transform: translateY(0);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- HAMBURGER MENÜ (Hover & Focus) --- */
+        .btn-icon-sidebar {
+            background: transparent;
+            border: 2px solid transparent;
+            color: #63b3ed; /* Leuchtendes Blau */
+            font-size: 1.8rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            outline: none;
+        }
+
+        .btn-icon-sidebar:hover {
+            background: rgba(99, 179, 237, 0.1);
+            color: white;
+            border-color: rgba(99, 179, 237, 0.3);
+        }
+
+        .btn-icon-sidebar:focus {
+            box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.4);
+            color: white;
+        }
+
+        /* --- KONTEXTMENÜ (Modals) IM SIDEBAR-SCHEMA --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 25, 47, 0.85); /* Sehr dunkles Blau, leicht transparent */
+            backdrop-filter: blur(4px); /* Moderner Blur-Effekt */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .modal-content {
+            background-color: #1a365d; /* Gleiches Blau wie Navbar/Sidebar */
+            border: 1px solid #4299e1;
+            padding: 25px;
+            border-radius: 12px;
+            min-width: 300px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            color: white;
+        }
+
+        .modal-content h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.1rem;
+            color: #63b3ed;
+            border-bottom: 1px solid #2c5282;
+            padding-bottom: 10px;
+        }
+
+        /* Buttons im Kontextmenü */
+        .modal-content button {
+            text-align: left;
+            padding: 12px 15px;
+            background: #2a4365;
+            border: 1px solid #2c5282;
+            color: #e2e8f0;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .modal-content button:hover {
+            background: #3182ce;
+            color: white;
+            border-color: #63b3ed;
+        }
+
+        .modal-content .btn-close {
+            background: transparent;
+            border: none;
+            color: #a0aec0;
+            text-align: center;
+            margin-top: 5px;
+            font-size: 0.85rem;
+            text-decoration: underline;
+        }
+
+        .modal-content .btn-close:hover {
+            color: #fc8181;
+        }
+
+        .modal-content hr {
+            border: 0;
+            border-top: 1px solid #2c5282;
+            margin: 5px 0;
+        }
+
+        /* --- SIDEBAR: Jetzt im einheitlichen Dunkelblau --- */
+        /* --- SIDEBAR GRUNDSTRUKTUR --- */
+        .sidebar {
+            width: 320px;
+            min-width: 320px;
+            background-color: #1a365d; /* Das dunkelste Blau der Navbar */
+            color: #e2e8f0;
+            border-left: 1px solid #2c5282;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-sizing: border-box;
+        }
+
+        /* --- SEKTIONEN --- */
+        .sidebar-section h3 {
+            font-size: 0.8rem;
+            color: #63b3ed; /* Ein helleres, leuchtendes Blau für Headlines */
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin: 0 0 12px 0;
+            border-bottom: 1px solid #2c5282;
+            padding-bottom: 5px;
+        }
+
+        /* --- INPUT STYLING (Heller als der Hintergrund) --- */
+        .sidebar-section label {
+            display: block;
+            font-size: 0.75rem;
+            color: #a0aec0;
+            margin-bottom: 4px;
+        }
+
+        .sidebar-section input[type="number"] {
+            width: 100%;
+            background-color: #2a4365; /* Mittleres Blau - heller als Sidebar */
+            border: 1px solid #4299e1;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            box-sizing: border-box;
+            transition: all 0.2s;
+        }
+
+        .sidebar-section input[type="number"]:focus {
+            outline: none;
+            background-color: #2c5282;
+            border-color: #63b3ed;
+            box-shadow: 0 0 0 2px rgba(99, 179, 237, 0.4);
+        }
+
+        /* --- AGENTEN-KARTEN (Dezent abgehoben) --- */
+        .agent-item {
+            background-color: #2d3748; /* Anthrazit-Blau */
+            border: 1px solid #4a5568;
+            padding: 10px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .agent-label {
+            color: #f7fafc;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .agent-coords {
+            color: #a0aec0;
+            font-size: 0.75rem;
+        }
+
+        /* --- BUTTONS --- */
+        .sidebar-actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background-color: #4299e1;
+            color: white;
+            border: none;
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        .btn-secondary {
+            background-color: #2c5282;
+            color: #ebf8ff;
+            border: 1px solid #4299e1;
+        }
+
+        .btn-danger {
+            background-color: #9b2c2c;
+            color: #fff5f5;
+            border: none;
+        }
+
+        /* --- LOG CONTAINER --- */
+        .log-container {
+            background-color: #000000; /* Tiefschwarz für Terminal-Look */
+            border: 1px solid #2c5282;
+            border-radius: 4px;
+            padding: 10px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+        }
+
+        .log-entry {
+            color: #cbd5e0;
+            border-bottom: 1px solid #1a202c;
+            padding: 2px 0;
+        }
+
+        /* In der index.html unter <style> */
+
+        .content-area {
+            display: flex;          /* Erlaubt Nebeneinander-Darstellung */
+            flex-direction: row;    /* Gitter links, Sidebar rechts */
+            flex: 1;
+            width: 100%;
+            height: calc(100vh - 60px); /* Höhe minus Navbar */
+            overflow: hidden;       /* Verhindert Scrollbars im Hauptlayout */
+        }
+
+        three-grid-scene {
+            flex: 1;                /* Nimmt allen verfügbaren Platz */
+            min-width: 0;           /* WICHTIG: Erlaubt dem Gitter zu schrumpfen, wenn die Sidebar kommt */
+            display: block;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="elm-app"></div>
+    <script type="module" src="/index.ts"></script>
+</body>
 </html>

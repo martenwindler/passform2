@@ -12,6 +12,7 @@ run:
 	source install/setup.bash && ros2 launch $(PKG_NAME) $(PKG_NAME)_launch.py
 
 clean:
+	bash utils/clean__all.sh --quiet
 	rm -rf build/ install/ log/
 
 help:
