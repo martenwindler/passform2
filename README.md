@@ -16,7 +16,7 @@ make frontend
 
 Build backend.
 ```text
-make start-all
+make backend
 ```
 
 Build all.
