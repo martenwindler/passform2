@@ -1,23 +1,31 @@
-SHELL := /bin/bash
-PKG_NAME := passform2
+# --- KONFIGURATION ---
+FRONTEND_DIR=passform2_agent_frontend/passform2_agent_frontend
+BACKEND_DIR=passform2_agent_backend
 
-.PHONY: all build clean run help
-
-all: build run
-
-build:
-	colcon build --packages-select $(PKG_NAME) --symlink-install
-
-run:
-	source install/setup.bash && ros2 launch $(PKG_NAME) $(PKG_NAME)_launch.py
-
-clean:
-	bash utils/clean__all.sh --quiet
-	rm -rf build/ install/ log/
+.PHONY: help frontend backend start-all install
 
 help:
 	@echo "Verfügbare Befehle:"
-	@echo "  make build  - Baut das Paket $(PKG_NAME)"
-	@echo "  make run    - Startet das Launch-File von $(PKG_NAME)"
-	@echo "  make all    - Baut und startet das Paket"
-	@echo "  make clean  - Löscht build, install und log Ordner"
+	@echo "  make frontend   - Startet das Frontend"
+	@echo "  make backend    - Startet das Backend"
+	@echo "  make start-all  - Startet beides parallel"
+
+# --- EINZELSTART ---
+
+frontend:
+	@echo ">>> Starte Frontend in $(FRONTEND_DIR)..."
+	cd $(FRONTEND_DIR) && bash ../start__frontend.sh
+
+backend:
+	@echo ">>> Starte Backend in $(BACKEND_DIR)..."
+	cd $(BACKEND_DIR) && bash ./start__backend.sh
+
+# --- PARALLELER START ---
+start-all:
+	@echo ">>> Starte Gesamtsystem..."
+	$(MAKE) -j2 frontend backend
+
+# --- INSTALLATION ---
+install:
+	@echo ">>> Installiere Abhängigkeiten..."
+	cd $(FRONTEND_DIR) && npm install

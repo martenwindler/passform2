@@ -5,25 +5,23 @@ ROS2 ecosystem managing RFID events, heartbeats, system states, Raspberry Pi clu
 ```text
 passform2_ws/
 ├── src/
-│   ├── passform2/                # Ros2 package knowledge update
 │   ├── passform_agent_backend/   # Backend
-│   ├── passform_agent_frontend/  # Frontend
-│   └── passform2_rfid/           # RFID
-└──                               # Other
+│   └── passform_agent_frontend/  # Frontend
+└── ...                           # Other
 ```
-Build.
+Build frontend.
 ```text
-make build
-```
-
-Build and start directly.
-```text
-make all
+make frontend
 ```
 
-Start, when already built.
+Build backend.
 ```text
-make run
+make start-all
+```
+
+Build all.
+```text
+make start-all
 ```
 
 tbc/tbd.

@@ -1,13 +1,4 @@
 {
-    "agents": [
-        {
-            "agent_id": "Robot-007",
-            "module_type": "tisch",
-            "x": 2,
-            "y": 2,
-            "orientation": 0.0,
-            "status": "active"
-        }
-    ],
-    "last_update": "2026-01-15T18:28:14.591050"
+    "agents": [],
+    "last_update": "2026-01-15T22:20:34.646800"
 }
