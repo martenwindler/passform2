@@ -1,21 +1,22 @@
 module Main exposing (main)
 
 import Browser
+import Decoders
+import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
-import Http
-import Dict exposing (Dict)
+import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode
 import Json.Encode as Encode
-
-import Types exposing (..)
 import Ports
-import Decoders
+import Types exposing (..)
 import View.Navbar as Navbar
 import View.Sidebar as Sidebar
 
+
 -- PROGRAM
+
+
 main : Program { backendIP : String, savedConfig : Maybe String } Model Msg
 main =
     Browser.element
@@ -25,17 +26,22 @@ main =
         , subscriptions = subscriptions
         }
 
+
 -- HARTE FALLBACK-KONFIGURATION
+
+
 defaultAgents : Dict (Int, Int) AgentModule
 defaultAgents =
     Dict.fromList
-        [ ((3, 4), { agent_id = Just "Tisch-1", module_type = "tisch", position = {x=3, y=4}, orientation = 0, is_dynamic = False, payload = Nothing })
-        , ((3, 5), { agent_id = Just "Greifer-1", module_type = "greifer", position = {x=3, y=5}, orientation = 0, is_dynamic = False, payload = Nothing })
-        , ((4, 4), { agent_id = Just "Tisch-2", module_type = "tisch", position = {x=4, y=4}, orientation = 0, is_dynamic = False, payload = Nothing })
-        , ((2, 2), { agent_id = Just "FTF-1", module_type = "ftf", position = {x=2, y=2}, orientation = 0, is_dynamic = True, payload = Nothing })
+        [ ( ( 3, 4 ), { agent_id = Just "Tisch-1", module_type = "tisch", position = { x = 3, y = 4 }, orientation = 0, is_dynamic = False, payload = Nothing } )
+        , ( ( 3, 5 ), { agent_id = Just "Greifer-1", module_type = "greifer", position = { x = 3, y = 5 }, orientation = 0, is_dynamic = False, payload = Nothing } )
+        , ( ( 2, 2 ), { agent_id = Just "FTF-1", module_type = "ftf", position = { x = 2, y = 2 }, orientation = 0, is_dynamic = True, payload = Nothing } )
         ]
 
+
 -- INIT
+
+
 init : { backendIP : String, savedConfig : Maybe String } -> ( Model, Cmd Msg )
 init flags =
     let
@@ -43,8 +49,12 @@ init flags =
             case flags.savedConfig of
                 Just json ->
                     case Decode.decodeString Decoders.agentMapDecoder json of
-                        Ok agents -> agents
-                        Err _ -> defaultAgents
+                        Ok agents ->
+                            agents
+
+                        Err _ ->
+                            defaultAgents
+
                 Nothing ->
                     defaultAgents
     in
@@ -53,77 +63,91 @@ init flags =
       , connected = True
       , agents = initialAgents
       , savedDefault = initialAgents
-      , logs = [ { message = "System gestartet. Bereit.", level = "info" } ]
+      , logs = [ { message = "System bereit. SPI & ROS initialisiert.", level = "success" } ]
       , pathStart = Nothing
       , pathGoal = Nothing
       , currentPath = Nothing
       , hoveredCell = Nothing
       , sidebarOpen = False
-      , gridWidth = 8 
-      , gridHeight = 4
+      , gridWidth = 10
+      , gridHeight = 6
       , editing = True
-      , is3D = False 
+      , is3D = False
       , loading = False
       , activeMenu = Nothing
+      , waitingForNfc = False
+      , nfcStatus = "unknown" -- NEU: Initialer Hardware-Status
       }
     , Ports.connectToBackend flags.backendIP
     )
 
+
 -- UPDATE
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        -- AGENTEN MANAGEMENT
+        -- --- AGENTEN MANAGEMENT ---
         RotateAgent cell ->
             let
-                newAgents = Dict.update (cell.x, cell.y) (Maybe.map (\a -> { a | orientation = modBy 360 (a.orientation + 90) })) model.agents
+                newAgents =
+                    Dict.update ( cell.x, cell.y ) (Maybe.map (\a -> { a | orientation = modBy 360 (a.orientation + 90) })) model.agents
             in
             ( { model | agents = newAgents, currentPath = Nothing }, Cmd.none )
 
         MoveAgent { oldX, oldY, newX, newY } ->
-            let
-                isOccupied = Dict.member (newX, newY) model.agents
-            in
-            if isOccupied then
+            if Dict.member ( newX, newY ) model.agents then
                 ( model, Cmd.none )
+
             else
-                case Dict.get (oldX, oldY) model.agents of
+                case Dict.get ( oldX, oldY ) model.agents of
                     Just agent ->
                         let
-                            tempAgents = Dict.remove (oldX, oldY) model.agents
-                            updatedAgent = { agent | position = { x = newX, y = newY } }
-                            newAgents = Dict.insert (newX, newY) updatedAgent tempAgents
+                            tempAgents =
+                                Dict.remove ( oldX, oldY ) model.agents
+
+                            updatedAgent =
+                                { agent | position = { x = newX, y = newY } }
+
+                            newAgents =
+                                Dict.insert ( newX, newY ) updatedAgent tempAgents
                         in
                         ( { model | agents = newAgents, currentPath = Nothing }, Cmd.none )
+
                     Nothing ->
                         ( model, Cmd.none )
 
         StartAgent moduleType cell ->
             let
-                newId = moduleType ++ "-" ++ (String.fromInt cell.x) ++ (String.fromInt cell.y)
-                isFtf = (moduleType == "ftf")
-                newAgent = 
+                newId =
+                    moduleType ++ "-" ++ String.fromInt cell.x ++ String.fromInt cell.y
+
+                isFtf =
+                    moduleType == "ftf"
+
+                newAgent =
                     { agent_id = Just newId
                     , module_type = moduleType
                     , position = cell
                     , orientation = 0
                     , is_dynamic = isFtf
-                    , payload = Nothing 
+                    , payload = Nothing
                     }
             in
-            ( { model | agents = Dict.insert (cell.x, cell.y) newAgent model.agents, activeMenu = Nothing, currentPath = Nothing }, Cmd.none )
+            ( { model | agents = Dict.insert ( cell.x, cell.y ) newAgent model.agents, activeMenu = Nothing, currentPath = Nothing }, Cmd.none )
 
         RemoveAgent cell ->
-            ( { model | agents = Dict.remove (cell.x, cell.y) model.agents, activeMenu = Nothing, currentPath = Nothing }, Cmd.none )
+            ( { model | agents = Dict.remove ( cell.x, cell.y ) model.agents, activeMenu = Nothing, currentPath = Nothing }, Cmd.none )
 
-        -- PERSISTENZ
+        -- --- PERSISTENZ & KONFIGURATION ---
         SetCurrentAsDefault ->
             let
-                jsonString = model.agents |> Decoders.encodeAgentMap |> Encode.encode 0
-                newLog = { message = "Standardkonfiguration lokal gesichert.", level = "success" }
+                jsonString =
+                    model.agents |> Decoders.encodeAgentMap |> Encode.encode 0
             in
-            ( { model | savedDefault = model.agents, logs = newLog :: model.logs }
-            , Ports.saveToLocalStorage jsonString 
+            ( { model | savedDefault = model.agents, logs = { message = "Konfiguration lokal gesichert.", level = "success" } :: model.logs }
+            , Ports.saveToLocalStorage jsonString
             )
 
         LoadDefaultConfig ->
@@ -132,137 +156,277 @@ update msg model =
         ClearGrid ->
             ( { model | agents = Dict.empty, pathStart = Nothing, pathGoal = Nothing, currentPath = Nothing }, Cmd.none )
 
-        -- PFADPLANUNG
+        ExportConfig ->
+            let
+                jsonString =
+                    model.agents |> Decoders.encodeAgentMap |> Encode.encode 0
+            in
+            ( model, Ports.exportConfig jsonString )
+
+        ImportConfigTrigger ->
+            ( model, Ports.importConfigTrigger () )
+
+        ConfigReceived jsonString ->
+            case Decode.decodeString Decoders.agentMapDecoder jsonString of
+                Ok newAgents ->
+                    ( { model | agents = newAgents, currentPath = Nothing }, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
+
+        -- --- PFADPLANUNG & MISSIONEN ---
         StartPlanning _ ->
             case ( model.pathStart, model.pathGoal ) of
                 ( Just start, Just goal ) ->
                     let
                         payload =
                             Encode.object
-                                [ ( "start", Encode.object [ ("x", Encode.int start.x), ("y", Encode.int start.y) ] )
-                                , ( "goal", Encode.object [ ("x", Encode.int goal.x), ("y", Encode.int goal.y) ] )
+                                [ ( "start", Encode.object [ ( "x", Encode.int start.x ), ( "y", Encode.int start.y ) ] )
+                                , ( "goal", Encode.object [ ( "x", Encode.int goal.x ), ( "y", Encode.int goal.y ) ] )
                                 , ( "agents", Decoders.encodeAgentMap model.agents )
                                 ]
                     in
-                    ( { model | loading = True, logs = { message = "Missionsberechnung gestartet...", level = "info" } :: model.logs }
-                    , Ports.triggerPlanning payload 
+                    ( { model | loading = True, logs = { message = "Berechne Mission...", level = "info" } :: model.logs }
+                    , Ports.triggerPlanning payload
                     )
-                _ -> ( model, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
 
         PlanningResultRaw rawJson ->
-            case Decode.decodeValue Decoders.pathDecoder rawJson of 
-                Ok path -> ( { model | currentPath = Just path, loading = False, logs = { message = "Mission erfolgreich geplant.", level = "success" } :: model.logs }, Cmd.none )
-                Err _ -> ( { model | loading = False, logs = { message = "Fehler bei Missionsplanung.", level = "warning" } :: model.logs }, Cmd.none )
+            case Decode.decodeValue Decoders.pathDecoder rawJson of
+                Ok path ->
+                    ( { model | currentPath = Just path, loading = False, logs = { message = "Pfad gefunden. Starte Ausführung.", level = "success" } :: model.logs }, Cmd.none )
 
-        -- AGENTEN LIVE-UPDATE
-        UpdateAgents rawJson ->
-            case model.mode of
-                Hardware ->
-                    case Decode.decodeValue Decoders.agentMapDecoder rawJson of
-                        Ok newAgentsDict -> ( { model | agents = newAgentsDict }, Cmd.none )
-                        Err _ -> ( model, Cmd.none )
-                Simulation -> ( model, Cmd.none )
+                Err _ ->
+                    ( { model | loading = False, logs = { message = "Kein Pfad möglich.", level = "warning" } :: model.logs }, Cmd.none )
 
-        SetConnected status -> ( { model | connected = status }, Cmd.none )
-
-        HandleSystemLog result ->
+        PlanningResult result ->
             case result of
-                Ok logEntry -> ( { model | logs = List.take 20 (logEntry :: model.logs) }, Cmd.none )
-                Err _ -> ( model, Cmd.none )
+                Ok path ->
+                    ( { model | currentPath = Just path, loading = False, logs = { message = "Pfad via HTTP empfangen.", level = "success" } :: model.logs }, Cmd.none )
+
+                Err _ ->
+                    ( { model | loading = False, logs = { message = "HTTP Planungsfehler.", level = "error" } :: model.logs }, Cmd.none )
+
+        -- --- HARDWARE INTERAKTION (NFC / RFID) ---
+        RequestNfcWrite content ->
+            ( { model
+                | waitingForNfc = True
+                , logs = { message = "NFC: Warte auf Chip...", level = "info" } :: model.logs
+              }
+            , Ports.writeNfcTrigger content
+            )
 
         HandleRfid result ->
             case result of
-                Ok rfidId -> ( { model | logs = { message = "RFID Scan: " ++ rfidId, level = "success" } :: model.logs }, Cmd.none )
-                Err _ -> ( model, Cmd.none )
+                Ok rfidId ->
+                    ( { model | logs = { message = "NFC Tag erkannt: " ++ rfidId, level = "success" } :: model.logs }, Cmd.none )
 
+                Err _ ->
+                    ( model, Cmd.none )
+
+        HandleNfcStatus result ->
+            case result of
+                Ok status ->
+                    ( { model | nfcStatus = status }, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
+
+        -- --- SYSTEM UPDATES ---
+        UpdateAgents rawJson ->
+            if model.mode == Hardware then
+                case Decode.decodeValue Decoders.agentMapDecoder rawJson of
+                    Ok newAgentsDict ->
+                        ( { model | agents = newAgentsDict }, Cmd.none )
+
+                    Err _ ->
+                        ( model, Cmd.none )
+
+            else
+                ( model, Cmd.none )
+
+        SetConnected status ->
+            ( { model | connected = status }, Cmd.none )
+
+        HandleSystemLog result ->
+            case result of
+                Ok logEntry ->
+                    let
+                        lowerMsg =
+                            String.toLower logEntry.message
+
+                        isNfcRelated =
+                            String.contains "nfc" lowerMsg
+
+                        isHardwareError =
+                            logEntry.level == "error" || logEntry.level == "warning"
+
+                        newWaitingState =
+                            if isNfcRelated || isHardwareError then
+                                False
+
+                            else
+                                model.waitingForNfc
+                    in
+                    ( { model
+                        | logs = List.take 30 (logEntry :: model.logs)
+                        , waitingForNfc = newWaitingState
+                      }
+                    , Cmd.none
+                    )
+
+                Err _ ->
+                    ( { model | waitingForNfc = False }, Cmd.none )
+
+        LogReceived logMsg ->
+            ( { model | logs = { message = logMsg, level = "info" } :: model.logs }, Cmd.none )
+
+        -- --- UI & MODUS STEUERUNG ---
         ToggleMode ->
             let
-                newMode = if model.mode == Simulation then Hardware else Simulation
-                modeStr = if newMode == Simulation then "simulation" else "hardware"
+                newMode =
+                    if model.mode == Simulation then
+                        Hardware
+
+                    else
+                        Simulation
+
+                modeStr =
+                    if newMode == Simulation then
+                        "simulation"
+
+                    else
+                        "hardware"
+
                 ( updatedAgents, logEntry ) =
                     if newMode == Simulation then
-                        ( model.savedDefault, { message = "Modus: Simulation", level = "info" } )
-                    else
-                        ( Dict.empty, { message = "Modus: Hardware (Warte auf ROS...)", level = "warning" } )
-            in
-            ( { model | mode = newMode, agents = updatedAgents, logs = logEntry :: model.logs, currentPath = Nothing }, Ports.setMode modeStr )
+                        ( model.savedDefault, { message = "Simulations-Modus aktiv.", level = "info" } )
 
-        ConfigReceived jsonString ->
-            case Decode.decodeString Decoders.agentMapDecoder jsonString of
-                Ok newAgents -> ( { model | agents = newAgents, currentPath = Nothing }, Cmd.none )
-                Err _ -> ( model, Cmd.none )
+                    else
+                        ( Dict.empty, { message = "Hardware-Modus aktiv.", level = "warning" } )
+            in
+            ( { model | mode = newMode, agents = updatedAgents, logs = logEntry :: model.logs, currentPath = Nothing }
+            , Ports.setMode modeStr
+            )
 
         HandleGridClick cell ->
-            case Dict.get (cell.x, cell.y) model.agents of
-                Just agent -> ( { model | activeMenu = Just (SettingsMenu cell agent) }, Cmd.none )
-                Nothing -> if model.editing then ( { model | activeMenu = Just (SelectionMenu cell) }, Cmd.none ) else ( model, Cmd.none )
+            case Dict.get ( cell.x, cell.y ) model.agents of
+                Just agent ->
+                    ( { model | activeMenu = Just (SettingsMenu cell agent) }, Cmd.none )
 
-        ToggleSidebar -> ( { model | sidebarOpen = not model.sidebarOpen }, Cmd.none )
-        ToggleViewMode -> ( { model | is3D = not model.is3D }, Cmd.none )
-        SetPathStart cell -> ( { model | pathStart = Just cell, activeMenu = Nothing }, Cmd.none )
-        SetPathGoal cell -> ( { model | pathGoal = Just cell, activeMenu = Nothing }, Cmd.none )
-        CloseMenu -> ( { model | activeMenu = Nothing }, Cmd.none )
-        SetGridWidth val -> ( { model | gridWidth = String.toInt val |> Maybe.withDefault 1 }, Cmd.none )
-        SetGridHeight val -> ( { model | gridHeight = String.toInt val |> Maybe.withDefault 1 }, Cmd.none )
-        NoOp -> ( model, Cmd.none )
-        _ -> ( model, Cmd.none )
+                Nothing ->
+                    if model.editing then
+                        ( { model | activeMenu = Just (SelectionMenu cell) }, Cmd.none )
 
--- SUBSCRIPTIONS (Unverändert)
+                    else
+                        ( model, Cmd.none )
+
+        ToggleSidebar ->
+            ( { model | sidebarOpen = not model.sidebarOpen }, Cmd.none )
+
+        ToggleViewMode ->
+            ( { model | is3D = not model.is3D }, Cmd.none )
+
+        SetPathStart cell ->
+            ( { model | pathStart = Just cell, activeMenu = Nothing }, Cmd.none )
+
+        SetPathGoal cell ->
+            ( { model | pathGoal = Just cell, activeMenu = Nothing }, Cmd.none )
+
+        CloseMenu ->
+            ( { model | activeMenu = Nothing }, Cmd.none )
+
+        SetGridWidth val ->
+            ( { model | gridWidth = String.toInt val |> Maybe.withDefault 10 }, Cmd.none )
+
+        SetGridHeight val ->
+            ( { model | gridHeight = String.toInt val |> Maybe.withDefault 6 }, Cmd.none )
+
+        ModeChanged _ ->
+            ( model, Cmd.none )
+
+        NoOp ->
+            ( model, Cmd.none )
+
+
+-- SUBSCRIPTIONS
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Ports.socketStatusReceiver SetConnected
-        , Ports.activeAgentsReceiver UpdateAgents 
-        , Ports.pathCompleteReceiver PlanningResultRaw 
-        , Ports.configReceived ConfigReceived 
+        , Ports.activeAgentsReceiver UpdateAgents
+        , Ports.pathCompleteReceiver PlanningResultRaw
+        , Ports.configReceived ConfigReceived
         , Ports.systemLogReceiver (Decode.decodeValue Decoders.decodeSystemLog >> HandleSystemLog)
         , Ports.rfidReceiver (Decode.decodeValue Decoders.decodeRfid >> HandleRfid)
+        -- NEU: Port für den NFC Hardware-Status abonnieren
+        , Ports.nfcStatusReceiver (Decode.decodeValue Decode.string >> HandleNfcStatus)
         ]
 
+
 -- VIEW
+
+
 view : Model -> Html Msg
 view model =
     div [ class "app-layout" ]
         [ Navbar.view model
         , div [ class "content-area" ]
             [ view3D model
-            , if model.sidebarOpen then Sidebar.view model else text ""
+            , if model.sidebarOpen then
+                Sidebar.view model
+
+              else
+                text ""
             ]
-        , viewActiveMenu model.activeMenu
+        , viewActiveMenu model model.activeMenu
         ]
+
 
 view3D : Model -> Html Msg
 view3D model =
     node "three-grid-scene"
         [ attribute "agents" (model.agents |> Decoders.encodeAgentMap |> Encode.encode 0)
         , attribute "path" (Decoders.encodePath model.currentPath |> Encode.encode 0)
-        , attribute "is-3d" (if model.is3D then "true" else "false")
+        , attribute "is-3d"
+            (if model.is3D then
+                "true"
+
+             else
+                "false"
+            )
         , attribute "grid-width" (String.fromInt model.gridWidth)
         , attribute "grid-height" (String.fromInt model.gridHeight)
-        , attribute "start-pos" (model.pathStart |> Maybe.map (\c -> Encode.object [("x", Encode.int c.x), ("y", Encode.int c.y)]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
-        , attribute "goal-pos" (model.pathGoal |> Maybe.map (\c -> Encode.object [("x", Encode.int c.x), ("y", Encode.int c.y)]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
+        , attribute "start-pos" (model.pathStart |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
+        , attribute "goal-pos" (model.pathGoal |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
         , Html.Events.on "agent-moved" (Decode.map MoveAgent decodeAgentMove)
         , Html.Events.on "cell-clicked" (Decode.map HandleGridClick Decoders.decodeCellClick)
         ]
         []
 
+
 decodeAgentMove : Decode.Decoder { oldX : Int, oldY : Int, newX : Int, newY : Int }
 decodeAgentMove =
-    Decode.at ["detail"] <|
+    Decode.at [ "detail" ] <|
         Decode.map4 (\ox oy nx ny -> { oldX = ox, oldY = oy, newX = nx, newY = ny })
             (Decode.field "oldX" Decode.int)
             (Decode.field "oldY" Decode.int)
             (Decode.field "newX" Decode.int)
             (Decode.field "newY" Decode.int)
 
-viewActiveMenu : Maybe MenuType -> Html Msg
-viewActiveMenu maybeMenu =
+
+viewActiveMenu : Model -> Maybe MenuType -> Html Msg
+viewActiveMenu model maybeMenu = 
     case maybeMenu of
         Just (SelectionMenu cell) ->
             div [ class "modal-overlay" ]
                 [ div [ class "modal-content" ]
-                    [ h3 [] [ text "Agent hinzufügen" ]
-                    , button [ onClick (StartAgent "ftf" cell), class "btn-ftf" ] [ text "🚀 FTF (Transport-Agent)" ]
+                    [ h3 [] [ text "Modul hinzufügen" ]
+                    , button [ onClick (StartAgent "ftf" cell), class "btn-ftf" ] [ text "🚀 FTF (Transport)" ]
                     , button [ onClick (StartAgent "rollen_ns" cell) ] [ text "Rollen Modul" ]
                     , button [ onClick (StartAgent "greifer" cell) ] [ text "Greifer Modul" ]
                     , button [ onClick (StartAgent "tisch" cell) ] [ text "Tisch Modul" ]
@@ -271,18 +435,43 @@ viewActiveMenu maybeMenu =
                     , button [ onClick CloseMenu, class "btn-close" ] [ text "Abbrechen" ]
                     ]
                 ]
+
         Just (SettingsMenu cell agent) ->
+            let
+                aid =
+                    agent.agent_id |> Maybe.withDefault "unnamed"
+
+                ( statusText, statusClass ) =
+                    case model.nfcStatus of  -- JETZT findet Elm das 'model'!
+                        "online" -> ( "Bereit", "nfc-online" )
+                        "missing" -> ( "Hardware fehlt", "nfc-missing" )
+                        _ -> ( "Prüfe...", "nfc-unknown" )
+            in
             div [ class "modal-overlay" ]
                 [ div [ class "modal-content" ]
-                    [ h3 [] [ text ("Modul: " ++ (agent.module_type |> Sidebar.formatType)) ]
-                    , if agent.is_dynamic then p [] [ text "Status: Dynamisches Fahrzeug" ] else text ""
-                    , button [ onClick (RotateAgent cell) ] [ text "Modul drehen (90°)" ]
+                    [ h3 [] [ text (Sidebar.formatType agent.module_type) ]
+                    
+                    , div [ class "nfc-status-container" ]
+                        [ span [ class ("status-dot " ++ statusClass) ] []
+                        , span [ class "nfc-status-text" ] [ text ("NFC-Reader: " ++ statusText) ]
+                        ]
+
+                    , button 
+                        [ onClick (RequestNfcWrite aid)
+                        , class "btn-nfc-write"
+                        , disabled (model.nfcStatus == "missing")
+                        ]
+                        [ text ("ID '" ++ aid ++ "' auf Chip brennen") ]
+                    
                     , hr [] []
+                    , button [ onClick (RotateAgent cell) ] [ text "Drehen (90°)" ]
                     , button [ onClick (SetPathStart cell), class "btn-path-start" ] [ text "Als Start" ]
                     , button [ onClick (SetPathGoal cell), class "btn-path-goal" ] [ text "Als Ziel" ]
                     , hr [] []
-                    , button [ onClick (RemoveAgent cell), class "btn-delete" ] [ text "Modul löschen" ]
+                    , button [ onClick (RemoveAgent cell), class "btn-delete" ] [ text "Löschen" ]
                     , button [ onClick CloseMenu, class "btn-close" ] [ text "Schließen" ]
                     ]
                 ]
-        Nothing -> text ""
+
+        Nothing ->
+            text ""

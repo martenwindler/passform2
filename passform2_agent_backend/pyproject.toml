@@ -12,6 +12,8 @@ dependencies = [
     "setuptools",
     "rclpy",
     "fastapi",
+    "mfrc522", 
+    "spidev",
     "uvicorn",
     "pydantic",
     "pydantic-settings",

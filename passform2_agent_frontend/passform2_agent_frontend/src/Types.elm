@@ -19,9 +19,7 @@ type alias AgentModule =
     , module_type : String
     , position : GridCell
     , orientation : Int
-    -- NEU: Markiert, ob es ein FTF oder ein statisches Modul ist
     , is_dynamic : Bool
-    -- NEU: ID des aktuell transportierten Moduls (falls vorhanden)
     , payload : Maybe String
     }
 
@@ -51,6 +49,9 @@ type alias Model =
     , sidebarOpen : Bool
     , gridWidth : Int
     , gridHeight : Int
+    , waitingForNfc : Bool
+    -- NEU: Trackt den Hardware-Zustand des NFC-Readers ("online", "missing", "unknown")
+    , nfcStatus : String
     }
 
 type Mode = Simulation | Hardware
@@ -91,3 +92,6 @@ type Msg
     | ModeChanged (Result Http.Error ())
     | HandleSystemLog (Result Decode.Error SystemLog)
     | HandleRfid (Result Decode.Error String)
+    -- NEU: Verarbeitet den Hardware-Status vom Backend
+    | HandleNfcStatus (Result Decode.Error String)
+    | RequestNfcWrite String

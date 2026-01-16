@@ -11,19 +11,32 @@ view model =
     aside [ class "sidebar" ]
         [ h2 [] [ text "Gitter-Konfiguration" ]
         
-        -- 1. System-Logs (Ganz oben)
+        -- 1. System-Logs
         , div [ class "sidebar-section log-section" ]
-            [ h3 [] [ text "System-Logs" ]
-            , div [ class "log-container" ]
+            [ h3 [] [ text "System-Meldungen" ]
+            , div [ id "log-container", class "log-container" ]
                 (List.map (\log -> 
                     div [ class ("log-entry " ++ log.level) ] 
-                        [ text log.message ]
+                        [ span [ class "log-dot" ] []
+                        , text log.message 
+                        ]
                 ) model.logs)
             ]
 
-        -- 2. Gitter-Einstellungen (50/50 Layout)
+        -- NEU: NFC Warte-Indikator (Erscheint nur während des Schreibvorgangs)
+        , if model.waitingForNfc then
+            div [ class "sidebar-section nfc-wait-section" ]
+                [ div [ class "nfc-wait-indicator" ]
+                    [ div [ class "pulse-ring" ] []
+                    , span [] [ text "Bitte Chip an den Reader halten (5s)..." ]
+                    ]
+                ]
+          else
+            text ""
+
+        -- 2. Gitter-Einstellungen
         , div [ class "sidebar-section" ]
-            [ h3 [] [ text "Dimensionen" ]
+            [ h3 [] [ text "Gitter-Dimensionen" ]
             , div [ class "input-row" ] 
                 [ div [ class "input-group" ]
                     [ label [] [ text "Breite:" ]
@@ -36,41 +49,40 @@ view model =
                 ]
             ]
 
-        -- 3. Aktionen (Wieder hinzugefügt für Import/Export/Reset)
+        -- 3. Globale Aktionen
         , div [ class "sidebar-section" ]
             [ h3 [] [ text "Aktionen" ]
             , div [ class "sidebar-actions-grid" ]
                 [ button [ class "btn-secondary", onClick LoadDefaultConfig ] [ text "Standard laden" ]
-                , button [ class "btn-primary", onClick SetCurrentAsDefault ] [ text "Standard setzen" ]
+                , button [ class "btn-primary", onClick SetCurrentAsDefault ] [ text "Layout speichern" ]
                 , button [ class "btn-secondary", onClick ExportConfig ] [ text "Export JSON" ]
                 , button [ class "btn-secondary", onClick ImportConfigTrigger ] [ text "Import JSON" ]
                 , button [ class "btn-danger", onClick ClearGrid ] [ text "Gitter leeren" ]
                 ]
             ]
 
-        -- 4. Liste der Agenten
+        -- 4. Liste der aktiven Module
         , div [ class "sidebar-section" ]
-            [ h3 [] [ text ("Module (" ++ String.fromInt (Dict.size model.agents) ++ ")") ]
+            [ h3 [] [ text ("Aktive Module (" ++ String.fromInt (Dict.size model.agents) ++ ")") ]
             , if Dict.isEmpty model.agents then
-                p [ class "sidebar-hint" ] [ text "Gitter ist leer." ]
+                p [ class "sidebar-hint" ] [ text "Keine Module im Gitter." ]
               else
                 ul [ class "agent-list" ] 
-                    (model.agents |> Dict.values |> List.map viewAgentItem)
+                    (model.agents |> Dict.values |> List.sortBy .module_type |> List.map viewAgentItem)
             ]
 
-        -- 5. Pfadplanung Status
-        , div [ class "sidebar-section" ]
-            [ h3 [] [ text "Pfadplanung" ]
-            , viewCoordinateStatus "Start" model.pathStart
-            , viewCoordinateStatus "Ziel" model.pathGoal
+        -- 5. Missions-Status & Planung
+        , div [ class "sidebar-section mission-section" ]
+            [ h3 [] [ text "Missions-Planung" ]
+            , viewCoordinateStatus "📦 Start" model.pathStart
+            , viewCoordinateStatus "🏁 Ziel" model.pathGoal
             
-            -- Dynamisches Feedback
             , if model.loading then
                 div [ class "planning-status-box" ]
-                    [ div [ class "spinner" ] [] -- CSS Spinner
-                    , span [] [ text "Berechnung läuft..." ]
+                    [ div [ class "spinner" ] []
+                    , span [] [ text "Berechne Mission..." ]
                     ]
-            else
+              else
                 text ""
 
             , button 
@@ -78,7 +90,7 @@ view model =
                 , onClick (StartPlanning False)
                 , disabled (not (canPlan model) || model.loading)
                 ] 
-                [ text (if model.loading then "Warten..." else "Pfad berechnen") ]
+                [ text (if model.loading then "Warten..." else "Mission starten") ]
             ]
         ]
 
@@ -86,11 +98,23 @@ view model =
 
 viewAgentItem : AgentModule -> Html Msg
 viewAgentItem agent =
-    li [ class "agent-item" ]
+    li [ class ("agent-item " ++ (if agent.is_dynamic then "dynamic-agent" else "static-agent")) ]
         [ div [ class "agent-info" ]
-            [ span [ class "agent-label" ] [ text (formatType agent.module_type) ]
+            [ div [ class "agent-header" ] 
+                [ span [ class "agent-label" ] [ text (formatType agent.module_type) ]
+                , if agent.is_dynamic then 
+                    span [ class "badge dynamic" ] [ text "Mobil" ]
+                  else 
+                    text ""
+                ]
             , span [ class "agent-coords" ] 
                 [ text ("(" ++ String.fromInt agent.position.x ++ "," ++ String.fromInt agent.position.y ++ ") | " ++ String.fromInt agent.orientation ++ "°") ]
+            
+            , case agent.payload of
+                Just pId -> 
+                    div [ class "agent-payload" ] [ text ("📦 Trägt: " ++ pId) ]
+                Nothing -> 
+                    text ""
             ]
         , button [ class "btn-icon-delete", onClick (RemoveAgent agent.position) ] [ text "×" ]
         ]
@@ -98,9 +122,10 @@ viewAgentItem agent =
 formatType : String -> String
 formatType t =
     case t of
+        "ftf" -> "Transport-Agent (FTF)"
         "rollen_ns" -> "Rollen-Modul"
-        "greifer" -> "Greifer"
-        "tisch" -> "Tisch"
+        "greifer" -> "Greifer-Einheit"
+        "tisch" -> "Arbeitstisch"
         "conveyeur" -> "Förderband"
         _ -> t
 

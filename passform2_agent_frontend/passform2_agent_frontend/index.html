@@ -486,6 +486,56 @@
             margin-bottom: 10px;
             display: inline-block;
         }
+
+        .btn-nfc-write {
+            background-color: #ed8936 !important; /* Orange */
+            color: white !important;
+            font-weight: bold;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            cursor: pointer;
+        }
+
+        .btn-nfc-write:hover {
+            background-color: #dd6b20 !important;
+        }
+
+        .nfc-status-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 0.9em;
+            background: rgba(0, 0, 0, 0.05);
+            padding: 6px;
+            border-radius: 4px;
+        }
+
+        .nfc-status-text {
+            color: #4a5568;
+        }
+
+        /* Der Status-Punkt */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.nfc-online { background-color: #48bb78; box-shadow: 0 0 5px #48bb78; }
+        .status-dot.nfc-missing { background-color: #f56565; }
+        .status-dot.nfc-unknown { background-color: #a0aec0; }
+
+        /* Deaktivierter Button Style */
+        .btn-nfc-write:disabled {
+            background-color: #cbd5e0;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
     </style>
 </head>
 <body>

@@ -7,7 +7,6 @@ import './src/ThreeGridScene'; // Registriert die Web Component
 const savedConfig = localStorage.getItem('p2_agent_config');
 const defaultBackend = 'http://localhost:8000';
 
-// Falls noch "5000" im Speicher steht, überschreiben wir es mit dem Standard
 let backendIP = localStorage.getItem('p2_backend_ip') || defaultBackend;
 if (backendIP.includes(":5000")) {
     backendIP = defaultBackend;
@@ -25,7 +24,6 @@ let socket: Socket | null = null;
 
 // --- HILFSFUNKTIONEN FÜR STABILITÄT ---
 
-// Elm -> JS: Sicherstellen, dass der Port existiert, bevor wir ihn abonnieren
 const subscribeSafe = (portName: string, callback: (data: any) => void) => {
     const port = (app.ports as any)[portName];
     if (port && port.subscribe) {
@@ -35,27 +33,27 @@ const subscribeSafe = (portName: string, callback: (data: any) => void) => {
     }
 };
 
-// JS -> Elm: Sicherstellen, dass der Port existiert, bevor wir Daten senden
 const sendSafe = (portName: string, data: any) => {
     const port = (app.ports as any)[portName];
     if (port && port.send) {
         port.send(data);
     } else {
-        console.warn(`📩 Incoming Port '${portName}' ist in Elm nicht aktiv. Daten verworfen.`);
+        console.warn(`📩 Incoming Port '${portName}' ist in Elm nicht aktiv.`);
     }
 };
 
-// --- OUTGOING PORTS (Elm -> JS) ---
+// --- BACKEND VERBINDUNG & SOCKET LOGIK ---
 
 subscribeSafe('connectToBackend', (url: string) => {
     if (socket) {
         socket.disconnect();
     }
     
-    console.log("Versuche Verbindung zu:", url);
+    console.log("🔗 Verbinde zu Backend:", url);
     localStorage.setItem('p2_backend_ip', url);
     socket = io(url);
 
+    // Verbindungsevents
     socket.on('connect', () => {
         console.log("✅ Socket.IO verbunden");
         sendSafe('socketStatusReceiver', true);
@@ -73,13 +71,7 @@ subscribeSafe('connectToBackend', (url: string) => {
     // --- INCOMING DATA (Socket -> Elm) ---
 
     socket.on('active_agents', (data) => {
-        console.log("🤖 Daten werden an Elm gesendet...");
-        
-        if (app.ports.activeAgentsReceiver) {
-            app.ports.activeAgentsReceiver.send(data);
-        } else {
-            console.error("❌ Port 'activeAgentsReceiver' wurde in Elm nicht gefunden!");
-        }
+        sendSafe('activeAgentsReceiver', data);
     });
 
     socket.on('path_complete', (data: any) => {
@@ -91,13 +83,19 @@ subscribeSafe('connectToBackend', (url: string) => {
         sendSafe('systemLogReceiver', data);
     });
 
-    socket.on('rfid_scanned', (data: any) => {
-        console.log("🎴 RFID Scan:", data);
+    socket.on('rfid_found', (data: string) => {
+        console.log("🎴 RFID Scan erkannt:", data);
         sendSafe('rfidReceiver', data);
+    });
+
+    // NEU: Empfängt den Hardware-Status ("online" / "missing")
+    socket.on('nfc_status', (data: any) => {
+        console.log("📡 NFC Hardware Status:", data.status);
+        sendSafe('nfcStatusReceiver', data.status);
     });
 });
 
-// --- STEUERUNGS-PORTS ---
+// --- STEUERUNGS-PORTS (Elm -> JS -> Backend) ---
 
 subscribeSafe('setMode', (mode: string) => {
     if (socket?.connected) {
@@ -116,11 +114,24 @@ subscribeSafe('triggerPlanning', (payload: any) => {
     }
 });
 
+subscribeSafe('writeNfcTrigger', (text: string) => {
+    if (socket?.connected) {
+        console.log("📤 Sende Schreibbefehl für NFC:", text);
+        socket.emit('write_nfc', { text: text });
+    } else {
+        sendSafe('systemLogReceiver', { 
+            message: "NFC-Schreiben nicht möglich: Keine Socket-Verbindung.", 
+            level: "error" 
+        });
+    }
+});
+
+// --- LOKALE DATEN-VERWALTUNG ---
+
 subscribeSafe('saveToLocalStorage', (jsonString: string) => {
     localStorage.setItem('p2_agent_config', jsonString);
 });
 
-// Datei Export
 subscribeSafe('exportConfig', (jsonString: string) => {
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -131,7 +142,7 @@ subscribeSafe('exportConfig', (jsonString: string) => {
     URL.revokeObjectURL(url);
 });
 
-// Datei Import
+// Name korrigiert passend zu Main.elm: importConfigTrigger
 subscribeSafe('importConfigTrigger', () => {
     const input = document.createElement('input');
     input.type = 'file';
