@@ -2,6 +2,8 @@
 
 ROS2 ecosystem managing RFID events, heartbeats, system states, Raspberry Pi clusters.
 
+## Software
+
 ```text
 passform2/
 ├── passform2_agent_backend/  # FastAPI Orchestrator
@@ -41,6 +43,8 @@ Build all.
 make start-all
 ```
 
-tbc/tbd.
-
+## Hardware
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/818f071a-f960-4b0f-81d4-465de21fc4ed" alt="IMG_1196" width="350">
+</p>
 
