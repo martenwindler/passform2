@@ -134,40 +134,97 @@ export class ThreeGridScene extends HTMLElement {
 
     // Aktualisiert die Agenten-Meshes und deren Rotation
     private updateAgents(agents: any[]) {
-        const toRemove = new Set(this.agentMeshes.keys());
+        // Wir nutzen jetzt die agent_id als Key für eine flüssige Bewegung
+        const currentIds = new Set(agents.map(a => a.agent_id));
+        const toRemove = new Set([...this.agentMeshes.keys()].filter(id => !currentIds.has(id)));
+
         agents.forEach(agent => {
-            const key = `${agent.position.x}_${agent.position.y}`;
-            toRemove.delete(key);
-            let mesh = this.agentMeshes.get(key);
+            const id = agent.agent_id;
+            let mesh = this.agentMeshes.get(id);
+
             if (!mesh) {
-                mesh = this.createAgentMesh(agent.module_type);
+                mesh = this.createAgentMesh(agent.module_type, agent.is_dynamic);
                 this.scene.add(mesh);
-                this.agentMeshes.set(key, mesh);
+                this.agentMeshes.set(id, mesh);
             }
-            mesh.position.set(agent.position.x + 0.5, 0.2, agent.position.y + 0.5);
+
+            // Zielposition setzen
+            const targetX = agent.position.x + 0.5;
+            const targetZ = agent.position.y + 0.5;
+
+            // Einfaches "Sliding" für dynamische Agenten (FTF)
+            if (agent.is_dynamic) {
+                mesh.position.lerp(new THREE.Vector3(targetX, 0.1, targetZ), 0.1);
+            } else {
+                mesh.position.set(targetX, 0.2, targetZ);
+            }
+            
             mesh.rotation.y = (agent.orientation || 0) * (Math.PI / 180);
+            
+            // Visualisierung der Beladung (Payload)
+            if (agent.payload) {
+                mesh.scale.set(1.1, 1.2, 1.1); // FTF "plustert" sich auf, wenn es trägt
+            } else {
+                mesh.scale.set(1, 1, 1);
+            }
         });
-        toRemove.forEach(key => {
-            const mesh = this.agentMeshes.get(key);
-            if (mesh) { this.scene.remove(mesh); this.agentMeshes.delete(key); }
+
+        // Verschwundene Agenten löschen
+        toRemove.forEach(id => {
+            const mesh = this.agentMeshes.get(id);
+            if (mesh) { this.scene.remove(mesh); this.agentMeshes.delete(id); }
         });
     }
 
-    private createAgentMesh(type: string): THREE.Object3D {
+    private createAgentMesh(type: string, isDynamic: boolean): THREE.Object3D {
+        if (isDynamic || type === 'ftf') {
+            // Das FTF als flache, gelbe "Flunder"
+            const group = new THREE.Group();
+            const bodyGeo = new THREE.BoxGeometry(0.7, 0.1, 0.8);
+            const bodyMat = new THREE.MeshPhongMaterial({ color: 0xffd700, emissive: 0x443300 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            
+            // Kleine "Augen" oder Sensoren für die Fahrtrichtung
+            const eyeGeo = new THREE.BoxGeometry(0.1, 0.05, 0.1);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const eye = new THREE.Mesh(eyeGeo, eyeMat);
+            eye.position.set(0, 0.05, 0.35);
+            
+            group.add(body);
+            group.add(eye);
+            return group;
+        }
+
+        // Statische Module (unverändert, aber optimiert)
         let geo, col;
         if (type.includes('rollen')) { geo = new THREE.BoxGeometry(0.85, 0.15, 0.85); col = 0x3182ce; }
         else if (type === 'greifer') { geo = new THREE.CylinderGeometry(0.35, 0.35, 0.6, 16); col = 0xed8936; }
         else if (type === 'conveyeur') { geo = new THREE.BoxGeometry(0.9, 0.1, 0.9); col = 0x38a169; }
         else { geo = new THREE.BoxGeometry(0.95, 0.3, 0.95); col = 0x718096; }
+        
         return new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: col }));
     }
 
+    // Pfad-Zeichnung: Jetzt mit Leucht-Effekt für die Mission
     private drawPath(pathNodes: any[]) {
-        if (this.pathLine) { this.scene.remove(this.pathLine); this.pathLine.geometry.dispose(); this.pathLine = null; }
+        if (this.pathLine) { this.scene.remove(this.pathLine); this.pathLine.geometry.dispose(); }
         if (!pathNodes || pathNodes.length < 2) return;
-        const points = pathNodes.map(n => new THREE.Vector3(n.position.x + 0.5, 0.15, n.position.y + 0.5));
+
+        const points = pathNodes.map(n => {
+            // Wir nutzen n.position (für Sim) oder n direkt (Fallback)
+            const pos = n.position || n;
+            return new THREE.Vector3(pos.x + 0.5, 0.12, pos.y + 0.5);
+        });
+
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        this.pathLine = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 4 }));
+        const material = new THREE.LineBasicMaterial({ 
+            color: 0x00f2ff, // Neon-Blau für Missionen
+            linewidth: 3,
+            transparent: true,
+            opacity: 0.8
+        });
+
+        this.pathLine = new THREE.Line(geometry, material);
         this.scene.add(this.pathLine);
     }
 

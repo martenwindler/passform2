@@ -455,6 +455,37 @@
             background-color: rgba(66, 153, 225, 0.5); /* Blaues Leuchten */
             border: 2px solid #63b3ed;
         }
+
+        /* Spezifisches Styling für den FTF-Button im Modal */
+        .btn-ftf {
+            background-color: #f6e05e !important; /* Gelb (FTF-Farbe) */
+            color: #2d3748 !important;            /* Dunkelgrauer Text für Kontrast */
+            font-weight: bold;
+            border: 2px solid #ecc94b;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .btn-ftf:hover {
+            background-color: #ecc94b !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-ftf:active {
+            transform: translateY(0);
+        }
+
+        /* Ergänzung für die Status-Anzeige im Settings-Menü */
+        .modal-content p {
+            font-size: 0.9rem;
+            color: #4a5568;
+            background: #edf2f7;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>

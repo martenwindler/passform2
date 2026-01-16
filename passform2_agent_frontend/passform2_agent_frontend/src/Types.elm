@@ -9,7 +9,6 @@ import Json.Decode as Decode
 type alias GridCell = 
     { x : Int, y : Int }
 
--- NEU: SystemLog definieren, da Main.elm danach sucht
 type alias SystemLog =
     { message : String
     , level : String
@@ -20,6 +19,10 @@ type alias AgentModule =
     , module_type : String
     , position : GridCell
     , orientation : Int
+    -- NEU: Markiert, ob es ein FTF oder ein statisches Modul ist
+    , is_dynamic : Bool
+    -- NEU: ID des aktuell transportierten Moduls (falls vorhanden)
+    , payload : Maybe String
     }
 
 type alias Path =
@@ -36,7 +39,7 @@ type alias Model =
     , connected : Bool
     , agents : Dict (Int, Int) AgentModule
     , savedDefault : Dict (Int, Int) AgentModule
-    , logs : List SystemLog  -- GEÄNDERT: Von String zu SystemLog
+    , logs : List SystemLog 
     , pathStart : Maybe GridCell
     , pathGoal : Maybe GridCell
     , currentPath : Maybe Path

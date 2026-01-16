@@ -1,5 +1,6 @@
 import subprocess
 import logging
+import asyncio
 from typing import Dict, List, Optional, Any, Tuple
 
 from passform_agent_msgs.msg import AgentInfo
@@ -12,62 +13,37 @@ from app.config import config, SystemMode
 logger = logging.getLogger("agent_manager")
 
 class AgentEntry:
-    """Bündelt alle Informationen eines Agenten (ROS-Status + Prozess-Handle)."""
-    
     def __init__(self, agent_id: str, module_type: str, x: int = 0, y: int = 0):
         self.agent_id = agent_id
         self.module_type = module_type
         self.x = x
         self.y = y
         self.orientation = 0.0
-        self.status = "initializing"
+        self.status = "idle"
+        self.is_dynamic = (module_type.lower() == "ftf")
+        self.payload: Optional[Dict] = None # Jetzt speichern wir das ganze Agent-Dict als Payload
         self.process: Optional[subprocess.Popen] = None
-        self.ros_info: Optional[Dict] = None
 
     def update_from_ros(self, agent_info: AgentInfo):
-        """Extrahiert Daten aus der ROS-Struktur."""
-        try:
-            self.ros_info = message_to_ordereddict(agent_info)
-            self.x = int(agent_info.position.x)
-            self.y = int(agent_info.position.y)
-            self.orientation = float(agent_info.orientation)
-            self.status = "active"
-            logger.info(f"📡 Agent {self.agent_id} updated: ({self.x},{self.y}) @ {self.orientation}°")
-        except AttributeError as e:
-            logger.error(f"Strukturfehler in ROS-Message für {self.agent_id}: {e}")
-
-    def update_manually(self, data: Dict[str, Any]):
-        """Update für Simulation / manuelle Steuerung."""
-        self.x = int(data.get("x", self.x))
-        self.y = int(data.get("y", self.y))
-        self.module_type = data.get("module_type", self.module_type)
-        self.orientation = float(data.get("orientation", self.orientation))
-        self.status = data.get("status", "simulated")
+        self.x = int(agent_info.position.x)
+        self.y = int(agent_info.position.y)
+        self.orientation = float(agent_info.orientation)
+        self.status = "active"
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Erzeugt das JSON-Format, das exakt zum Elm-Decoder passt.
-        Struktur: { "agent_id": "...", "position": {"x": 1, "y": 2}, ... }
-        """
         return {
             "agent_id": str(self.agent_id),
             "module_type": str(self.module_type),
-            "position": {
-                "x": int(self.x),
-                "y": int(self.y)
-            },
-            # Wir behalten x und y flach für den Planer bei, 
-            # aber position ist für Elm entscheidend
+            "is_dynamic": self.is_dynamic,
+            "payload": self.payload.get("agent_id") if self.payload else None,
+            "position": {"x": int(self.x), "y": int(self.y)},
             "x": int(self.x),
             "y": int(self.y),
             "orientation": int(self.orientation),
             "status": str(self.status)
         }
 
-
 class AgentManager:
-    """Zentrale Instanz zur Verwaltung aller aktiven Agenten (Singleton)."""
-    
     _instance = None
 
     def __new__(cls):
@@ -76,76 +52,67 @@ class AgentManager:
             cls._instance.agents: Dict[str, AgentEntry] = {}
             cls._instance.logs_history: List[Dict[str, str]] = []
             cls._instance.max_logs = 30
-            logger.info("AgentManager Singleton initialisiert.")
         return cls._instance
 
-    def sync_from_ros(self, agent_info: AgentInfo):
-        """Zentraler Einstiegspunkt für ROS-Heartbeats."""
-        aid = agent_info.agent_id
-        
-        if aid not in self.agents:
-            self.agents[aid] = AgentEntry(aid, agent_info.module_type)
-            self.log_to_system(f"Neuer Agent erkannt: {aid}", "success")
+    # --- MISSIONS-ABARBEITUNG ---
+    async def execute_mission(self, ftf_id: str, full_path: List[Dict], start_pos: Tuple[int, int], goal_pos: Tuple[int, int]):
+        """Simuliert die Fahrt des FTF und das Handling des Moduls."""
+        ftf = self.agents.get(ftf_id)
+        if not ftf: return
 
-        self.agents[aid].update_from_ros(agent_info)
-        self.send_agent_list()
+        self.log_to_system(f"FTF {ftf_id} startet Mission...", "info")
 
-    def update_agent_manually(self, agent_id: str, data: Dict[str, Any]):
-        """Schnittstelle für Simulator / API-Updates."""
-        if agent_id not in self.agents:
-            self.agents[agent_id] = AgentEntry(
-                agent_id, 
-                data.get("module_type", "unknown"),
-                x=data.get("x", 0),
-                y=data.get("y", 0)
-            )
-        
-        self.agents[agent_id].update_manually(data)
+        for i, node in enumerate(full_path):
+            # 1. Position aktualisieren
+            ftf.x = node.get("x")
+            ftf.y = node.get("y")
+            ftf.status = "moving"
+            
+            # 2. Pickup-Logik: Wenn wir am Startpunkt ankommen
+            if (ftf.x, ftf.y) == start_pos and not ftf.payload:
+                # Wir suchen das statische Modul an dieser Stelle
+                target_agent_id = None
+                for aid, a in self.agents.items():
+                    if not a.is_dynamic and (a.x, a.y) == start_pos:
+                        target_agent_id = aid
+                        break
+                
+                if target_agent_id:
+                    self.log_to_system(f"📦 Modul {target_agent_id} aufgenommen.", "success")
+                    ftf.payload = self.agents.pop(target_agent_id).to_dict()
+            
+            # 3. Drop-Logik: Wenn wir am Zielpunkt ankommen
+            if (ftf.x, ftf.y) == goal_pos and ftf.payload:
+                payload_data = ftf.payload
+                new_id = payload_data["agent_id"]
+                self.agents[new_id] = AgentEntry(new_id, payload_data["module_type"], ftf.x, ftf.y)
+                ftf.payload = None
+                self.log_to_system(f"✅ Modul an Ziel {goal_pos} abgesetzt.", "success")
+
+            # Update an alle Clients senden
+            self.send_agent_list()
+            await asyncio.sleep(0.8) # Geschwindigkeit der Simulation
+
+        ftf.status = "idle"
         self.send_agent_list()
+        self.log_to_system("Mission abgeschlossen.", "success")
 
     def get_grid_model(self) -> Dict[Tuple[int, int], Dict]:
-        """Gibt das aktuelle Weltmodell als Koordinaten-Dict zurück."""
         return {(a.x, a.y): a.to_dict() for a in self.agents.values()}
 
     def send_agent_list(self):
-        """Synchronisiert Backend-Status mit Persistence und Frontend."""
-        current_mode = config.get_current_mode()
         agents_data = [a.to_dict() for a in self.agents.values()]
-        
-        # Per WebSocket an Elm senden
         socket_manager.emit_event_sync('active_agents', {'agents': agents_data})
-        
-        # Nur im Hardware-Modus persistent speichern (Verhindert Ghosting in Simulation)
-        if current_mode == SystemMode.HARDWARE:
-            persistence_manager.save_state(agents_data)
-
-    def remove_agent(self, agent_id: str):
-        """Entfernt einen Agenten und beendet ggf. den Prozess."""
-        if agent_id in self.agents:
-            entry = self.agents.pop(agent_id)
-            if entry.process and entry.process.poll() is None:
-                entry.process.terminate()
-            self.send_agent_list()
-
-    def clear_all_agents(self):
-        """Löscht alle Agenten (Reset für Hardware-Wechsel)."""
-        self.agents.clear()
-        logger.info("Sämtliche Agenten aus dem Manager entfernt.")
-        self.send_agent_list()
 
     def log_to_system(self, message: str, level: str = "info"):
-        """Speichert Logs im Buffer und sendet sie an Elm."""
         log_entry = {"message": message, "level": level}
         self.logs_history.append(log_entry)
-        
-        if len(self.logs_history) > self.max_logs:
-            self.logs_history.pop(0)
-            
         socket_manager.emit_event_sync('system_log', log_entry)
 
-    def get_logs_history(self) -> List[Dict[str, str]]:
-        """Gibt die gespeicherten Logs zurück."""
-        return self.logs_history
+    def get_logs_history(self): return self.logs_history
 
-# Singleton Instanz
+    def clear_all_agents(self):
+        self.agents.clear()
+        self.send_agent_list()
+
 agent_manager = AgentManager()

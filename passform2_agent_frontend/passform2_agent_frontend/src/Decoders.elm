@@ -1,6 +1,6 @@
 module Decoders exposing (..)
 
-import Json.Decode as Decode exposing (Decoder, field, int, string, list, maybe, float)
+import Json.Decode as Decode exposing (Decoder, field, int, string, list, maybe, float, bool)
 import Json.Encode as Encode
 import Dict exposing (Dict)
 import Types exposing (..)
@@ -20,49 +20,33 @@ decodeRfid =
         , string 
         ]
 
-
 -- --- AGENT DECODERS (JSON -> Elm) ---
 
--- Liest x und y aus dem aktuellen Kontext
 gridCellDecoder : Decoder GridCell
 gridCellDecoder =
     Decode.map2 GridCell
         (field "x" int)
         (field "y" int)
 
--- --- AGENT DECODERS (JSON -> Elm) ---
+andMap : Decoder a -> Decoder (a -> b) -> Decoder b
+andMap decoderA decoderFunction =
+    Decode.map2 (\value function -> function value) decoderA decoderFunction
 
--- KORREKTUR: Wir lesen orientation als float (sicherer) und runden dann
 agentModuleDecoder : Decoder AgentModule
 agentModuleDecoder =
-    Decode.map4 AgentModule
-        (field "agent_id" (maybe string))
-        (field "module_type" string)
-        gridCellDecoder
-        -- Wir erzwingen hier die Umwandlung, egal ob Python Int oder Float schickt
-        (Decode.oneOf 
-            [ field "orientation" int
-            , field "orientation" float |> Decode.map round
-            , Decode.succeed 0 
-            ]
-        )
-
--- KORREKTUR: Die Hilfsfunktion für den Port/Update muss den richtigen Decoder nutzen!
-decodeIncomingAgents : Decode.Value -> Msg
-decodeIncomingAgents jsonValue =
-    -- Wir nutzen hier den agentMapDecoder, da er das {"agents": [...]} Format beherrscht
-    -- und direkt das fertige Dict für dein Model liefert.
-    case Decode.decodeValue agentMapDecoder jsonValue of
-        Ok agentsDict ->
-            -- WICHTIG: Deine Msg in Types.elm muss dieses Dict aufnehmen können!
-            -- Falls UpdateAgents nur Decode.Value nimmt, musst du dies in der Main.elm handeln.
-            UpdateAgents jsonValue 
-
-        Err err ->
-            let
-                _ = Debug.log "ELM DECODER ERROR" (Decode.errorToString err)
-            in
-            NoOp
+    Decode.succeed AgentModule
+        |> andMap (field "agent_id" (maybe string))
+        |> andMap (field "module_type" string)
+        |> andMap (field "position" gridCellDecoder)
+        |> andMap 
+            (Decode.oneOf 
+                [ field "orientation" int
+                , field "orientation" float |> Decode.map round
+                , Decode.succeed 0 
+                ]
+            )
+        |> andMap (Decode.oneOf [ field "is_dynamic" bool, Decode.succeed False ])
+        |> andMap (Decode.oneOf [ field "payload" (maybe string), Decode.succeed Nothing ])
 
 -- Erwartet das Objekt {"agents": [...]}
 agentMapDecoder : Decoder (Dict (Int, Int) AgentModule)
@@ -115,6 +99,12 @@ encodeAgentModule agent =
                 ] 
           )
         , ( "orientation", Encode.int agent.orientation )
+        , ( "is_dynamic", Encode.bool agent.is_dynamic )
+        , ( "payload"
+          , case agent.payload of
+                Just p -> Encode.string p
+                Nothing -> Encode.null
+          )
         ]
 
 encodePath : Maybe Path -> Encode.Value

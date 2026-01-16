@@ -29,14 +29,10 @@ main =
 defaultAgents : Dict (Int, Int) AgentModule
 defaultAgents =
     Dict.fromList
-        [ ((3, 4), { agent_id = Just "Tisch-1", module_type = "tisch", position = {x=3, y=4}, orientation = 0 })
-        , ((3, 5), { agent_id = Just "Greifer-1", module_type = "greifer", position = {x=3, y=5}, orientation = 0 })
-        , ((4, 4), { agent_id = Just "Tisch-2", module_type = "tisch", position = {x=4, y=4}, orientation = 0 })
-        , ((4, 5), { agent_id = Just "Tisch-3", module_type = "tisch", position = {x=4, y=5}, orientation = 0 })
-        , ((5, 4), { agent_id = Just "Tisch-4", module_type = "tisch", position = {x=5, y=4}, orientation = 0 })
-        , ((5, 5), { agent_id = Just "Rollen-1", module_type = "rollen_ns", position = {x=5, y=5}, orientation = 0 })
-        , ((6, 4), { agent_id = Just "Tisch-5", module_type = "tisch", position = {x=6, y=4}, orientation = 0 })
-        , ((6, 5), { agent_id = Just "Conveyeur-1", module_type = "conveyeur", position = {x=6, y=5}, orientation = 0 })
+        [ ((3, 4), { agent_id = Just "Tisch-1", module_type = "tisch", position = {x=3, y=4}, orientation = 0, is_dynamic = False, payload = Nothing })
+        , ((3, 5), { agent_id = Just "Greifer-1", module_type = "greifer", position = {x=3, y=5}, orientation = 0, is_dynamic = False, payload = Nothing })
+        , ((4, 4), { agent_id = Just "Tisch-2", module_type = "tisch", position = {x=4, y=4}, orientation = 0, is_dynamic = False, payload = Nothing })
+        , ((2, 2), { agent_id = Just "FTF-1", module_type = "ftf", position = {x=2, y=2}, orientation = 0, is_dynamic = True, payload = Nothing })
         ]
 
 -- INIT
@@ -104,8 +100,16 @@ update msg model =
 
         StartAgent moduleType cell ->
             let
-                newId = (String.fromInt cell.x) ++ "-" ++ (String.fromInt cell.y)
-                newAgent = { agent_id = Just newId, module_type = moduleType, position = cell, orientation = 0 }
+                newId = moduleType ++ "-" ++ (String.fromInt cell.x) ++ (String.fromInt cell.y)
+                isFtf = (moduleType == "ftf")
+                newAgent = 
+                    { agent_id = Just newId
+                    , module_type = moduleType
+                    , position = cell
+                    , orientation = 0
+                    , is_dynamic = isFtf
+                    , payload = Nothing 
+                    }
             in
             ( { model | agents = Dict.insert (cell.x, cell.y) newAgent model.agents, activeMenu = Nothing, currentPath = Nothing }, Cmd.none )
 
@@ -140,83 +144,54 @@ update msg model =
                                 , ( "agents", Decoders.encodeAgentMap model.agents )
                                 ]
                     in
-                    ( { model | loading = True, logs = { message = "Pfadplanung gestartet...", level = "info" } :: model.logs }
+                    ( { model | loading = True, logs = { message = "Missionsberechnung gestartet...", level = "info" } :: model.logs }
                     , Ports.triggerPlanning payload 
                     )
                 _ -> ( model, Cmd.none )
 
         PlanningResultRaw rawJson ->
             case Decode.decodeValue Decoders.pathDecoder rawJson of 
-                Ok path -> ( { model | currentPath = Just path, loading = False, logs = { message = "Pfad erfolgreich berechnet.", level = "success" } :: model.logs }, Cmd.none )
-                Err _ -> ( { model | loading = False, logs = { message = "Fehler bei Pfadberechnung.", level = "warning" } :: model.logs }, Cmd.none )
+                Ok path -> ( { model | currentPath = Just path, loading = False, logs = { message = "Mission erfolgreich geplant.", level = "success" } :: model.logs }, Cmd.none )
+                Err _ -> ( { model | loading = False, logs = { message = "Fehler bei Missionsplanung.", level = "warning" } :: model.logs }, Cmd.none )
 
-        -- AGENTEN LIVE-UPDATE (Vom Backend/ROS)
+        -- AGENTEN LIVE-UPDATE
         UpdateAgents rawJson ->
             case model.mode of
                 Hardware ->
                     case Decode.decodeValue Decoders.agentMapDecoder rawJson of
-                        Ok newAgentsDict ->
-                            ( { model | agents = newAgentsDict }, Cmd.none )
-                        Err _ ->
-                            ( model, Cmd.none )
+                        Ok newAgentsDict -> ( { model | agents = newAgentsDict }, Cmd.none )
+                        Err _ -> ( model, Cmd.none )
+                Simulation -> ( model, Cmd.none )
 
-                Simulation ->
-                    ( model, Cmd.none )
+        SetConnected status -> ( { model | connected = status }, Cmd.none )
 
-        -- Die Verbindung zum Backend (Nur einmal!)
-        SetConnected status ->
-            ( { model | connected = status }, Cmd.none )
-
-        -- SYSTEM-LOGS
         HandleSystemLog result ->
             case result of
-                Ok logEntry ->
-                    ( { model | logs = List.take 20 (logEntry :: model.logs) }, Cmd.none )
-                Err err ->
-                    ( model, Cmd.none )
+                Ok logEntry -> ( { model | logs = List.take 20 (logEntry :: model.logs) }, Cmd.none )
+                Err _ -> ( model, Cmd.none )
 
-        -- RFID SCANS
         HandleRfid result ->
             case result of
-                Ok rfidId ->
-                    let
-                        newLog = { message = "RFID Scan: " ++ rfidId, level = "success" }
-                    in
-                    ( { model | logs = List.take 20 (newLog :: model.logs) }, Cmd.none )
-                Err _ ->
-                    ( model, Cmd.none )
+                Ok rfidId -> ( { model | logs = { message = "RFID Scan: " ++ rfidId, level = "success" } :: model.logs }, Cmd.none )
+                Err _ -> ( model, Cmd.none )
 
-        -- MODUS WECHSEL
         ToggleMode ->
             let
                 newMode = if model.mode == Simulation then Hardware else Simulation
                 modeStr = if newMode == Simulation then "simulation" else "hardware"
-                
                 ( updatedAgents, logEntry ) =
                     if newMode == Simulation then
-                        ( model.savedDefault
-                        , { message = "Wechsel zu Simulation: Standard geladen.", level = "info" }
-                        )
+                        ( model.savedDefault, { message = "Modus: Simulation", level = "info" } )
                     else
-                        ( Dict.empty
-                        , { message = "Wechsel zu Hardware: Warte auf ROS-Agenten...", level = "warning" }
-                        )
+                        ( Dict.empty, { message = "Modus: Hardware (Warte auf ROS...)", level = "warning" } )
             in
-            ( { model 
-                | mode = newMode
-                , agents = updatedAgents
-                , logs = logEntry :: model.logs
-                , currentPath = Nothing 
-              }
-            , Ports.setMode modeStr 
-            )
+            ( { model | mode = newMode, agents = updatedAgents, logs = logEntry :: model.logs, currentPath = Nothing }, Ports.setMode modeStr )
 
         ConfigReceived jsonString ->
             case Decode.decodeString Decoders.agentMapDecoder jsonString of
                 Ok newAgents -> ( { model | agents = newAgents, currentPath = Nothing }, Cmd.none )
                 Err _ -> ( model, Cmd.none )
 
-        -- UI & NAVIGATION
         HandleGridClick cell ->
             case Dict.get (cell.x, cell.y) model.agents of
                 Just agent -> ( { model | activeMenu = Just (SettingsMenu cell agent) }, Cmd.none )
@@ -229,32 +204,18 @@ update msg model =
         CloseMenu -> ( { model | activeMenu = Nothing }, Cmd.none )
         SetGridWidth val -> ( { model | gridWidth = String.toInt val |> Maybe.withDefault 1 }, Cmd.none )
         SetGridHeight val -> ( { model | gridHeight = String.toInt val |> Maybe.withDefault 1 }, Cmd.none )
-        
         NoOp -> ( model, Cmd.none )
         _ -> ( model, Cmd.none )
 
--- SUBSCRIPTIONS
+-- SUBSCRIPTIONS (Unverändert)
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ -- 1. Status der Verbindung (Online/Offline)
-          Ports.socketStatusReceiver SetConnected
-        
-        -- 2. Das Herzstück: Agenten-Updates vom Backend
-        -- Empfängt das JSON {"agents": [...]}, das im 'update' decodiert wird
+        [ Ports.socketStatusReceiver SetConnected
         , Ports.activeAgentsReceiver UpdateAgents 
-        
-        -- 3. Pfad-Ergebnisse vom neuen internen Planer
         , Ports.pathCompleteReceiver PlanningResultRaw 
-        
-        -- 4. Konfigurations-Daten (Import/Export)
         , Ports.configReceived ConfigReceived 
-        
-        -- 5. System-Logs für die Sidebar
-        -- Wir decodieren hier direkt und schicken das Resultat an HandleSystemLog
         , Ports.systemLogReceiver (Decode.decodeValue Decoders.decodeSystemLog >> HandleSystemLog)
-        
-        -- 6. RFID/NFC-Events von den echten Sensoren
         , Ports.rfidReceiver (Decode.decodeValue Decoders.decodeRfid >> HandleRfid)
         ]
 
@@ -301,6 +262,7 @@ viewActiveMenu maybeMenu =
             div [ class "modal-overlay" ]
                 [ div [ class "modal-content" ]
                     [ h3 [] [ text "Agent hinzufügen" ]
+                    , button [ onClick (StartAgent "ftf" cell), class "btn-ftf" ] [ text "🚀 FTF (Transport-Agent)" ]
                     , button [ onClick (StartAgent "rollen_ns" cell) ] [ text "Rollen Modul" ]
                     , button [ onClick (StartAgent "greifer" cell) ] [ text "Greifer Modul" ]
                     , button [ onClick (StartAgent "tisch" cell) ] [ text "Tisch Modul" ]
@@ -313,6 +275,7 @@ viewActiveMenu maybeMenu =
             div [ class "modal-overlay" ]
                 [ div [ class "modal-content" ]
                     [ h3 [] [ text ("Modul: " ++ (agent.module_type |> Sidebar.formatType)) ]
+                    , if agent.is_dynamic then p [] [ text "Status: Dynamisches Fahrzeug" ] else text ""
                     , button [ onClick (RotateAgent cell) ] [ text "Modul drehen (90°)" ]
                     , hr [] []
                     , button [ onClick (SetPathStart cell), class "btn-path-start" ] [ text "Als Start" ]
