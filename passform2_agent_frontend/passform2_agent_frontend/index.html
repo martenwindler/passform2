@@ -426,6 +426,35 @@
             display: block;
             height: 100%;
         }
+
+        /* Layout für Breite/Länge nebeneinander */
+        .input-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .input-row .input-group {
+            flex: 1;
+        }
+
+        /* Statusfarben für Koordinaten */
+        .text-green { color: #68d391; font-weight: bold; }
+        .text-red { color: #fc8181; font-style: italic; }
+
+        /* Styling für die Koordinaten-Anzeige in der Sidebar */
+        .coord-item {
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+            padding: 5px 8px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+        }
+
+        .grid-cell.is-path {
+            background-color: rgba(66, 153, 225, 0.5); /* Blaues Leuchten */
+            border: 2px solid #63b3ed;
+        }
     </style>
 </head>
 <body>

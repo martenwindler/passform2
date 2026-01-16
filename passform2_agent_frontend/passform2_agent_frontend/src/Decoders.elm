@@ -30,22 +30,47 @@ gridCellDecoder =
         (field "x" int)
         (field "y" int)
 
--- KORREKTUR: Wir nutzen gridCellDecoder direkt, ohne 'field "position"'.
--- Dadurch sucht Elm x und y auf der gleichen Ebene wie agent_id und module_type.
+-- --- AGENT DECODERS (JSON -> Elm) ---
+
+-- KORREKTUR: Wir lesen orientation als float (sicherer) und runden dann
 agentModuleDecoder : Decoder AgentModule
 agentModuleDecoder =
     Decode.map4 AgentModule
-        (maybe (field "agent_id" string))
+        (field "agent_id" (maybe string))
         (field "module_type" string)
-        gridCellDecoder -- Erwartet x und y direkt im Agenten-Objekt
-        (Decode.oneOf [ field "orientation" int, Decode.succeed 0 ])
+        gridCellDecoder
+        -- Wir erzwingen hier die Umwandlung, egal ob Python Int oder Float schickt
+        (Decode.oneOf 
+            [ field "orientation" int
+            , field "orientation" float |> Decode.map round
+            , Decode.succeed 0 
+            ]
+        )
+
+-- KORREKTUR: Die Hilfsfunktion für den Port/Update muss den richtigen Decoder nutzen!
+decodeIncomingAgents : Decode.Value -> Msg
+decodeIncomingAgents jsonValue =
+    -- Wir nutzen hier den agentMapDecoder, da er das {"agents": [...]} Format beherrscht
+    -- und direkt das fertige Dict für dein Model liefert.
+    case Decode.decodeValue agentMapDecoder jsonValue of
+        Ok agentsDict ->
+            -- WICHTIG: Deine Msg in Types.elm muss dieses Dict aufnehmen können!
+            -- Falls UpdateAgents nur Decode.Value nimmt, musst du dies in der Main.elm handeln.
+            UpdateAgents jsonValue 
+
+        Err err ->
+            let
+                _ = Debug.log "ELM DECODER ERROR" (Decode.errorToString err)
+            in
+            NoOp
 
 -- Erwartet das Objekt {"agents": [...]}
 agentMapDecoder : Decoder (Dict (Int, Int) AgentModule)
 agentMapDecoder =
     field "agents" (list agentModuleDecoder)
         |> Decode.map (\agents -> 
-            List.map (\a -> ((a.position.x, a.position.y), a)) agents
+            agents
+                |> List.map (\a -> ((a.position.x, a.position.y), a))
                 |> Dict.fromList
         )
 

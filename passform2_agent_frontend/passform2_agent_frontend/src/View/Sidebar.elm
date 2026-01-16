@@ -11,20 +11,32 @@ view model =
     aside [ class "sidebar" ]
         [ h2 [] [ text "Gitter-Konfiguration" ]
         
-        -- Gitter-Einstellungen
+        -- 1. System-Logs (Ganz oben)
+        , div [ class "sidebar-section log-section" ]
+            [ h3 [] [ text "System-Logs" ]
+            , div [ class "log-container" ]
+                (List.map (\log -> 
+                    div [ class ("log-entry " ++ log.level) ] 
+                        [ text log.message ]
+                ) model.logs)
+            ]
+
+        -- 2. Gitter-Einstellungen (50/50 Layout)
         , div [ class "sidebar-section" ]
             [ h3 [] [ text "Dimensionen" ]
-            , div [ class "input-group" ]
-                [ label [] [ text "Breite:" ]
-                , input [ type_ "number", value (String.fromInt model.gridWidth), onInput SetGridWidth ] []
-                ]
-            , div [ class "input-group" ]
-                [ label [] [ text "Länge:" ]
-                , input [ type_ "number", value (String.fromInt model.gridHeight), onInput SetGridHeight ] []
+            , div [ class "input-row" ] 
+                [ div [ class "input-group" ]
+                    [ label [] [ text "Breite:" ]
+                    , input [ type_ "number", value (String.fromInt model.gridWidth), onInput SetGridWidth ] []
+                    ]
+                , div [ class "input-group" ]
+                    [ label [] [ text "Länge:" ]
+                    , input [ type_ "number", value (String.fromInt model.gridHeight), onInput SetGridHeight ] []
+                    ]
                 ]
             ]
 
-        -- Layout-Aktionen
+        -- 3. Aktionen (Wieder hinzugefügt für Import/Export/Reset)
         , div [ class "sidebar-section" ]
             [ h3 [] [ text "Aktionen" ]
             , div [ class "sidebar-actions-grid" ]
@@ -36,7 +48,7 @@ view model =
                 ]
             ]
 
-        -- Liste der Agenten
+        -- 4. Liste der Agenten
         , div [ class "sidebar-section" ]
             [ h3 [] [ text ("Module (" ++ String.fromInt (Dict.size model.agents) ++ ")") ]
             , if Dict.isEmpty model.agents then
@@ -46,32 +58,32 @@ view model =
                     (model.agents |> Dict.values |> List.map viewAgentItem)
             ]
 
-        -- Pfadplanung Status
+        -- 5. Pfadplanung Status
         , div [ class "sidebar-section" ]
             [ h3 [] [ text "Pfadplanung" ]
             , viewCoordinateStatus "Start" model.pathStart
             , viewCoordinateStatus "Ziel" model.pathGoal
+            
+            -- Dynamisches Feedback
+            , if model.loading then
+                div [ class "planning-status-box" ]
+                    [ div [ class "spinner" ] [] -- CSS Spinner
+                    , span [] [ text "Berechnung läuft..." ]
+                    ]
+            else
+                text ""
+
             , button 
-                [ class (if canPlan model then "btn-sidebar-primary" else "btn-disabled")
+                [ class (if canPlan model && not model.loading then "btn-sidebar-primary" else "btn-disabled")
                 , onClick (StartPlanning False)
                 , disabled (not (canPlan model) || model.loading)
                 ] 
-                [ text (if model.loading then "Berechne..." else "Pfad berechnen") ]
-            ]
-
-        -- System-Logs Panel (AKTUALISIERT)
-        , div [ class "sidebar-section log-section" ]
-            [ h3 [] [ text "System-Logs" ]
-            , div [ class "log-container" ]
-                -- Hier nutzen wir jetzt log.level für die CSS-Klasse und log.message für den Text
-                (List.map (\log -> 
-                    div [ class ("log-entry " ++ log.level) ] 
-                        [ text log.message ]
-                ) model.logs)
+                [ text (if model.loading then "Warten..." else "Pfad berechnen") ]
             ]
         ]
 
--- Hilfsfunktionen zur Darstellung
+-- --- HILFSFUNKTIONEN ---
+
 viewAgentItem : AgentModule -> Html Msg
 viewAgentItem agent =
     li [ class "agent-item" ]

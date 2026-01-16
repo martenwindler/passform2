@@ -152,23 +152,27 @@ update msg model =
 
         -- AGENTEN LIVE-UPDATE (Vom Backend/ROS)
         UpdateAgents rawJson ->
-            case Decode.decodeValue Decoders.agentMapDecoder rawJson of
-                Ok newAgents ->
-                    ( { model | agents = newAgents }, Cmd.none )
+            case model.mode of
+                Hardware ->
+                    case Decode.decodeValue Decoders.agentMapDecoder rawJson of
+                        Ok newAgentsDict ->
+                            ( { model | agents = newAgentsDict }, Cmd.none )
+                        Err _ ->
+                            ( model, Cmd.none )
 
-                Err error ->
-                    let
-                        _ = Debug.log "Decoder Fehler Agenten" error
-                    in
+                Simulation ->
                     ( model, Cmd.none )
+
+        -- Die Verbindung zum Backend (Nur einmal!)
+        SetConnected status ->
+            ( { model | connected = status }, Cmd.none )
 
         -- SYSTEM-LOGS
         HandleSystemLog result ->
             case result of
                 Ok logEntry ->
                     ( { model | logs = List.take 20 (logEntry :: model.logs) }, Cmd.none )
-
-                Err _ ->
+                Err err ->
                     ( model, Cmd.none )
 
         -- RFID SCANS
@@ -179,20 +183,33 @@ update msg model =
                         newLog = { message = "RFID Scan: " ++ rfidId, level = "success" }
                     in
                     ( { model | logs = List.take 20 (newLog :: model.logs) }, Cmd.none )
-
                 Err _ ->
                     ( model, Cmd.none )
 
-        -- STATUS & CONFIG
-        SetConnected status ->
-            ( { model | connected = status }, Cmd.none )
-
+        -- MODUS WECHSEL
         ToggleMode ->
             let
                 newMode = if model.mode == Simulation then Hardware else Simulation
                 modeStr = if newMode == Simulation then "simulation" else "hardware"
+                
+                ( updatedAgents, logEntry ) =
+                    if newMode == Simulation then
+                        ( model.savedDefault
+                        , { message = "Wechsel zu Simulation: Standard geladen.", level = "info" }
+                        )
+                    else
+                        ( Dict.empty
+                        , { message = "Wechsel zu Hardware: Warte auf ROS-Agenten...", level = "warning" }
+                        )
             in
-            ( { model | mode = newMode }, Ports.setMode modeStr )
+            ( { model 
+                | mode = newMode
+                , agents = updatedAgents
+                , logs = logEntry :: model.logs
+                , currentPath = Nothing 
+              }
+            , Ports.setMode modeStr 
+            )
 
         ConfigReceived jsonString ->
             case Decode.decodeString Decoders.agentMapDecoder jsonString of
@@ -220,11 +237,24 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Ports.socketStatusReceiver SetConnected
+        [ -- 1. Status der Verbindung (Online/Offline)
+          Ports.socketStatusReceiver SetConnected
+        
+        -- 2. Das Herzstück: Agenten-Updates vom Backend
+        -- Empfängt das JSON {"agents": [...]}, das im 'update' decodiert wird
         , Ports.activeAgentsReceiver UpdateAgents 
+        
+        -- 3. Pfad-Ergebnisse vom neuen internen Planer
         , Ports.pathCompleteReceiver PlanningResultRaw 
+        
+        -- 4. Konfigurations-Daten (Import/Export)
         , Ports.configReceived ConfigReceived 
+        
+        -- 5. System-Logs für die Sidebar
+        -- Wir decodieren hier direkt und schicken das Resultat an HandleSystemLog
         , Ports.systemLogReceiver (Decode.decodeValue Decoders.decodeSystemLog >> HandleSystemLog)
+        
+        -- 6. RFID/NFC-Events von den echten Sensoren
         , Ports.rfidReceiver (Decode.decodeValue Decoders.decodeRfid >> HandleRfid)
         ]
 

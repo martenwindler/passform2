@@ -16,7 +16,7 @@ from rclpy.timer import Timer
 
 from rosidl_runtime_py import message_to_ordereddict
 
-# ROS Nachrichten-Typen
+# ROS Nachrichten-Typen laut passform_agent_msgs
 from passform_agent_msgs.msg import (
     AgentAnnounce,
     AgentInfo,
@@ -32,7 +32,7 @@ from app.managers.agent_manager import agent_manager
 # ====================================================================== #
 class RosClient(Node):
     def __init__(self) -> None:
-        # Domain ID setzen, bevor der Kontext vollständig aktiv ist
+        # Domain ID setzen
         os.environ["ROS_DOMAIN_ID"] = str(Config.get_domain_id())
 
         super().__init__("python_backend_node")
@@ -42,7 +42,7 @@ class RosClient(Node):
         )
 
         # Heartbeat Management
-        self.heartbeat_timeout_sec = 2.0  # Erhöht auf 2s für stabilere Verbindung
+        self.heartbeat_timeout_sec = 2.0  
         self.heartbeat_timers: Dict[str, Timer] = {}
 
         self._setup_ros_interfaces()
@@ -50,12 +50,12 @@ class RosClient(Node):
     def _setup_ros_interfaces(self) -> None:
         """Abonniert Themen und erstellt Publisher."""
         
-        # 1. Subscriber für direkte Status-Updates (Wichtig für deinen test_agent.py)
+        # 1. Subscriber für direkte Status-Updates (AgentInfo)
         self.agent_info_sub = self.create_subscription(
             AgentInfo, "agent_info", self._on_agent_info, 10
         )
 
-        # 2. Subscriber für Agenten-Ankündigungen
+        # 2. Subscriber für Agenten-Ankündigungen (AgentAnnounce)
         self.agent_announce_sub = self.create_subscription(
             AgentAnnounce, "agent_announce", self._on_agent_announce, 10
         )
@@ -77,22 +77,24 @@ class RosClient(Node):
     
     def _on_agent_info(self, msg: AgentInfo) -> None:
         """Verarbeitet direkte Heartbeats vom Typ AgentInfo."""
-        # Daten im AgentManager synchronisieren
+        # Wir reichen die Message direkt an den Manager weiter
+        # Dieser extrahiert jetzt intern x, y und agent_id
         agent_manager.sync_from_ros(msg)
-        # Timeout-Timer verwalten
         self._manage_heartbeat(msg.agent_id)
 
     def _on_agent_announce(self, msg: AgentAnnounce) -> None:
-        """Verarbeitet eingehende Initial-Ankündigungen."""
-        agent_id = msg.agent_info.agent_id
-        # Daten synchronisieren
+        """Verarbeitet Heartbeats vom Typ AgentAnnounce."""
+        # AgentAnnounce enthält ein AgentInfo-Feld namens 'agent_info'
         agent_manager.sync_from_ros(msg.agent_info)
-        # Timeout-Timer verwalten
-        self._manage_heartbeat(agent_id)
+        
+        # Falls der Agent sich explizit abmeldet
+        if not msg.active:
+            agent_manager.remove_agent(msg.agent_info.agent_id)
+        else:
+            self._manage_heartbeat(msg.agent_info.agent_id)
 
     def _manage_heartbeat(self, agent_id: str) -> None:
         """Startet oder resettet den Timeout-Timer für einen Agenten."""
-        # Alten Timer stoppen falls vorhanden
         if agent_id in self.heartbeat_timers:
             self.heartbeat_timers[agent_id].cancel()
             self.destroy_timer(self.heartbeat_timers[agent_id])
@@ -103,7 +105,6 @@ class RosClient(Node):
             if agent_id in self.heartbeat_timers:
                 del self.heartbeat_timers[agent_id]
 
-        # Neuen Timer erstellen
         self.heartbeat_timers[agent_id] = self.create_timer(
             self.heartbeat_timeout_sec, _on_timeout
         )
@@ -111,20 +112,23 @@ class RosClient(Node):
     # ------------------------------------------------------------------ #
     #                        Pfadplanungs-Logik                          #
     # ------------------------------------------------------------------ #
-    def send_path_request(self, req: Any, use_central: bool = False) -> None:
+    
+    def send_path_request(self, req: Any, use_central: bool = True) -> None:
         """Konvertiert Pydantic-Request in ROS-Message und sendet sie."""
         try:
             ros_msg = PathRequest()
             ros_msg.request_id = req.request_id
-            ros_msg.start_x, ros_msg.start_y = req.start.x, req.start.y
-            ros_msg.goal_x,  ros_msg.goal_y  = req.goal.x,  req.goal.y
+            
+            ros_msg.start.x = int(req.start.x)
+            ros_msg.start.y = int(req.start.y)
+            ros_msg.goal.x = int(req.goal.x)
+            ros_msg.goal.y = int(req.goal.y)
 
             if use_central:
                 self.path_request_central_pub.publish(ros_msg)
             else:
                 self.path_request_pub.publish(ros_msg)
-            
-            self.get_logger().info(f"PathRequest '{req.request_id}' publiziert.")
+                
         except Exception as exc:
             self.get_logger().error(f"Fehler beim Senden der PathRequest: {exc}")
 
@@ -147,7 +151,7 @@ class RosClient(Node):
 
 
 # ====================================================================== #
-#                          Infrastruktur-API                             #
+#                        Infrastruktur-API                               #
 # ====================================================================== #
 _ros_instance: Optional[RosClient] = None
 _ros_executor: Optional[SingleThreadedExecutor] = None
@@ -183,7 +187,7 @@ def get_ros_client() -> RosClient:
     return _ros_instance or start_ros_spin()
 
 def restart_ros_client() -> RosClient:
-    """Wird bei Modus-Wechsel (Sim/HW) aufgerufen, um Domain zu ändern."""
+    """Wird bei Modus-Wechsel (Sim/HW) aufgerufen."""
     global _ros_instance, _ros_executor, _ros_thread
 
     if _ros_executor:
@@ -193,7 +197,6 @@ def restart_ros_client() -> RosClient:
     if _ros_thread and _ros_thread.is_alive():
         _ros_thread.join(timeout=2.0)
 
-    # AgentManager leeren, da wir die Domain wechseln
     agent_manager.clear_all_agents()
 
     _ros_instance = None

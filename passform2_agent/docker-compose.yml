@@ -1,0 +1,36 @@
+# Docker Compose für ROS Agent Container
+version: '3.8'
+
+services:
+  ros-agent:
+    image: ros-agent:latest  # Verwendet fertiges Image anstatt build
+    container_name: ros-agent
+    privileged: true  # Notwendig für GPIO/SPI Zugriff auf Raspberry Pi
+    devices:
+      - /dev/gpiomem:/dev/gpiomem  # GPIO Zugriff
+      - /dev/spidev0.0:/dev/spidev0.0  # SPI für NFC-Reader
+      - /dev/spidev0.1:/dev/spidev0.1
+    volumes:
+      - /sys:/sys:ro  # System-Informationen
+      - /dev/shm:/dev/shm
+    environment:
+      # Setze diese Umgebungsvariablen je nach Bedarf:
+      
+      # MODULE_TYPE: Art des Moduls
+      - MODULE_TYPE=greifer  # greifer, rollen_ns, rollen_ow, mensch
+      
+      # Position manuell setzen (überspringt NFC-Reader):
+      - POSITION_X=0
+      - POSITION_Y=1
+      
+      # NFC-Reader komplett überspringen:
+      - SKIP_NFC=true
+      - ROS_DOMAIN_ID=0
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    restart: unless-stopped
+    user: "${UID}:${UID}"
+    network_mode: host  # Für ROS-Kommunikation
+    
+    # Für Debugging:
+    # stdin_open: true
+    # tty: true

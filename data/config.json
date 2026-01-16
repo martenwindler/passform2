@@ -1,4 +1,21 @@
 {
-    "agents": [],
-    "last_update": "2026-01-15T22:20:34.646800"
+    "agents": [
+        {
+            "agent_id": "Robot-007",
+            "module_type": "tisch",
+            "x": 1,
+            "y": 1,
+            "orientation": 0,
+            "status": "active"
+        },
+        {
+            "agent_id": "Robot-008",
+            "module_type": "greifer",
+            "x": 3,
+            "y": 1,
+            "orientation": 90,
+            "status": "active"
+        }
+    ],
+    "last_update": "2026-01-16T01:31:46.945108"
 }

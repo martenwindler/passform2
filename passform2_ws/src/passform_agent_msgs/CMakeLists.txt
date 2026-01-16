@@ -9,11 +9,17 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/AgentInfo.msg"
   "msg/AgentAnnounce.msg"
+  "msg/AgentInfo.msg"
+  "msg/Award.msg"
+  "msg/CFP.msg"
+  "msg/CostPropagation.msg"
+  "msg/GridPosition.msg"
+  "msg/PathComplete.msg"
   "msg/PathRequest.msg"
   "msg/PathResult.msg"
-  "msg/PathComplete.msg"
+  "msg/Proposal.msg"
 )
 
 ament_package()
+

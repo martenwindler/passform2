@@ -59,10 +59,6 @@ subscribeSafe('connectToBackend', (url: string) => {
     socket.on('connect', () => {
         console.log("✅ Socket.IO verbunden");
         sendSafe('socketStatusReceiver', true);
-        sendSafe('systemLogReceiver', { 
-            message: "Verbunden mit Backend: " + url, 
-            level: "success" 
-        });
     });
 
     socket.on('disconnect', () => {
@@ -76,9 +72,14 @@ subscribeSafe('connectToBackend', (url: string) => {
 
     // --- INCOMING DATA (Socket -> Elm) ---
 
-    socket.on('active_agents', (data: any) => {
-        console.log("🤖 Agenten-Update:", data);
-        sendSafe('activeAgentsReceiver', data);
+    socket.on('active_agents', (data) => {
+        console.log("🤖 Daten werden an Elm gesendet...");
+        
+        if (app.ports.activeAgentsReceiver) {
+            app.ports.activeAgentsReceiver.send(data);
+        } else {
+            console.error("❌ Port 'activeAgentsReceiver' wurde in Elm nicht gefunden!");
+        }
     });
 
     socket.on('path_complete', (data: any) => {
