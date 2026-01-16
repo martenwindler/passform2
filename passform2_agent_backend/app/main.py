@@ -82,50 +82,55 @@ fastapi_app.add_middleware(
 
 @socket_manager.sio.on('plan_path')
 async def handle_plan_path(sid, payload):
-    """
-    Berechnet Pfad. Nutzt im Simulationsmodus die Daten aus dem Elm-Payload,
-    im Hardware-Modus die Daten aus dem ROS-Weltmodell.
-    """
     try:
         start = payload.get("start")
         goal = payload.get("goal")
-        elm_agents = payload.get("agents") # Liste von Agenten-Objekten aus Elm
+        elm_agents = payload.get("agents", {}) 
         
-        if not start or not goal:
-            return
-
-        # 1. Welches Weltmodell nutzen wir? (Teile & Herrsche)
-        if config.get_current_mode() == SystemMode.SIMULATION and elm_agents:
-            # Simulation: Wir nehmen das Gitter, das Elm uns schickt
-            grid = {(a["x"], a["y"]): a for a in elm_agents}
-            logger.info("Pfadplanung: Nutze Simulations-Layout von Elm.")
-        else:
-            # Hardware: Wir nehmen das Gitter aus dem AgentManager (ROS)
-            grid = agent_manager.get_grid_model()
-            logger.info("Pfadplanung: Nutze Hardware-Layout vom Backend.")
+        grid = {}
+        agents_list = elm_agents.values() if isinstance(elm_agents, dict) else elm_agents
+        
+        for agent in agents_list:
+            # Sicherstellen, dass wir x/y finden (Simulation schickt 'position', Hardware ist flach)
+            pos = agent.get("position", agent) 
+            x, y = pos.get("x"), pos.get("y")
+            
+            if x is not None and y is not None:
+                # Wir speichern eine Kopie und stellen sicher, dass x/y auch flach drin sind
+                a_copy = agent.copy()
+                a_copy["x"], a_copy["y"] = int(x), int(y)
+                grid[(int(x), int(y))] = a_copy
 
         start_tuple = (int(start["x"]), int(start["y"]))
         goal_tuple = (int(goal["x"]), int(goal["y"]))
 
-        agent_manager.log_to_system(f"Starte A* Planung: {start_tuple} ➔ {goal_tuple}", "info")
-        
-        # 2. A* Berechnung
         path, cost, message = planner.a_star(start_tuple, goal_tuple, grid)
         
         if path:
-            agent_manager.log_to_system(message, "success")
+            # KORREKTUR DER LOG-AUSGABE:
+            # Wir holen x/y sicher aus dem Pfad-Objekt
+            path_coords = []
+            for a in path:
+                p = a.get("position", a)
+                path_coords.append(f"({p.get('x')},{p.get('y')})")
+            
+            coords_str = " ➔ ".join(path_coords)
+            agent_manager.log_to_system(f"Route: {coords_str}", "success")
+            agent_manager.log_to_system(f"Kosten: {cost:.1f}", "info")
+
+            # Rückgabe an Elm
             await socket_manager.emit_event('path_complete', {
                 "status": 1,
                 "cost": float(cost),
                 "path": path
             }, target_sid=sid)
         else:
-            agent_manager.log_to_system(f"Planung abgebrochen: {message}", "warning")
+            agent_manager.log_to_system(f"Abbruch: {message}", "warning")
             await socket_manager.emit_event('path_complete', {"status": 0, "cost": 0.0, "path": []}, target_sid=sid)
 
     except Exception as e:
-        logger.error(f"Fehler in handle_plan_path: {e}", exc_info=True)
-        agent_manager.log_to_system("Schwerer Fehler im Backend-Planer", "error")
+        logger.error(f"Fehler: {e}", exc_info=True)
+        agent_manager.log_to_system("Fehler in der Pfadplanung", "error")
 
 @socket_manager.sio.on('set_mode')
 async def handle_set_mode(sid, data):

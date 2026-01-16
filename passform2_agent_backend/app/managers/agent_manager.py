@@ -45,10 +45,19 @@ class AgentEntry:
         self.status = data.get("status", "simulated")
 
     def to_dict(self) -> Dict[str, Any]:
-        """Erzeugt das flache JSON für Decoders.elm."""
+        """
+        Erzeugt das JSON-Format, das exakt zum Elm-Decoder passt.
+        Struktur: { "agent_id": "...", "position": {"x": 1, "y": 2}, ... }
+        """
         return {
             "agent_id": str(self.agent_id),
             "module_type": str(self.module_type),
+            "position": {
+                "x": int(self.x),
+                "y": int(self.y)
+            },
+            # Wir behalten x und y flach für den Planer bei, 
+            # aber position ist für Elm entscheidend
             "x": int(self.x),
             "y": int(self.y),
             "orientation": int(self.orientation),
