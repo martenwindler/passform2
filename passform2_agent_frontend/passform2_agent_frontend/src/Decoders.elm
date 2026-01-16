@@ -1,6 +1,6 @@
 module Decoders exposing (..)
 
-import Json.Decode as Decode exposing (Decoder, field, int, string, list, maybe, float, bool)
+import Json.Decode as Decode exposing (Decoder, bool, field, float, int, list, maybe, string)
 import Json.Encode as Encode
 import Dict exposing (Dict)
 import Types exposing (..)
@@ -47,6 +47,8 @@ agentModuleDecoder =
             )
         |> andMap (Decode.oneOf [ field "is_dynamic" bool, Decode.succeed False ])
         |> andMap (Decode.oneOf [ field "payload" (maybe string), Decode.succeed Nothing ])
+        -- NEU: Signalstärke vom Backend (Default 100, falls Feld fehlt)
+        |> andMap (Decode.oneOf [ field "signal_strength" int, Decode.succeed 100 ])
 
 -- Erwartet das Objekt {"agents": [...]}
 agentMapDecoder : Decoder (Dict (Int, Int) AgentModule)
@@ -75,7 +77,7 @@ decodeCellClick =
             (field "y" int)
         )
 
--- --- ENCODERS (Elm -> JSON) ---
+-- --- ENCODERS (Elm -> JSON / Ports) ---
 
 encodeAgentMap : Dict (Int, Int) AgentModule -> Encode.Value
 encodeAgentMap agents =
@@ -105,6 +107,8 @@ encodeAgentModule agent =
                 Just p -> Encode.string p
                 Nothing -> Encode.null
           )
+        -- NEU: Auch die Signalstärke für die 3D-View encodieren
+        , ( "signal_strength", Encode.int agent.signal_strength )
         ]
 
 encodePath : Maybe Path -> Encode.Value

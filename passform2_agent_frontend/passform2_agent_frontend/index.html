@@ -536,6 +536,409 @@
             cursor: not-allowed;
             opacity: 0.7;
         }
+
+        /* --- Parameter Grid (1 Zeile, 4 Spalten) --- */
+
+        .parameter-grid-row {
+            display: grid;
+            /* Erstellt 4 gleich große Spalten */
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px; /* Abstand zwischen den Spalten */
+            margin-bottom: 12px;
+        }
+
+        /* Einzelnes Parameter-Kästchen */
+        .parameter-item {
+            display: flex;
+            flex-direction: column; /* Label über dem Input stapeln */
+            align-items: center;
+            text-align: center;
+        }
+
+        /* Das Label: Kleinbuchstaben, aber als Kapitälchen dargestellt */
+        .parameter-item label {
+            font-size: 0.7rem;
+            color: #a0aec0;
+            margin-bottom: 4px;
+            /* Der Trick für "kleine Großbuchstaben": */
+            text-transform: lowercase;
+            font-variant: small-caps;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            white-space: nowrap; /* Verhindert Umbruch bei engen Platzverhältnissen */
+        }
+
+        /* Das Input-Feld: Groß und gut lesbar */
+        .parameter-item input {
+            width: 100%;
+            text-align: center;
+            font-size: 1.1rem; /* Größere Schrift für die Zahl */
+            font-weight: 500;
+            padding: 6px 2px;
+            
+            /* Dark Mode Styling beibehalten */
+            background: rgba(26, 32, 44, 0.8);
+            border: 1px solid #4a5568;
+            color: #e2e8f0;
+            border-radius: 6px;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .parameter-item input:focus {
+            border-color: #48bb78;
+            background: rgba(26, 32, 44, 1);
+            outline: none;
+        }
+
+        /* Optional: Entfernt die kleinen Spinner-Pfeile in Zahlenfeldern für einen cleaneren Look */
+        .parameter-item input::-webkit-outer-spin-button,
+        .parameter-item input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .parameter-item input {
+            -moz-appearance: textfield;
+        }
+
+        /* Der Anwenden-Button darunter */
+        .btn-apply {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(to right, #48bb78, #38a169);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .btn-apply:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.25);
+        }
+
+        .btn-apply:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .signal-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 15px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .signal-label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .signal-bar-container {
+            flex-grow: 1;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .signal-bar-fill {
+            height: 100%;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.5s;
+        }
+
+        .signal-value {
+            font-family: monospace;
+            font-weight: bold;
+            min-width: 35px;
+            text-align: right;
+        }
+
+        .hardware-status-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .status-column {
+            flex: 1;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .status-label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #000; /* Schwarz */
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-text {
+            font-size: 13px;
+            font-weight: 600;
+            color: #000; /* Schwarz */
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .status-online { background-color: #4caf50; box-shadow: 0 0 5px rgba(76, 175, 80, 0.5); }
+        .status-missing { background-color: #f44336; }
+        .status-unknown { background-color: #adb5bd; }
+
+        /* Signal-Anpassung */
+        .signal-label-main {
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        /* --- KONTEXTMENÜ OVERLAY (Hintergrund) --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 25, 47, 0.85); /* Dunkles Blau-Transparent */
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        /* --- MODAL BOX --- */
+        .modal-content {
+            background-color: #1a365d; /* Dunkelblau */
+            border: 1px solid #4299e1;
+            padding: 25px;
+            border-radius: 12px;
+            width: 320px;
+            box-shadow: 0 20px 25px rgba(0, 0, 0, 0.5);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .modal-content h3 {
+            margin: 0 0 5px 0;
+            color: #63b3ed; /* Hellblaues Highlight */
+            border-bottom: 1px solid #2c5282;
+            padding-bottom: 8px;
+            font-size: 1.2rem;
+        }
+
+        /* --- HARDWARE STATUS (Die 50/50 Spalten) --- */
+        .hardware-status-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin: 5px 0;
+        }
+
+        .status-column {
+            flex: 1;
+            background: #f8f9fa; /* HELLER Hintergrund für schwarze Schrift */
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .status-label {
+            display: block;
+            font-size: 10px;
+            text-transform: uppercase;
+            color: #000 !important; /* SCHWARZ */
+            margin-bottom: 4px;
+            font-weight: 800;
+        }
+
+        .status-text {
+            font-size: 13px;
+            font-weight: 700;
+            color: #000 !important; /* SCHWARZ */
+        }
+
+        /* --- SIGNALSTÄRKE (Balken-Bereich) --- */
+        .signal-wrapper {
+            background: #f8f9fa; /* HELLER Hintergrund */
+            padding: 10px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid #dee2e6;
+        }
+
+        .signal-label-main {
+            font-weight: 800;
+            font-size: 12px;
+            color: #000 !important; /* SCHWARZ */
+        }
+
+        .signal-bar-container {
+            flex-grow: 1;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .signal-value {
+            font-family: monospace;
+            font-weight: 900;
+            color: #000 !important; /* SCHWARZ */
+            min-width: 35px;
+            text-align: right;
+        }
+
+        /* --- STATUS DOTS & BUTTONS --- */
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .status-online { background-color: #4caf50; box-shadow: 0 0 5px #4caf50; }
+        .status-missing { background-color: #f44336; }
+
+        .modal-content button {
+            padding: 12px;
+            background: #2a4365;
+            border: 1px solid #4299e1;
+            color: white;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .modal-content button:hover:not(:disabled) {
+            background: #3182ce;
+        }
+
+        .modal-content .btn-close {
+            background: transparent;
+            border: none;
+            color: #a0aec0;
+            text-decoration: underline;
+            font-size: 0.8rem;
+            margin-top: 5px;
+        }
+
+        /* 1. Modul-Name (Überschrift) in Weiß */
+        .modal-content h3 {
+            margin: 0 0 15px 0;
+            color: #ffffff !important; /* "Rollen-Modul" etc. in reinem Weiß */
+            border-bottom: 1px solid #2c5282;
+            padding-bottom: 10px;
+            font-size: 1.3rem;
+            text-align: center;
+        }
+
+        /* 2. Hardware-Status Zeile */
+        .hardware-status-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        /* 3. Die weiße Pille (Underlay) */
+        .status-column {
+            flex: 1;
+            background-color: #ffffff; /* Weißes Underlay */
+            padding: 10px 15px;
+            border-radius: 25px;       /* Pillen-Form */
+            display: flex;
+            flex-direction: column;
+            align-items: center;       /* Zentriert Inhalt in der Pille */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* 4. Text innerhalb der weißen Pille (Schwarz für Lesbarkeit) */
+        .status-label {
+            display: block;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            color: #4a5568;            /* Dunkelgrau für das Label */
+            font-weight: 800;
+            margin-bottom: 2px;
+        }
+
+        .status-text {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #000000;            /* Status "Online"/"Fehlt" in Schwarz */
+        }
+
+        /* 5. Anpassung der Status-Indikatoren in der Pille */
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        /* Kompaktes Raster für die Sidebar-Aktionen */
+        .actions-compact-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* 2 gleich große Spalten */
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        /* Kleinere Buttons für die Sidebar */
+        .btn-small {
+            padding: 6px 4px !important;
+            font-size: 0.75rem !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .btn-full-width {
+            width: 100%;
+            margin-top: 4px;
+        }
+
+        /* Einheitliche Höhe für alle kompakten Buttons */
+        .sidebar-section button {
+            min-height: 32px;
+        }
+
+        /* Emojis etwas kleiner machen */
+        .btn-small span {
+            font-size: 0.9rem;
+}
     </style>
 </head>
 <body>

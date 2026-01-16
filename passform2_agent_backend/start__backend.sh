@@ -11,7 +11,7 @@ source /opt/ros/jazzy/setup.bash
 source /home/martenwd/passform2/passform2_ws/install/setup.bash
 
 # 2. Virtuelle Umgebung laden
-source .venv/bin/activate
+source . ../.venv/bin/activate
 
 # 3. Modul-Pfad setzen
 export PYTHONPATH=$PYTHONPATH:.

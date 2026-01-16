@@ -3,133 +3,183 @@ import subprocess
 import threading
 import os
 import logging
-from typing import Dict, List, Tuple
+import time
+from typing import Dict, List, Tuple, Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.config import config
-from app.managers.agent_manager import agent_manager
 
-# Logger Setup
 logger = logging.getLogger("node_manager")
 router = APIRouter()
 
 # --- Pydantic-Schemas für die API ---
 class StartAgentRequest(BaseModel):
-    node_id: str
-    position: List[int]  # [x, y]
+    agent_id: str
+    x: int
+    y: int
     module_type: str
-
-class KillAgentRequest(BaseModel):
-    node_id: str
-
 
 # --- Node-Manager Singleton ---
 class NodeManager:
-    """
-    Verwaltet die Betriebssystem-Prozesse der ROS 2 Simulation.
-    Stellt sicher, dass Simulations-Nodes auf Domain ID 1 laufen.
-    """
     _instance = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(NodeManager, cls).__new__(cls)
-            cls._instance.global_lock = threading.RLock()
-            logger.info("NodeManager Singleton erfolgreich initialisiert.")
+            cls._instance.processes: Dict[str, subprocess.Popen] = {}
+            cls._instance.lock = threading.RLock()
+            logger.info("✅ NodeManager Orchestrator bereit.")
         return cls._instance
 
-    def start_node(self, node_id: str, position: Tuple[int, int], module_type: str) -> None:
-        """
-        Startet einen Simulations-Agenten (ROS 2 Launch) in einem separaten Thread.
-        """
-        position_str = str(list(position)).replace(" ", "")
+    def _get_project_root(self):
+        """Ermittelt den absoluten Pfad zum passform2 Hauptverzeichnis."""
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+    # --- SYSTEM NODES ---
+
+    def start_system_nodes(self):
+        """Startet zentrale ROS-Nodes wie den monitor_node / central_planner."""
+        base_path = self._get_project_root()
         
-        # Befehl aus der zentralen Config beziehen
-        cmd = config.get_launch_command(node_id, position_str, module_type)
+        paths_to_try = [
+            os.path.join(base_path, "passform2_ws/src/passform_agent_planning/passform_agent_planning/monitor_node.py"),
+            os.path.join(base_path, "passform2_ws/src/passform_agent_planning/monitor_node.py")
+        ]
+        
+        script_path = next((p for p in paths_to_try if os.path.exists(p)), None)
+        
+        if not script_path:
+            logger.error(f"❌ Monitor-Script konnte an keinem Ort gefunden werden!")
+            return
 
-        def node_thread() -> None:
+        def monitor_thread():
             try:
-                # Umgebungsvariablen für ROS Domain ID 1 (Simulation)
                 env = os.environ.copy()
-                env['ROS_DOMAIN_ID'] = str(config.settings.domain_ids['simulation'] if hasattr(config.settings, 'domain_ids') else '1')
+                env['ROS_DOMAIN_ID'] = str(config.get_domain_id())
                 
-                logger.info(f"Starte Prozess für Agent '{node_id}' mit Befehl: {' '.join(cmd)}")
+                cmd = [
+                    "python3", script_path, 
+                    "--ros-args", 
+                    "-p", f"heartbeat_hz:={config.heartbeat_hz}",
+                    "-p", f"timeout_factor:={config.timeout_factor}",
+                    "--log-level", "INFO"
+                ]
                 
-                # Subprozess starten
-                proc = subprocess.Popen(
-                    cmd, 
-                    env=env, 
-                    preexec_fn=os.setsid  # Ermöglicht das Killen der gesamten Prozessgruppe
-                )
-                
-                # Den Prozess im AgentManager registrieren (für Status-Updates an Elm)
-                agent_manager.register_local_process(node_id, module_type, proc)
-                
-                # Blockiert den Thread, bis der Prozess endet
+                proc = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
+                with self.lock:
+                    self.processes["system_monitor"] = proc
+                logger.info(f"🖥️ System-Monitor/Planner gestartet (Hz: {config.heartbeat_hz})")
                 proc.wait()
+            except Exception as e:
+                logger.error(f"❌ Fehler im Monitor-Node: {e}")
+
+        threading.Thread(target=monitor_thread, name="SystemMonitor", daemon=True).start()
+
+    # --- AGENT NODES ---
+
+    def start_agents_from_config(self, agents_list: List[Dict[str, Any]]):
+        logger.info(f"🚀 Orchestriere {len(agents_list)} Agenten-Nodes...")
+        for agent in agents_list:
+            self.start_node(agent.get("agent_id"), (agent.get("x", 0), agent.get("y", 0)), agent.get("module_type", "unknown"))
+
+    def start_node(self, agent_id: str, position: Tuple[int, int], module_type: str) -> None:
+        """Startet einen einzelnen Agent-Node Prozess mit SSoT Parametern."""
+        with self.lock:
+            if agent_id in self.processes: return
+
+        def node_thread():
+            try:
+                base_path = self._get_project_root()
+                env = os.environ.copy()
+                env['ROS_DOMAIN_ID'] = str(config.get_domain_id())
                 
-            except Exception as exc:
-                logger.error(f"[ERROR] Fehler im Thread von Agent '{node_id}': {exc}")
+                paths_to_try = [
+                    os.path.join(base_path, "passform2_ws/src/passform_agent_planning/passform_agent_planning/agent_node.py"),
+                    os.path.join(base_path, "passform2_ws/src/passform_agent_planning/agent_node.py")
+                ]
+                script_path = next((p for p in paths_to_try if os.path.exists(p)), None)
+
+                if not script_path:
+                    logger.error(f"❌ Agent-Script für {agent_id} nicht gefunden.")
+                    return
+
+                cmd = [
+                    "python3", script_path, 
+                    "--ros-args", 
+                    "-p", f"agent_id:={agent_id}", 
+                    "-p", f"module_type:={module_type}", 
+                    "-p", f"position:=[{position[0]},{position[1]}]",
+                    "-p", f"heartbeat_hz:={config.heartbeat_hz}",
+                    "--log-level", "INFO"
+                ]
+                
+                proc = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
+                with self.lock:
+                    self.processes[agent_id] = proc
+                proc.wait()
+            except Exception as e:
+                logger.error(f"❌ Fehler im Prozess von {agent_id}: {e}")
             finally:
-                # Wenn der Prozess endet (gekillt oder abgestürzt), im AgentManager aufräumen
-                logger.info(f"Prozess für Agent '{node_id}' wurde beendet.")
-                agent_manager.remove_agent(node_id)
+                with self.lock:
+                    if agent_id in self.processes: del self.processes[agent_id]
 
-        # Thread als Daemon starten, damit er das Backend beim Beenden nicht blockiert
-        thread = threading.Thread(target=node_thread, name=f"AgentThread_{node_id}", daemon=True)
-        thread.start()
+        threading.Thread(target=node_thread, name=f"Thread_{agent_id}", daemon=True).start()
 
-    def kill_node(self, node_id: str) -> None:
-        """Beendet einen spezifischen Agenten über den AgentManager."""
-        agent_manager.remove_agent(node_id)
+    # --- RESTART LOGIK (NEU) ---
 
-    def kill_all_nodes(self) -> None:
-        """Beendet alle aktuell registrierten Agenten-Prozesse."""
-        logger.info("Fahre alle Simulations-Nodes herunter...")
-        agent_manager.clear_all_agents()
+    def restart_active_agents(self):
+        """
+        Stoppt alle laufenden Agenten und startet sie neu.
+        Wird genutzt, um globale Parameteränderungen (z.B. Herzrate) zu übernehmen.
+        """
+        with self.lock:
+            # Kopie der IDs, um während der Iteration löschen/starten zu können
+            active_agent_ids = [aid for aid in self.processes.keys() if aid != "system_monitor"]
+        
+        if not active_agent_ids:
+            logger.info("ℹ️ Keine aktiven Agenten zum Neustarten vorhanden.")
+            return
 
+        logger.info(f"🔄 Starte {len(active_agent_ids)} Agenten neu (Synchronisation mit SSoT)...")
 
-# Globale Singleton-Instanz erzeugen
+        # Lokaler Import um Circular Dependency zu vermeiden
+        from .agent_manager import agent_manager
+
+        for aid in active_agent_ids:
+            agent = agent_manager.agents.get(aid)
+            if agent:
+                # 1. Prozess beenden
+                self.kill_node(aid)
+                # 2. Kurz warten (OS Cleanup)
+                time.sleep(0.2)
+                # 3. Mit neuen Parametern aus SSoT starten
+                self.start_node(aid, (agent.x, agent.y), agent.module_type)
+        
+        logger.info("✅ Alle Agenten erfolgreich neu orchestriert.")
+
+    # --- TERMINATION ---
+
+    def kill_node(self, agent_id: str):
+        with self.lock:
+            proc = self.processes.get(agent_id)
+            if proc:
+                try:
+                    # Sendet SIGTERM an die gesamte Prozessgruppe
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                    logger.info(f"🛑 Node {agent_id} beendet.")
+                except Exception as e:
+                    logger.warning(f"⚠️ Konnte Node {agent_id} nicht sauber beenden: {e}")
+
+    def kill_all_nodes(self):
+        logger.info("🛑 Herunterfahren aller ROS-Nodes...")
+        with self.lock:
+            for aid in list(self.processes.keys()):
+                self.kill_node(aid)
+
 node_manager = NodeManager()
 
-# --- FastAPI Router Endpunkte ---
-
-@router.post("/start_agent_node")
-async def start_agent_node(req: StartAgentRequest):
-    try:
-        if len(req.position) != 2:
-            raise ValueError("Position muss exakt 2 Werte enthalten [x, y]")
-        
-        pos_tuple = (req.position[0], req.position[1])
-        node_manager.start_node(req.node_id, pos_tuple, req.module_type)
-        
-        return {
-            "success": True,
-            "message": f"Start-Befehl für Agent '{req.node_id}' gesendet."
-        }
-    except Exception as exc:
-        logger.error(f"API Error (start_agent_node): {exc}")
-        raise HTTPException(status_code=500, detail=str(exc))
-
-@router.post("/kill_agent_node")
-async def kill_agent_node(req: KillAgentRequest):
-    try:
-        node_manager.kill_node(req.node_id)
-        return {
-            "success": True,
-            "message": f"Kill-Befehl für Agent '{req.node_id}' akzeptiert."
-        }
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-
-@router.post("/kill_all_nodes")
-async def kill_all_nodes_api():
-    try:
-        node_manager.kill_all_nodes()
-        return {
-            "success": True,
-            "message": "Alle laufenden Agenten-Prozesse werden beendet."
-        }
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+@router.post("/start_agent")
+async def api_start_agent(req: StartAgentRequest):
+    node_manager.start_node(req.agent_id, (req.x, req.y), req.module_type)
+    return {"status": "ok"}

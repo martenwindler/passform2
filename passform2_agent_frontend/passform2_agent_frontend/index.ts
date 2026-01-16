@@ -6,8 +6,11 @@ import './src/ThreeGridScene'; // Registriert die Web Component
 
 const savedConfig = localStorage.getItem('p2_agent_config');
 const defaultBackend = 'http://localhost:8000';
+const rosBridgeUrl = 'http://localhost:5000';
 
 let backendIP = localStorage.getItem('p2_backend_ip') || defaultBackend;
+
+// Falls noch eine alte IP mit Port 5000 im Speicher ist, auf Standard zurücksetzen
 if (backendIP.includes(":5000")) {
     backendIP = defaultBackend;
 }
@@ -21,6 +24,7 @@ const app = Elm.Main.init({
 });
 
 let socket: Socket | null = null;
+let rosSocket: Socket | null = null;
 
 // --- HILFSFUNKTIONEN FÜR STABILITÄT ---
 
@@ -38,40 +42,70 @@ const sendSafe = (portName: string, data: any) => {
     if (port && port.send) {
         port.send(data);
     } else {
-        console.warn(`📩 Incoming Port '${portName}' ist in Elm nicht aktiv.`);
+        console.error(`📩 Fehler: Incoming Port '${portName}' existiert nicht in Main.elm.`);
     }
 };
 
-// --- BACKEND VERBINDUNG & SOCKET LOGIK ---
+// --- ROS-BRIDGE VERBINDUNG (Port 5000) ---
+
+const connectToRosBridge = () => {
+    if (rosSocket) rosSocket.disconnect();
+    
+    console.log("🤖 Initialisiere Verbindung zu ROS-Bridge (Hardware)...");
+    
+    // WICHTIG: WebSocket-Only verhindert den 400 Bad Request Fehler
+    rosSocket = io(rosBridgeUrl, {
+        transports: ['websocket'],
+        upgrade: false,
+        reconnection: true,
+        reconnectionAttempts: Infinity
+    });
+
+    rosSocket.on('connect', () => {
+        console.log("✅ ROS-Bridge (5000): WebSocket-Verbindung steht.");
+    });
+
+    rosSocket.on('active_agents', (data) => {
+        console.log("📥 Hardware-Daten erhalten:", data);
+        
+        // Wir leiten die Daten an Elm weiter
+        if (data && Object.keys(data).length > 0) {
+            sendSafe('activeAgentsReceiver', data);
+        }
+    });
+
+    rosSocket.on('connect_error', (err) => {
+        console.error("❌ ROS-Bridge (5000) Fehler:", err.message);
+    });
+
+    rosSocket.on('disconnect', (reason) => {
+        console.warn("⚠️ ROS-Bridge getrennt:", reason);
+    });
+};
+
+// Startet die ROS-Verbindung sofort beim Laden
+connectToRosBridge();
+
+// --- HAUPT-BACKEND VERBINDUNG (Port 8000) ---
 
 subscribeSafe('connectToBackend', (url: string) => {
-    if (socket) {
-        socket.disconnect();
-    }
+    if (socket) socket.disconnect();
     
-    console.log("🔗 Verbinde zu Backend:", url);
+    console.log("🔗 Verbinde zu Haupt-Backend (Simulation):", url);
     localStorage.setItem('p2_backend_ip', url);
     socket = io(url);
 
-    // Verbindungsevents
     socket.on('connect', () => {
-        console.log("✅ Socket.IO verbunden");
+        console.log("✅ Haupt-Backend (8000) verbunden.");
         sendSafe('socketStatusReceiver', true);
+        socket?.emit('get_nfc_status');
     });
-
-    socket.on('disconnect', () => {
-        console.log("❌ Socket.IO getrennt");
-        sendSafe('socketStatusReceiver', false);
-        sendSafe('systemLogReceiver', { 
-            message: "Verbindung zum Backend verloren.", 
-            level: "warning" 
-        });
-    });
-
-    // --- INCOMING DATA (Socket -> Elm) ---
 
     socket.on('active_agents', (data) => {
-        sendSafe('activeAgentsReceiver', data);
+        console.log("📥 Simulations-Daten erhalten");
+        // Falls die Simulation die Agenten in ein 'agents' Feld wickelt, entpacken wir sie
+        const agents = data.agents ? data.agents : data;
+        sendSafe('activeAgentsReceiver', agents);
     });
 
     socket.on('path_complete', (data: any) => {
@@ -88,14 +122,34 @@ subscribeSafe('connectToBackend', (url: string) => {
         sendSafe('rfidReceiver', data);
     });
 
-    // NEU: Empfängt den Hardware-Status ("online" / "missing")
     socket.on('nfc_status', (data: any) => {
-        console.log("📡 NFC Hardware Status:", data.status);
-        sendSafe('nfcStatusReceiver', data.status);
+        const statusValue = (data && data.status) ? data.status : data;
+        console.log("📡 NFC Hardware Status:", statusValue);
+        sendSafe('nfcStatusReceiver', statusValue);
+    });
+
+    socket.on('disconnect', () => {
+        console.log("❌ Haupt-Backend getrennt.");
+        sendSafe('socketStatusReceiver', false);
     });
 });
 
 // --- STEUERUNGS-PORTS (Elm -> JS -> Backend) ---
+
+subscribeSafe('socketEmitPort', (payload: [string, any]) => {
+    const [eventName, data] = payload;
+    
+    // Befehle gehen primär an das Simulations-Backend
+    if (socket?.connected) {
+        socket.emit(eventName, data);
+    }
+    
+    // Spezielle Befehle (wie Herzschlag-Takt) auch an Hardware senden
+    if (rosSocket?.connected && eventName === 'set_heartbeat_rate') {
+        console.log("⚙️ Sende Heartbeat-Rate an Hardware-Bridge");
+        rosSocket.emit(eventName, data);
+    }
+});
 
 subscribeSafe('setMode', (mode: string) => {
     if (socket?.connected) {
@@ -114,15 +168,17 @@ subscribeSafe('triggerPlanning', (payload: any) => {
     }
 });
 
+subscribeSafe('savePlanningWeights', (weights: any) => {
+    if (socket?.connected) {
+        console.log("📤 Sende neue Planungs-Gewichte:", weights);
+        socket.emit('update_planning_config', weights);
+    }
+});
+
 subscribeSafe('writeNfcTrigger', (text: string) => {
     if (socket?.connected) {
         console.log("📤 Sende Schreibbefehl für NFC:", text);
         socket.emit('write_nfc', { text: text });
-    } else {
-        sendSafe('systemLogReceiver', { 
-            message: "NFC-Schreiben nicht möglich: Keine Socket-Verbindung.", 
-            level: "error" 
-        });
     }
 });
 
@@ -136,17 +192,13 @@ subscribeSafe('exportConfig', (jsonString: string) => {
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'passform_config.json';
-    a.click();
+    a.href = url; a.download = 'passform_config.json'; a.click();
     URL.revokeObjectURL(url);
 });
 
-// Name korrigiert passend zu Main.elm: importConfigTrigger
 subscribeSafe('importConfigTrigger', () => {
     const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
+    input.type = 'file'; input.accept = '.json';
     input.onchange = (e: any) => {
         const file = e.target.files[0];
         const reader = new FileReader();

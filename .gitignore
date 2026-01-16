@@ -1,66 +1,74 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# ──────────────────────────────────────────────────────────────
+# PASSFORM 2.0 - GLOBALE GITIGNORE
+# ──────────────────────────────────────────────────────────────
 
-# CMake and build artifacts (if manually invoked)
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-# Makefile
-*.so
-*.a
-*.o
-
-# Colcon build/install/log output (relative from workspace root)
+# --- ROS 2 & Colcon ---
+# Ignoriert alle Build-Artefakte im Workspace
+passform2_ws/build/
+passform2_ws/install/
+passform2_ws/log/
+# Falls colcon im Root gerufen wurde
 build/
 install/
 log/
+.colcon/
+ament_index/
 
-# ROS2 specific
-*.launch.pyc
-
-# Test & coverage
-*.gcno
-*.gcda
-*.gcov
-*.profraw
-htmlcov/
-.coverage
-
-# Python virtual environments
+# --- Python (Backend & ROS Nodes) ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+*.egg
+# Virtuelle Umgebungen
 .venv/
 env/
 venv/
+# Umgebungsvariablen (WICHTIG: Enthält Passwörter/IPs)
+.env
 
-# Misc
+# --- Daten & SSoT ---
+# Wir ignorieren die Live-Konfiguration, da sie lokale IPs/Zustände enthält
+/data/*.json
+# Ausnahme: Falls du ein Template behalten willst, erstelle config.json.template
+!/data/config.json.template
+
+# --- IDEs & Editoren ---
+.vscode/
+.idea/
 *.swp
 *.swo
 *~
 .DS_Store
-.idea/
-.vscode/
-*.bak
+Thumbs.db
 
-# Colcon metadata (optional but clean)
-.colcon/
-
-# Ignore ROS 2-generated index files
-ament_index/
-
-# Ignore tags and ctags
-tags
-TAGS
-
-# 
-**/**/docs/**/**
-
-#
+# --- Dokumentation & CAD/Assets ---
+# Ignoriert schwere Binärdateien und Zeichnungen
 *.jpg
 *.png
 *.drawio
 *.stl
 *.urdf
 *.dae
+*.pdf
+/docs/
 
-/data/*.json
+# --- Docker ---
+.dockerignore
+# Docker-Logs oder temporäre Container-Files
+*.log
+
+# --- Test & Coverage ---
+.coverage
+htmlcov/
+*.gcno
+*.gcda
+*.gcov
+
+# --- Temporäres ---
+*.tmp
+*.bak
+*.bak.*

@@ -7,13 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # System-Importe
 from app.config import config, SystemMode
-from .managers.node_manager import router as node_manager_router
-# [Image of a typical FastAPI project structure with routers and managers]
-from .managers.path_manager import router as path_manager_router
-from .system_api import router as system_router
-from .socket.socket_io_manager import socket_manager
+from .managers.socket_io_manager import socket_manager
 from .managers.agent_manager import agent_manager
 from .managers.nfc_manager import nfc_manager 
+from .managers.config_manager import config_manager
+from .managers.node_manager import node_manager, router as node_manager_router
+from .managers.path_manager import router as path_manager_router
+
+from .system_api import router as system_router
 from .ros.ros_client import get_ros_client
 from .logic.planner import planner
 
@@ -27,53 +28,76 @@ async def lifespan(app: FastAPI):
     """Verwaltet Startup und Shutdown des Backends."""
     logger.info(f"🚀 PassForm Backend startet im Modus: {config.get_current_mode().value}")
     
-    # 1. ROS-Client initialisieren
-    get_ros_client()
+    # 0. SSoT laden (config.json)
+    agent_manager.load_from_ssot()
 
-    # 2. NFC-Reader starten (Hintergrund-Thread für kontinuierliches Lesen)
-    nfc_manager.start_reading()
+    # 1. ROS-Nodes Orchestrierung
+    try:
+        # A) Zentralen System-Monitor/Planner starten
+        node_manager.start_system_nodes()
+        
+        # B) Agenten-Nodes aus SSoT spawnen
+        agents_to_spawn = [a.to_dict() for a in agent_manager.agents.values()]
+        node_manager.start_agents_from_config(agents_to_spawn)
+        
+        logger.info(f"✅ Orchestrator: System-Nodes und {len(agents_to_spawn)} Agenten gestartet.")
+    except Exception as e:
+        logger.error(f"❌ Kritischer Fehler beim Starten der ROS-Nodes: {e}")
+
+    # 2. ROS-Client initialisieren
+    try:
+        get_ros_client()
+    except Exception as e:
+        logger.warning(f"⚠️ ROS-Client konnte nicht initialisiert werden: {e}")
+
+    # 3. NFC-Reader starten
+    if nfc_manager.get_status() == "online":
+        nfc_manager.start_reading()
+        logger.info("📡 NFC-Hintergrund-Thread gestartet.")
+
+    # 4. NEU: Health-Broadcast-Loop für Signalstärken starten
+    health_task = asyncio.create_task(agent_manager.start_health_broadcast_loop())
+    logger.info("💓 Health-Monitoring-Loop für Agenten gestartet.")
     
-    # 3. Callback für neue Socket-Verbindungen (Daten-Synchronisation)
+    # 5. Callback für neue Socket-Verbindungen (Daten-Synchronisation)
     async def sync_state_for_client(sid):
         try:
-            # Begrüßung
-            welcome_msg = {
-                "message": f"Verbindung stabil: {socket_manager.active_clients_count()} Client(s) online", 
-                "level": "success"
-            }
-            await socket_manager.emit_event('system_log', welcome_msg, target_sid=sid)
+            logger.info(f"🔗 Synchronisiere neuen Client: {sid}")
             
-            # NEU: Hardware-Status des NFC-Readers synchronisieren
-            await socket_manager.emit_event('nfc_status', {
-                "status": nfc_manager.get_status()  # "online" oder "missing"
+            # NFC & Modus Status
+            await socket_manager.emit_event('nfc_status', {"status": nfc_manager.get_status()}, target_sid=sid)
+            await socket_manager.emit_event('mode', config.get_current_mode().value, target_sid=sid)
+            
+            # Begrüßung & System-Log
+            await socket_manager.emit_event('system_log', {
+                "message": f"System bereit (Hz: {config.heartbeat_hz})", 
+                "level": "success"
             }, target_sid=sid)
             
-            # Bestehende Logs und Agenten senden
+            # Bestehende Logs senden
             for log_entry in agent_manager.get_logs_history():
                 await socket_manager.emit_event('system_log', log_entry, target_sid=sid)
             
-            agents_data = [a.to_dict() for a in agent_manager.agents.values()]
-            await socket_manager.emit_event('active_agents', {'agents': agents_data}, target_sid=sid)
+            # Aktuelle Agenten-Topologie inkl. Signalstärke senden
+            agent_manager.send_agent_list()
             
-            logger.info(f"✅ Sync für Client {sid} abgeschlossen (NFC-Status: {nfc_manager.get_status()}).")
         except Exception as e:
-            logger.error(f"Fehler beim Client-Sync: {e}")
+            logger.error(f"❌ Fehler beim Client-Sync: {e}")
 
     socket_manager.set_on_new_client_callback(sync_state_for_client)
     
-    yield
+    yield # --- App läuft hier ---
     
     # --- SHUTDOWN ---
     logger.info("🛑 PassForm Backend wird beendet...")
-    nfc_manager.running = False  # Stoppt den NFC-Lese-Thread
-    from .managers.node_manager import node_manager
+    health_task.cancel() # Hintergrund-Task beenden
+    nfc_manager.running = False 
     node_manager.kill_all_nodes()
 
 # --- APP SETUP ---
 fastapi_app = FastAPI(
     title="PassForm Agent Backend",
-    description="Zentrale Steuerung für FTF, statische Module und RFID-Hardware",
-    version="1.3.2",
+    version="1.7.0",
     lifespan=lifespan
 )
 
@@ -89,96 +113,90 @@ fastapi_app.add_middleware(
 
 @socket_manager.sio.on('plan_path')
 async def handle_plan_path(sid, payload):
-    """Missionsplanung: Entscheidet zwischen FTF-Transport und Modul-Kette."""
     try:
         start, goal = payload.get("start"), payload.get("goal")
         elm_agents = payload.get("agents", {}) 
         
-        # Grid normalisieren
-        grid = {}
-        agents_list = elm_agents.values() if isinstance(elm_agents, dict) else elm_agents
-        ftf_agent = None
-
-        for agent in agents_list:
-            pos = agent.get("position", agent) 
-            x, y = int(pos.get("x")), int(pos.get("y"))
-            a_data = agent.copy()
-            a_data["x"], a_data["y"] = x, y
-            grid[(x, y)] = a_data
-            if agent.get("module_type") == "ftf":
-                ftf_agent = a_data
-
+        # Umwandlung für Planner
+        grid = { (int(a.get("x")), int(a.get("y"))): a for a in (elm_agents.values() if isinstance(elm_agents, dict) else elm_agents) }
+        
+        ftf_agent = next((a for a in grid.values() if a.get("module_type") == "ftf"), None)
         start_tuple = (int(start["x"]), int(start["y"]))
         goal_tuple = (int(goal["x"]), int(goal["y"]))
 
         if ftf_agent:
             ftf_id = ftf_agent["agent_id"]
             ftf_pos = (int(ftf_agent["x"]), int(ftf_agent["y"]))
-            agent_manager.log_to_system(f"FTF Mission: Berechne Pfad für {ftf_id}...", "info")
-
+            
+            # Kombinierter Pfad (FTF -> Pickup -> Dropoff)
             path_a, _, _ = planner.a_star(ftf_pos, start_tuple, grid, travel_mode="ftf")
             path_b, cost_b, _ = planner.a_star(start_tuple, goal_tuple, grid, travel_mode="ftf")
             
             if path_a and path_b:
                 full_path = path_a + path_b[1:]
-                await socket_manager.emit_event('path_complete', {
-                    "status": 1, "cost": float(cost_b), "path": full_path
-                }, target_sid=sid)
-                agent_manager.log_to_system(f"Mission bestätigt. FTF startet.", "success")
+                await socket_manager.emit_event('path_complete', {"status": 0, "cost": float(cost_b), "path": full_path}, target_sid=sid)
+                # Mission asynchron ausführen (Animation/Simulation)
                 asyncio.create_task(agent_manager.execute_mission(ftf_id, full_path, start_tuple, goal_tuple))
             else:
                 agent_manager.log_to_system("Kein Pfad für FTF möglich.", "warning")
-                await socket_manager.emit_event('path_complete', {"status": 0, "path": []}, target_sid=sid)
         else:
-            path, cost, msg = planner.a_star(start_tuple, goal_tuple, grid, travel_mode="chain")
+            # Reine Ketten-Planung (ohne FTF Bewegung)
+            path, cost, _ = planner.a_star(start_tuple, goal_tuple, grid, travel_mode="chain")
             if path:
-                agent_manager.log_to_system(f"Kette gefunden: {msg}", "success")
-                await socket_manager.emit_event('path_complete', {"status": 1, "cost": float(cost), "path": path}, target_sid=sid)
-            else:
-                agent_manager.log_to_system("Keine Kette möglich.", "warning")
-                await socket_manager.emit_event('path_complete', {"status": 0, "path": []}, target_sid=sid)
+                await socket_manager.emit_event('path_complete', {"status": 0, "cost": float(cost), "path": path}, target_sid=sid)
 
     except Exception as e:
-        logger.error(f"Fehler in Pfadplanung: {e}", exc_info=True)
+        logger.error(f"Fehler in Pfadplanung: {e}")
+
+@socket_manager.sio.on('update_planning_config')
+async def handle_update_planning_config(sid, data):
+    try:
+        config_manager.current_data["config"]["planning_weights"] = data
+        config_manager.save_to_ssot()
+        agent_manager.log_to_system("⚙️ Planungs-Parameter in SSoT gesichert.", "success")
+    except Exception as e:
+        logger.error(f"Fehler beim Gewichts-Update: {e}")
 
 @socket_manager.sio.on('write_nfc')
 async def handle_write_nfc(sid, data):
-    """Hardware-Schreibvorgang mit Thread-Auslagerung."""
     tag_content = data if isinstance(data, str) else data.get("text", "")
-    
     if nfc_manager.get_status() == "missing":
-        await socket_manager.emit_event('system_log', {
-            "message": "🚫 NFC Fehler: Hardware (RC522) nicht gefunden!",
-            "level": "error"
-        }, target_sid=sid)
+        agent_manager.log_to_system("🚫 NFC Fehler: Hardware fehlt.", "error")
         return
-
     result = await asyncio.to_thread(nfc_manager.write_tag, tag_content)
-    
-    if result == "success":
-        msg, level = f"✅ NFC: '{tag_content}' erfolgreich geschrieben.", "success"
-    elif result == "timeout":
-        msg, level = "❌ NFC Abbruch: Kein Chip erkannt.", "warning"
-    else:
-        msg, level = "🚫 NFC: Hardware-Fehler.", "error"
-
-    await socket_manager.emit_event('system_log', {"message": msg, "level": level}, target_sid=sid)
+    agent_manager.log_to_system(f"NFC: {result}", "success" if result == "success" else "warning")
 
 @socket_manager.sio.on('set_mode')
 async def handle_set_mode(sid, data):
-    """Wechselt zwischen Simulation und Hardware-Modus."""
+    mode_str = data if isinstance(data, str) else data.get("mode")
     try:
-        mode_str = data if isinstance(data, str) else data.get("mode")
         new_mode = SystemMode(mode_str)
         if config.set_mode(new_mode):
-            if new_mode == SystemMode.HARDWARE:
-                agent_manager.clear_all_agents()
-                agent_manager.log_to_system("Hardware aktiv: Warte auf ROS...", "warning")
-            else:
-                agent_manager.log_to_system("Simulation aktiv.", "info")
+            agent_manager.clear_all_agents()
             await socket_manager.emit_event('mode', mode_str)
+            agent_manager.log_to_system(f"🔄 System auf {mode_str} umgeschaltet.", "info")
     except Exception as e:
-        logger.error(f"Modus-Fehler: {e}")
+        logger.error(f"Fehler beim Modus-Wechsel: {e}")
+
+@socket_manager.sio.on('set_heartbeat_rate')
+async def handle_set_heartbeat_rate(sid, data):
+    try:
+        # Daten können ein Float oder ein Dict sein
+        new_hz = float(data if isinstance(data, (int, float)) else data.get("hz", 1.0))
+        
+        if config.set_heartbeat_hz(new_hz):
+            # Bestätigung an alle Clients
+            await socket_manager.emit_event('system_log', {
+                "message": f"⚡ System-Takt auf {new_hz}Hz geändert.",
+                "level": "info"
+            })
+            
+            # WICHTIG: Die Agent-Liste neu senden, damit das UI die 
+            # Signalstärken-Berechnung sofort anpasst
+            agent_manager.send_agent_list()
+            
+    except Exception as e:
+        logger.error(f"Fehler beim Takt-Update: {e}")
 
 # --- API ENDPUNKTE ---
 fastapi_app.include_router(node_manager_router, prefix="/api/nodes")
@@ -187,17 +205,17 @@ fastapi_app.include_router(system_router, prefix="/api/system")
 
 @fastapi_app.get("/")
 async def root():
-    return {"service": "PassForm Backend", "mode": config.get_current_mode().value, "status": "online"}
+    return {
+        "service": "PassForm Backend", 
+        "mode": config.get_current_mode().value,
+        "heartbeat_ssot": f"{config.heartbeat_hz}Hz",
+        "nodes_active": len(node_manager.processes)
+    }
 
-@fastapi_app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled Exception: {exc}", exc_info=True)
-    return JSONResponse(status_code=500, content={"message": str(exc)})
-
-# Socket.IO an FastAPI binden
+# --- SOCKET.IO INTEGRATION ---
 socket_manager.attach_fastapi(fastapi_app)
 app = socket_manager.app_sio
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host=config.host, port=config.port, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

@@ -21,12 +21,20 @@ type alias AgentModule =
     , orientation : Int
     , is_dynamic : Bool
     , payload : Maybe String
+    , signal_strength : Int -- NEU: 0-100% Signalqualität
     }
 
 type alias Path =
     { status : Int
     , cost : Float
     , path : List AgentModule
+    }
+
+type alias PlanningWeights =
+    { execution_time_default : Float
+    , complex_module_time : Float
+    , human_extra_weight : Float
+    , proximity_penalty : Float
     }
 
 -- --- MODEL ---
@@ -50,8 +58,10 @@ type alias Model =
     , gridWidth : Int
     , gridHeight : Int
     , waitingForNfc : Bool
-    -- NEU: Trackt den Hardware-Zustand des NFC-Readers ("online", "missing", "unknown")
     , nfcStatus : String
+    , planningWeights : PlanningWeights
+    , currentHz : Float      -- NEU: Aktueller System-Takt (SSoT)
+    , alert : Maybe String   -- NEU: ID des kritischen Agenten für Warn-Toast
     }
 
 type Mode = Simulation | Hardware
@@ -92,6 +102,9 @@ type Msg
     | ModeChanged (Result Http.Error ())
     | HandleSystemLog (Result Decode.Error SystemLog)
     | HandleRfid (Result Decode.Error String)
-    -- NEU: Verarbeitet den Hardware-Status vom Backend
     | HandleNfcStatus (Result Decode.Error String)
     | RequestNfcWrite String
+    | SetWeight String String 
+    | SaveWeights
+    | ChangeHz Float         
+    | DismissAlert          

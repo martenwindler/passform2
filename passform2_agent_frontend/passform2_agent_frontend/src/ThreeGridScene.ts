@@ -7,19 +7,16 @@ export class ThreeGridScene extends HTMLElement {
     private raycaster: THREE.Raycaster;
     private gridHelper: THREE.GridHelper | null = null;
     
-    // Raster aus einzelnen Kacheln für die Boden-Einfärbung
     private gridCells: THREE.Mesh[][] = [];
     private agentMeshes: Map<string, THREE.Object3D> = new Map();
     private pathLine: THREE.Line | null = null;
     
-    // Farben & Marker-Status
     private readonly defaultGroundColor = 0x2d3748;
-    private readonly startColor = 0x48bb78; // Grün
-    private readonly goalColor = 0x3182ce;  // Blau
+    private readonly startColor = 0x48bb78; 
+    private readonly goalColor = 0x3182ce;  
     private startPos: {x: number, y: number} | null = null;
     private goalPos: {x: number, y: number} | null = null;
 
-    // Kamera & Interaktions-Parameter
     private targetCameraPos = new THREE.Vector3(16, 25, 16);
     private lerpSpeed = 0.08;
     private isDragging = false;
@@ -75,12 +72,10 @@ export class ThreeGridScene extends HTMLElement {
         this.updateGrid();
     }
 
-    // Erstellt das Gitter aus Einzelkacheln
     private updateGrid() {
         const w = Math.max(1, parseInt(this.getAttribute('grid-width') || '10'));
         const h = Math.max(1, parseInt(this.getAttribute('grid-height') || '10'));
 
-        // Alte Kacheln löschen
         this.gridCells.flat().forEach(cell => {
             this.scene.remove(cell);
             cell.geometry.dispose();
@@ -112,7 +107,6 @@ export class ThreeGridScene extends HTMLElement {
         this.updateMarkers();
     }
 
-    // Färbt die Kacheln für Start und Ziel ein
     private updateMarkers() {
         if (this.startPos) this.colorizeCell(this.startPos.x, this.startPos.y, this.defaultGroundColor);
         if (this.goalPos) this.colorizeCell(this.goalPos.x, this.goalPos.y, this.defaultGroundColor);
@@ -132,9 +126,7 @@ export class ThreeGridScene extends HTMLElement {
         }
     }
 
-    // Aktualisiert die Agenten-Meshes und deren Rotation
     private updateAgents(agents: any[]) {
-        // Wir nutzen jetzt die agent_id als Key für eine flüssige Bewegung
         const currentIds = new Set(agents.map(a => a.agent_id));
         const toRemove = new Set([...this.agentMeshes.keys()].filter(id => !currentIds.has(id)));
 
@@ -148,12 +140,10 @@ export class ThreeGridScene extends HTMLElement {
                 this.agentMeshes.set(id, mesh);
             }
 
-            // Zielposition setzen
             const targetX = agent.position.x + 0.5;
             const targetZ = agent.position.y + 0.5;
 
-            // Einfaches "Sliding" für dynamische Agenten (FTF)
-            if (agent.is_dynamic) {
+            if (agent.is_dynamic || agent.module_type === 'ftf') {
                 mesh.position.lerp(new THREE.Vector3(targetX, 0.1, targetZ), 0.1);
             } else {
                 mesh.position.set(targetX, 0.2, targetZ);
@@ -161,65 +151,136 @@ export class ThreeGridScene extends HTMLElement {
             
             mesh.rotation.y = (agent.orientation || 0) * (Math.PI / 180);
             
-            // Visualisierung der Beladung (Payload)
             if (agent.payload) {
-                mesh.scale.set(1.1, 1.2, 1.1); // FTF "plustert" sich auf, wenn es trägt
+                mesh.scale.set(1.1, 1.2, 1.1);
             } else {
                 mesh.scale.set(1, 1, 1);
             }
         });
 
-        // Verschwundene Agenten löschen
         toRemove.forEach(id => {
             const mesh = this.agentMeshes.get(id);
             if (mesh) { this.scene.remove(mesh); this.agentMeshes.delete(id); }
         });
     }
 
+    /**
+     * NEU: Erstellt Richtungspfeile basierend auf dem Modultyp (RViz-Logik)
+     */
+    private createDirectionArrows(moduleType: string): THREE.Group {
+        const arrowGroup = new THREE.Group();
+        // Ein kräftiges Cyan oder Gelb sorgt für besseren Kontrast auf dunklem Grund
+        const arrowColor = 0x00ffff; 
+        const arrowLength = 0.5;
+        const headLength = 0.2;
+        const headWidth = 0.15;
+
+        const directionMap: Record<string, THREE.Vector3[]> = {
+            'greifer': [
+                new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1),
+                new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0)
+            ],
+            'mensch': [
+                new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1),
+                new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0)
+            ],
+            'rollen_ns': [new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1)],
+            'rollen_ow': [new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0)]
+        };
+
+        const dirs = directionMap[moduleType] || [];
+
+        dirs.forEach(dir => {
+            const arrow = new THREE.ArrowHelper(
+                dir, 
+                new THREE.Vector3(0, 0, 0), // Ursprung lokal (wird gleich verschoben)
+                arrowLength, 
+                arrowColor,
+                headLength,
+                headWidth
+            );
+
+            // DER TRICK: Die Pfeile werden immer im Vordergrund gezeichnet
+            [arrow.line, arrow.cone].forEach((obj: any) => {
+                obj.material.transparent = true;
+                obj.material.opacity = 0.9;
+                obj.material.depthTest = false; // Ignoriert andere Objekte
+                obj.renderOrder = 999;          // Stellt sicher, dass es zuletzt gezeichnet wird
+            });
+
+            arrowGroup.add(arrow);
+        });
+
+        return arrowGroup;
+    }
+
     private createAgentMesh(type: string, isDynamic: boolean): THREE.Object3D {
+        const group = new THREE.Group();
+        let arrowsY = 0.2; // Standardhöhe für Pfeile
+
         if (isDynamic || type === 'ftf') {
-            // Das FTF als flache, gelbe "Flunder"
-            const group = new THREE.Group();
             const bodyGeo = new THREE.BoxGeometry(0.7, 0.1, 0.8);
             const bodyMat = new THREE.MeshPhongMaterial({ color: 0xffd700, emissive: 0x443300 });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
+            group.add(body);
             
-            // Kleine "Augen" oder Sensoren für die Fahrtrichtung
             const eyeGeo = new THREE.BoxGeometry(0.1, 0.05, 0.1);
             const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
             const eye = new THREE.Mesh(eyeGeo, eyeMat);
             eye.position.set(0, 0.05, 0.35);
-            
-            group.add(body);
             group.add(eye);
-            return group;
+            // Keine Pfeile für FTF
+        } else {
+            let geo, col, height = 0.3;
+            
+            if (type.includes('rollen')) { 
+                height = 0.15;
+                geo = new THREE.BoxGeometry(0.85, height, 0.85); 
+                col = 0x3182ce; 
+                arrowsY = height / 2 + 0.05; // Knapp über der Box
+            }
+            else if (type === 'greifer') { 
+                height = 0.6;
+                geo = new THREE.CylinderGeometry(0.35, 0.35, height, 16); 
+                col = 0xed8936; 
+                arrowsY = height / 2 + 0.1; // Ein Stück über dem Zylinder
+            }
+            else if (type === 'conveyeur') { 
+                height = 0.1;
+                geo = new THREE.BoxGeometry(0.9, height, 0.9); 
+                col = 0x38a169; 
+                arrowsY = height / 2 + 0.05;
+            }
+            else { 
+                geo = new THREE.BoxGeometry(0.95, 0.3, 0.95); 
+                col = 0x718096; 
+                arrowsY = 0.3 / 2 + 0.1;
+            }
+            
+            const mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: col }));
+            group.add(mesh);
+
+            // Pfeile hinzufügen und auf die richtige Höhe schieben
+            const arrows = this.createDirectionArrows(type);
+            arrows.position.y = arrowsY; 
+            group.add(arrows);
         }
 
-        // Statische Module (unverändert, aber optimiert)
-        let geo, col;
-        if (type.includes('rollen')) { geo = new THREE.BoxGeometry(0.85, 0.15, 0.85); col = 0x3182ce; }
-        else if (type === 'greifer') { geo = new THREE.CylinderGeometry(0.35, 0.35, 0.6, 16); col = 0xed8936; }
-        else if (type === 'conveyeur') { geo = new THREE.BoxGeometry(0.9, 0.1, 0.9); col = 0x38a169; }
-        else { geo = new THREE.BoxGeometry(0.95, 0.3, 0.95); col = 0x718096; }
-        
-        return new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: col }));
+        return group;
     }
 
-    // Pfad-Zeichnung: Jetzt mit Leucht-Effekt für die Mission
     private drawPath(pathNodes: any[]) {
         if (this.pathLine) { this.scene.remove(this.pathLine); this.pathLine.geometry.dispose(); }
         if (!pathNodes || pathNodes.length < 2) return;
 
         const points = pathNodes.map(n => {
-            // Wir nutzen n.position (für Sim) oder n direkt (Fallback)
             const pos = n.position || n;
             return new THREE.Vector3(pos.x + 0.5, 0.12, pos.y + 0.5);
         });
 
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         const material = new THREE.LineBasicMaterial({ 
-            color: 0x00f2ff, // Neon-Blau für Missionen
-            linewidth: 3,
+            color: 0x00f2ff, 
             transparent: true,
             opacity: 0.8
         });
@@ -227,8 +288,6 @@ export class ThreeGridScene extends HTMLElement {
         this.pathLine = new THREE.Line(geometry, material);
         this.scene.add(this.pathLine);
     }
-
-    // --- INTERAKTIONSLOGIK ---
 
     private onMouseDown(event: MouseEvent) {
         this.isMouseDown = true;
@@ -242,12 +301,15 @@ export class ThreeGridScene extends HTMLElement {
         if (!this.isDragging && delta > this.dragThreshold) {
             const coords = this.getMouseCoords(event);
             this.raycaster.setFromCamera(coords, this.camera);
-            const intersects = this.raycaster.intersectObjects(Array.from(this.agentMeshes.values()));
+            const intersects = this.raycaster.intersectObjects(Array.from(this.agentMeshes.values()), true);
             if (intersects.length > 0) {
                 this.isDragging = true;
-                const object = intersects[0].object;
-                this.draggedAgentKey = [...this.agentMeshes.entries()].find(([_, v]) => v === object)?.[0] || null;
-                if (this.draggedAgentKey) (this.agentMeshes.get(this.draggedAgentKey) as THREE.Mesh).material.opacity = 0.6;
+                // Finde die oberste Gruppe des Agenten
+                let target = intersects[0].object;
+                while (target.parent && target.parent !== this.scene) {
+                    target = target.parent;
+                }
+                this.draggedAgentKey = [...this.agentMeshes.entries()].find(([_, v]) => v === target)?.[0] || null;
             }
         }
 
@@ -284,7 +346,6 @@ export class ThreeGridScene extends HTMLElement {
             if (mesh) {
                 const oldPos = this.draggedAgentKey.split('_').map(Number);
                 const newX = Math.floor(mesh.position.x), newY = Math.floor(mesh.position.z);
-                (mesh as THREE.Mesh).material.opacity = 1.0;
                 mesh.position.y = 0.2;
                 this.dispatchEvent(new CustomEvent('agent-moved', {
                     detail: { oldX: oldPos[0], oldY: oldPos[1], newX, newY },

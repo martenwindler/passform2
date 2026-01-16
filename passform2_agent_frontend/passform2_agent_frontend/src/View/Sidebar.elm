@@ -23,7 +23,7 @@ view model =
                 ) model.logs)
             ]
 
-        -- NEU: NFC Warte-Indikator (Erscheint nur während des Schreibvorgangs)
+        -- NFC Warte-Indikator
         , if model.waitingForNfc then
             div [ class "sidebar-section nfc-wait-section" ]
                 [ div [ class "nfc-wait-indicator" ]
@@ -52,16 +52,24 @@ view model =
         -- 3. Globale Aktionen
         , div [ class "sidebar-section" ]
             [ h3 [] [ text "Aktionen" ]
-            , div [ class "sidebar-actions-grid" ]
-                [ button [ class "btn-secondary", onClick LoadDefaultConfig ] [ text "Standard laden" ]
-                , button [ class "btn-primary", onClick SetCurrentAsDefault ] [ text "Layout speichern" ]
-                , button [ class "btn-secondary", onClick ExportConfig ] [ text "Export JSON" ]
-                , button [ class "btn-secondary", onClick ImportConfigTrigger ] [ text "Import JSON" ]
-                , button [ class "btn-danger", onClick ClearGrid ] [ text "Gitter leeren" ]
+            , div [ class "actions-compact-grid" ]
+                [ button [ class "btn-secondary btn-small", onClick LoadDefaultConfig ] 
+                    [ span [] [ text "📂" ], text " Standard" ]
+                , button [ class "btn-primary btn-small", onClick SetCurrentAsDefault ] 
+                    [ span [] [ text "💾" ], text " Speichern" ]
+                , button [ class "btn-secondary btn-small", onClick ExportConfig ] 
+                    [ span [] [ text "📤" ], text " Export" ]
+                , button [ class "btn-secondary btn-small", onClick ImportConfigTrigger ] 
+                    [ span [] [ text "📥" ], text " Import" ]
                 ]
+            , button [ class "btn-danger btn-small btn-full-width", onClick ClearGrid ] 
+                [ span [] [ text "🗑️" ], text " Gitter leeren" ]
             ]
 
-        -- 4. Liste der aktiven Module
+        -- 4. Planungs-Parameter
+        , viewPlanningSettings model
+
+        -- 5. Liste der aktiven Module
         , div [ class "sidebar-section" ]
             [ h3 [] [ text ("Aktive Module (" ++ String.fromInt (Dict.size model.agents) ++ ")") ]
             , if Dict.isEmpty model.agents then
@@ -71,7 +79,7 @@ view model =
                     (model.agents |> Dict.values |> List.sortBy .module_type |> List.map viewAgentItem)
             ]
 
-        -- 5. Missions-Status & Planung
+        -- 6. Missions-Status & Planung
         , div [ class "sidebar-section mission-section" ]
             [ h3 [] [ text "Missions-Planung" ]
             , viewCoordinateStatus "📦 Start" model.pathStart
@@ -95,6 +103,39 @@ view model =
         ]
 
 -- --- HILFSFUNKTIONEN ---
+
+viewPlanningSettings : Model -> Html Msg
+viewPlanningSettings model =
+    let
+        weights = model.planningWeights
+    in
+    div [ class "sidebar-section settings-section" ]
+        [ h3 [] [ text "Planungs-Parameter" ]
+        -- NEU: Ein Container für eine Raster-Zeile
+        , div [ class "parameter-grid-row" ]
+            [ -- Item 1
+              div [ class "parameter-item" ]
+                [ label [] [ text "Basis (s)" ]
+                , input [ type_ "number", step "0.1", value (String.fromFloat weights.execution_time_default), onInput (SetWeight "execution_time_default") ] []
+                ]
+            -- Item 2
+            , div [ class "parameter-item" ]
+                [ label [] [ text "Komplex (s)" ]
+                , input [ type_ "number", step "0.1", value (String.fromFloat weights.complex_module_time), onInput (SetWeight "complex_module_time") ] []
+                ]
+            -- Item 3
+            , div [ class "parameter-item" ]
+                [ label [] [ text "Mensch" ]
+                , input [ type_ "number", step "0.5", value (String.fromFloat weights.human_extra_weight), onInput (SetWeight "human_extra_weight") ] []
+                ]
+            -- Item 4
+            , div [ class "parameter-item" ]
+                [ label [] [ text "Nähe" ]
+                , input [ type_ "number", step "0.1", value (String.fromFloat weights.proximity_penalty), onInput (SetWeight "proximity_penalty") ] []
+                ]
+            ]
+        , button [ class "btn-apply", onClick SaveWeights ] [ text "Parameter anwenden" ]
+        ]
 
 viewAgentItem : AgentModule -> Html Msg
 viewAgentItem agent =
@@ -122,11 +163,12 @@ viewAgentItem agent =
 formatType : String -> String
 formatType t =
     case t of
-        "ftf" -> "Transport-Agent (FTF)"
+        "ftf" -> "FTF Transport"
+        "conveyeur" -> "Conveyeur-Modul"
         "rollen_ns" -> "Rollen-Modul"
+        "mensch" -> "Mensch (Bediener)"
         "greifer" -> "Greifer-Einheit"
-        "tisch" -> "Arbeitstisch"
-        "conveyeur" -> "Förderband"
+        "tisch" -> "Arbeitsstation"
         _ -> t
 
 viewCoordinateStatus : String -> Maybe GridCell -> Html Msg

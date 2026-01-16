@@ -3,7 +3,7 @@ from typing import Dict, Any, Set
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.socket.socket_io_manager import socket_manager
+from .socket_io_manager import socket_manager
 
 # Logger Setup
 logger = logging.getLogger("path_manager")

@@ -1,5 +1,4 @@
 string agent_id
 string module_type
-GridPosition position
+passform_agent_msgs/GridPosition position
 float32 orientation
-string status

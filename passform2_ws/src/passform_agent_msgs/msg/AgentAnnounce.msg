@@ -1,2 +1,2 @@
-string agent_id
-string module_type
+bool active
+passform_agent_msgs/AgentInfo agent_info
