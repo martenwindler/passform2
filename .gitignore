@@ -62,3 +62,5 @@ TAGS
 *.stl
 *.urdf
 *.dae
+
+/data/*.json
