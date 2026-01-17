@@ -18,6 +18,7 @@ import View.HardwareStatus as HardwareStatus
 
 -- PROGRAM
 
+
 main : Program { backendIP : String, savedConfig : Maybe String } Model Msg
 main =
     Browser.element
@@ -29,6 +30,7 @@ main =
 
 
 -- INIT
+
 
 init : { backendIP : String, savedConfig : Maybe String } -> ( Model, Cmd Msg )
 init flags =
@@ -45,17 +47,18 @@ init flags =
     ( { mode = Simulation
       , backendIP = flags.backendIP
       , connected = True
+      , rosConnected = False
       , agents = initialAgents
       , savedDefault = initialAgents
-      , connectedHardware = [] -- NEU: Initial leer
+      , connectedHardware = []
       , logs = [ { message = "System bereit. SSoT geladen.", level = "success" } ]
       , pathStart = Nothing
       , pathGoal = Nothing
       , currentPath = Nothing
       , hoveredCell = Nothing
       , sidebarOpen = False
-      , gridWidth = 10
-      , gridHeight = 10
+      , gridWidth = 6
+      , gridHeight = 4
       , editing = True
       , is3D = False
       , loading = False
@@ -69,7 +72,7 @@ init flags =
             , complex_module_time = 3.5
             , human_extra_weight = 1.0
             , proximity_penalty = 0.5
-            , hardware_safety_factor = 1.2 -- Optionaler Hardware-Faktor
+            , hardware_safety_factor = 1.2
             }
       }
     , Ports.connectToBackend flags.backendIP
@@ -78,22 +81,24 @@ init flags =
 
 -- SUBSCRIPTIONS
 
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Ports.socketStatusReceiver SetConnected
+        , Ports.rosStatusReceiver SetRosConnected
         , Ports.activeAgentsReceiver UpdateAgents
         , Ports.pathCompleteReceiver PlanningResultRaw
         , Ports.configReceived ConfigReceived
         , Ports.systemLogReceiver (Decode.decodeValue Decoders.decodeSystemLog >> HandleSystemLog)
         , Ports.rfidReceiver (Decode.decodeValue Decoders.decodeRfid >> HandleRfid)
         , Ports.nfcStatusReceiver (Decode.decodeValue Decode.string >> HandleNfcStatus)
-        -- NEU: Empfang der Hardware-Liste vom Raspberry Pi
         , Ports.hardwareUpdateReceiver (Decode.decodeValue Decoders.hardwareListDecoder >> HandleHardwareUpdate)
         ]
 
 
 -- VIEW
+
 
 view : Model -> Html Msg
 view model =
@@ -104,12 +109,12 @@ view model =
             , if model.sidebarOpen then Sidebar.view model else text ""
             , HardwareStatus.viewAlertOverlay model.alert 
             ]
-        -- Das Modal bekommt nun das ganze Model (inkl. connectedHardware)
         , Modal.viewActiveMenu model model.activeMenu 
         ]
 
 
 -- HELPER VIEW (3D INTERFACE)
+
 
 view3D : Model -> Html Msg
 view3D model =

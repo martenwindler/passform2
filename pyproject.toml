@@ -10,9 +10,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "psutil",
-    "loguru",
-    "netifaces",
-    "zeroconf"
+    "websockets"
 ]
 
 [tool.setuptools]Dependencies!"

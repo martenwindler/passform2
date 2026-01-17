@@ -27,7 +27,7 @@ type alias AgentModule =
     , orientation : Int
     , is_dynamic : Bool
     , payload : Maybe String
-    , signal_strength : Int -- NEU: 0-100% Signalqualität
+    , signal_strength : Int -- 0-100% Signalqualität
     }
 
 type alias Path =
@@ -49,7 +49,8 @@ type alias PlanningWeights =
 type alias Model =
     { mode : Mode
     , backendIP : String
-    , connected : Bool
+    , connected : Bool            -- Status für Backend-REST (Port 8000)
+    , rosConnected : Bool         -- NEU: Status für Backend-ROS (Port 5000)
     , agents : Dict (Int, Int) AgentModule
     , savedDefault : Dict (Int, Int) AgentModule
     , logs : List SystemLog 
@@ -67,9 +68,9 @@ type alias Model =
     , waitingForNfc : Bool
     , nfcStatus : String
     , planningWeights : PlanningWeights
-    , currentHz : Float      -- NEU: Aktueller System-Takt (SSoT)
-    , alert : Maybe String   -- NEU: ID des kritischen Agenten für Warn-Toast
-    , connectedHardware : List HardwareDevice -- RPis
+    , currentHz : Float           -- Aktueller System-Takt (SSoT)
+    , alert : Maybe String        -- ID des kritischen Agenten für Warn-Toast
+    , connectedHardware : List HardwareDevice -- Externe RPis
     }
 
 type Mode = Simulation | Hardware
@@ -99,7 +100,8 @@ type Msg
     | RotateAgent GridCell
     | MoveAgent { oldX : Int, oldY : Int, newX : Int, newY : Int }
     | UpdateAgents Decode.Value
-    | SetConnected Bool
+    | SetConnected Bool           -- Setzt REST-Status
+    | SetRosConnected Bool        -- Setzt ROS-Status
     | LogReceived String
     | HandleGridClick GridCell
     | SetPathStart GridCell
@@ -114,6 +116,6 @@ type Msg
     | RequestNfcWrite String
     | SetWeight String String 
     | SaveWeights
-    | ChangeHz Float         
+    | ChangeHz Float                 
     | DismissAlert
     | HandleHardwareUpdate (Result Decode.Error (List HardwareDevice))

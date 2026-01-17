@@ -22,12 +22,10 @@ update msg model =
 
         -- --- AGENTEN UPDATES (SSoT Logik) ---
         UpdateAgents rawJson ->
-            -- Nur im Hardware-Modus überschreibt das Backend unseren lokalen Zustand
             if model.mode == Hardware then
                 case Decode.decodeValue Decoders.agentMapDecoder rawJson of
                     Ok newAgentsDict ->
                         let
-                            -- Check auf kritische Signalstärke (< 20%) für den Alarm-Toast
                             criticalAgentId =
                                 newAgentsDict
                                     |> Dict.values
@@ -39,7 +37,6 @@ update msg model =
 
                     Err _ ->
                         ( model, Cmd.none )
-
             else
                 ( model, Cmd.none )
 
@@ -52,7 +49,6 @@ update msg model =
                 modeStr =
                     if newMode == Simulation then "simulation" else "hardware"
 
-                -- Beim Wechsel: Simulation lädt Defaults, Hardware startet leer (wartet auf Sync)
                 ( updatedAgents, logEntry ) =
                     if newMode == Simulation then
                         ( model.savedDefault, { message = "Simulation aktiv: Lokale Bearbeitung möglich.", level = "info" } )
@@ -122,6 +118,9 @@ update msg model =
         SetConnected status ->
             ( { model | connected = status }, Cmd.none )
 
+        SetRosConnected status ->
+            ( { model | rosConnected = status }, Cmd.none )
+
         HandleSystemLog result ->
             case result of
                 Ok logEntry ->
@@ -129,14 +128,11 @@ update msg model =
                 Err _ ->
                     ( model, Cmd.none )
 
-        -- HARDWARE -- 
         HandleHardwareUpdate result ->
             case result of
                 Ok hardwareList ->
                     ( { model | connectedHardware = hardwareList }, Cmd.none )
-
-                Err error ->
-                    -- Optional: Fehler loggen
+                Err _ ->
                     ( model, Cmd.none )
 
         -- --- UI & PLANUNG ---
@@ -157,6 +153,7 @@ update msg model =
                         "complex_module_time" -> { oldWeights | complex_module_time = newVal }
                         "human_extra_weight" -> { oldWeights | human_extra_weight = newVal }
                         "proximity_penalty" -> { oldWeights | proximity_penalty = newVal }
+                        "hardware_safety_factor" -> { oldWeights | hardware_safety_factor = newVal }
                         _ -> oldWeights
             in
             ( { model | planningWeights = updatedWeights }, Cmd.none )
@@ -173,6 +170,14 @@ update msg model =
         SetPathGoal cell -> ( { model | pathGoal = Just cell, activeMenu = Nothing }, Cmd.none )
         CloseMenu -> ( { model | activeMenu = Nothing }, Cmd.none )
         NoOp -> ( model, Cmd.none )
+        
+        -- Fallbacks für restliche Nachrichten
+        HandleRfid _ -> ( model, Cmd.none )
+        ConfigReceived _ -> ( model, Cmd.none )
+        PlanningResultRaw _ -> ( model, Cmd.none )
+        PlanningResult _ -> ( model, Cmd.none )
+        ModeChanged _ -> ( model, Cmd.none )
+        
         _ -> ( model, Cmd.none )
 
 
@@ -186,4 +191,5 @@ encodeWeights w =
         , ( "complex_module_time", Encode.float w.complex_module_time )
         , ( "human_extra_weight", Encode.float w.human_extra_weight )
         , ( "proximity_penalty", Encode.float w.proximity_penalty )
+        , ( "hardware_safety_factor", Encode.float w.hardware_safety_factor ) 
         ]
