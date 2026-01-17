@@ -1,89 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "passform2"
 version = "0.1.0"
-description = "passform2"
-readme = "README.md"
-license = {text = "The Unlicense "}
-requires-python = ">=3.8"
+description = "PassForM2 Applikation"
 dependencies = [
-    "setuptools",
-    "rclpy",
+    "fastapi",
+    "uvicorn",
+    "psutil",
     "loguru",
     "netifaces",
     "zeroconf"
 ]
 
-[project.optional-dependencies]
-test = [
-    "duckdb",
-    "jupyterlab",
-    "loguru",
-    "matplotlib",
-    "notebook",
-    "numpy",
-    "openpyxl",
-    "pandas",
-    "pytest",
-    "ruff",
-    "sphinx",
-]
-
-[project.scripts]
-manager = "passform2.node_main:main"
-
-[build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-where = ["passform2*", "data"]
-exclude = [
-  ".venv*",
-  "build*",
-  "logs*",
-  "notebooks*",
-  "scripts*"
-]
-
-[tool.setuptools.data-files]
-"share/ament_index/resource_index/packages" = ["resource/passform2"]
-"share/passform2" = ["package.xml"]
-"share/passform2/launch" = ["launch/passform2_launch.py"]
-
-[tool.pytest.ini_options]
-env = [
-    "PROJECT_BASE_PATH=/root/passform2_ws/"
-]
-
-[tool.ruff]
-line-length = 88
-target-version = "py311"
-lint.select = [
-  "F", 
-  "E", 
-  "W", 
-  "I", 
-  "N", 
-  "UP", 
-  "C90"
-]
-lint.ignore = [
-  "C901",
-  "E501", 
-  "F841", 
-  "D100", 
-  "D101", 
-  "D102", 
-  "D103", 
-  "D104", 
-  "D105", 
-  "D106", 
-  "D107",
-  "I001",
-  "N806",
-  "N999",
-  "UP007",
-  "UP035",
-  "UP038",
-  "W293"
-]
+[tool.setuptools]Dependencies!"
+packages = []

@@ -1,5 +1,17 @@
 # --- KONFIGURATION ---
 # Pfade relativ zum Speicherort des Makefile (Wurzelverzeichnis passform2)
+
+# Prüfen, ob secret.key existiert, sonst Fehler
+ifeq ($(wildcard secret.key),)
+$(error [!] secret.key nicht gefunden. Bitte erstelle die Datei mit deinen Credentials!)
+endif
+
+# Variablen aus der secret.key extrahieren
+SSID    = $(shell sed -n '1p' secret.key)
+WLAN_PW = $(shell sed -n '2p' secret.key)
+PI_IP   = $(shell sed -n '3p' secret.key)
+PI_USER = $(shell sed -n '4p' secret.key)
+
 FRONTEND_DIR=passform2_agent_frontend/passform2_agent_frontend
 BACKEND_DIR_REST=passform2_agent_backend
 BACKEND_DIR_ROS=passform2_ws
@@ -56,3 +68,10 @@ clean:
 	@echo ">>> Bereinige temporäre Dateien..."
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	rm -rf $(BACKEND_DIR_ROS)/build $(BACKEND_DIR_ROS)/install $(BACKEND_DIR_ROS)/log
+
+deploy:
+	rsync -avz --delete --exclude '.git' --exclude 'venv/' ./ $(PI_USER)@$(PI_IP):~/passform2/
+	ssh $(PI_USER)@$(PI_IP) "cd ~/passform2 && docker compose up --build -d"
+
+logs:
+	ssh $(PI_USER)@$(PI_IP) "cd ~/passform2 && docker compose logs -f"

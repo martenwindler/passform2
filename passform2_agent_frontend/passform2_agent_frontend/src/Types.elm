@@ -14,6 +14,12 @@ type alias SystemLog =
     , level : String
     }
 
+type alias HardwareDevice =
+    { pi_id : String
+    , rfid_status : String
+    , pi_exists : Bool
+    }
+
 type alias AgentModule =
     { agent_id : Maybe String
     , module_type : String
@@ -35,6 +41,7 @@ type alias PlanningWeights =
     , complex_module_time : Float
     , human_extra_weight : Float
     , proximity_penalty : Float
+    , hardware_safety_factor : Float
     }
 
 -- --- MODEL ---
@@ -62,6 +69,7 @@ type alias Model =
     , planningWeights : PlanningWeights
     , currentHz : Float      -- NEU: Aktueller System-Takt (SSoT)
     , alert : Maybe String   -- NEU: ID des kritischen Agenten für Warn-Toast
+    , connectedHardware : List HardwareDevice -- RPis
     }
 
 type Mode = Simulation | Hardware
@@ -107,4 +115,5 @@ type Msg
     | SetWeight String String 
     | SaveWeights
     | ChangeHz Float         
-    | DismissAlert          
+    | DismissAlert
+    | HandleHardwareUpdate (Result Decode.Error (List HardwareDevice))

@@ -76,6 +76,8 @@ port configReceived : (String -> msg) -> Sub msg
 
 port nfcStatusReceiver : (Decode.Value -> msg) -> Sub msg
 
+port hardwareUpdateReceiver : (Decode.Value -> msg) -> Sub msg
+
 -- NEU: Event-Helper für die 3D-View
 onAgentMoved : Attribute Msg
 onAgentMoved =

@@ -44,7 +44,49 @@ make start-all
 ```
 
 ## Hardware
+
 <p align="center">
   <img src="https://github.com/user-attachments/assets/818f071a-f960-4b0f-81d4-465de21fc4ed" alt="IMG_1196" width="350">
 </p>
 
+```text
+sudo apt update && sudo apt install nmap -y
+```
+
+```text
+cmd.exe /c "netsh wlan show interfaces" | grep -i " SSID"
+```
+
+```text
+powershell.exe -Command "netsh wlan show profile name='DEINE_SSID' key=clear" | grep -i "Inhalt"
+```
+
+```text
+# on laptop
+cd ~/passform2
+rsync -avz --delete \
+--exclude '.git' \
+--exclude '__pycache__' \
+--exclude 'venv/' \
+--exclude '.vscode/' \
+~/passform2/ {USER}@{HOST_IP}:/home/{USER}/passform2/
+```
+
+```text
+# on pi
+cd ~/passform2
+docker compose up --build -d
+sudo apt install -y spi-tools
+```
+
+```text
+hostname -I | awk '{print $1}'
+```
+
+```text
+netsh interface portproxy add v4tov4 listenport=8000 listenaddress=0.0.0.0 connectport=8000 connectaddress=127.0.0.1
+```
+
+```text
+python3 ~/passform2/utils/pi__rfid_bridge.py
+```

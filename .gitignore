@@ -72,3 +72,6 @@ htmlcov/
 *.tmp
 *.bak
 *.bak.*
+
+
+secret.key

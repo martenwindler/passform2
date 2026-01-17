@@ -31,46 +31,68 @@ viewActiveMenu model maybeMenu =
                 aid =
                     agent.agent_id |> Maybe.withDefault "unnamed"
 
-                ( nfcStat, nfcText ) =
-                    case model.nfcStatus of
-                        "online" ->
-                            ( "online", "Bereit" )
+                -- 1. Suchen des Raspberry Pi in der Hardware-Registry
+                maybePi =
+                    model.connectedHardware
+                        |> List.filter (\hw -> hw.pi_id == "PassForM2-Pi5-Client")
+                        |> List.head
 
-                        "missing" ->
-                            ( "missing", "Fehlt" )
-
-                        _ ->
-                            ( "unknown", "Prüfe..." )
-
-                piIsOnline =
-                    model.connected && agent.signal_strength > 0
-
+                -- 2. Status für den Raspberry Pi bestimmen
                 ( piStat, piText ) =
-                    if piIsOnline then
-                        ( "online", "Online" )
+                    case maybePi of
+                        Just pi ->
+                            if pi.pi_exists then
+                                ( "online", "Verbunden" )
+                            else
+                                ( "missing", "Fehlt" )
 
-                    else
-                        ( "missing", "Offline" )
+                        Nothing ->
+                            ( "missing", "Offline" )
+
+                -- 3. Status für den RFID-Sensor (RC522) am Pi bestimmen
+                ( nfcStat, nfcText ) =
+                    case maybePi of
+                        Just pi ->
+                            if pi.rfid_status == "online" then
+                                ( "online", "Bereit" )
+                            else
+                                ( "missing", "Fehlt" )
+
+                        Nothing ->
+                            ( "unknown", "Kein Pi" )
+
+                -- 4. Übergeordnete Online-Logik (Kombination aus Socket und Pi-Status)
+                isHardwareReady =
+                    case maybePi of
+                        Just pi -> pi.pi_exists && pi.rfid_status == "online"
+                        Nothing -> False
+                
+                -- Signalstärke für das UI (basiert weiterhin auf dem Agent-Heartbeat)
+                agentIsActive =
+                    agent.signal_strength > 0
             in
             div [ class "modal-overlay" ]
                 [ div [ class "modal-content" ]
                     [ h3 [ style "color" "#fff" ] [ text (Sidebar.formatType agent.module_type) ]
                     , div [ class "agent-id-badge" ] [ text ("ID: " ++ aid) ]
 
-                    -- Hardware-Status-Reihe (Die Funktionen erzeugen die weißen Pillen)
+                    -- Hardware-Status-Reihe: Hier siehst du jetzt direkt den Pi-Status
                     , div [ class "hardware-status-row" ]
-                        [ viewStatusBadge "NFC-Reader" nfcStat nfcText
-                        , viewStatusBadge "Raspberry Pi" piStat piText
+                        [ viewStatusBadge "RC522 Sensor" nfcStat nfcText
+                        , viewStatusBadge "RPI 5 Node" piStat piText
                         ]
 
-                    -- Signalstärke (Ebenfalls im Pillen-Look)
-                    , viewSignalStrength piIsOnline agent.signal_strength
+                    -- Signalstärke des Agenten (Kommunikation zum Controller)
+                    , viewSignalStrength agentIsActive agent.signal_strength
 
                     , hr [] []
+                    
+                    -- Der Brenn-Button ist nur aktiv, wenn Pi UND Sensor online sind
                     , button
                         [ onClick (RequestNfcWrite aid)
                         , class "btn-nfc-write"
-                        , disabled (model.nfcStatus == "missing" || not piIsOnline)
+                        , disabled (not isHardwareReady)
+                        , style "opacity" (if isHardwareReady then "1" else "0.5")
                         ]
                         [ text "ID auf Chip brennen" ]
 

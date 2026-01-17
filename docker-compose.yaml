@@ -1,8 +1,7 @@
 services:
-  passform_manager:
+  backend:
     build: .
-    container_name: passform2_container
-    network_mode: "host"
+    network_mode: "host" # Wichtig für ROS 2 Kommunikation
     volumes:
-      - ./config.json:/app/config.json
-    restart: always
+      - .:/app
+    restart: unless-stopped

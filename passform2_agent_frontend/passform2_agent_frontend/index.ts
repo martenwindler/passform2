@@ -10,7 +10,6 @@ const rosBridgeUrl = 'http://localhost:5000';
 
 let backendIP = localStorage.getItem('p2_backend_ip') || defaultBackend;
 
-// Falls noch eine alte IP mit Port 5000 im Speicher ist, auf Standard zurücksetzen
 if (backendIP.includes(":5000")) {
     backendIP = defaultBackend;
 }
@@ -47,13 +46,13 @@ const sendSafe = (portName: string, data: any) => {
 };
 
 // --- ROS-BRIDGE VERBINDUNG (Port 5000) ---
+// (Für direkte Hardware-Agenten-Daten)
 
 const connectToRosBridge = () => {
     if (rosSocket) rosSocket.disconnect();
     
     console.log("🤖 Initialisiere Verbindung zu ROS-Bridge (Hardware)...");
     
-    // WICHTIG: WebSocket-Only verhindert den 400 Bad Request Fehler
     rosSocket = io(rosBridgeUrl, {
         transports: ['websocket'],
         upgrade: false,
@@ -66,9 +65,6 @@ const connectToRosBridge = () => {
     });
 
     rosSocket.on('active_agents', (data) => {
-        console.log("📥 Hardware-Daten erhalten:", data);
-        
-        // Wir leiten die Daten an Elm weiter
         if (data && Object.keys(data).length > 0) {
             sendSafe('activeAgentsReceiver', data);
         }
@@ -77,39 +73,51 @@ const connectToRosBridge = () => {
     rosSocket.on('connect_error', (err) => {
         console.error("❌ ROS-Bridge (5000) Fehler:", err.message);
     });
-
-    rosSocket.on('disconnect', (reason) => {
-        console.warn("⚠️ ROS-Bridge getrennt:", reason);
-    });
 };
 
-// Startet die ROS-Verbindung sofort beim Laden
 connectToRosBridge();
 
 // --- HAUPT-BACKEND VERBINDUNG (Port 8000) ---
+// (Zentrale Logik & Raspberry Pi Hardware-Registry)
 
 subscribeSafe('connectToBackend', (url: string) => {
     if (socket) socket.disconnect();
     
-    console.log("🔗 Verbinde zu Haupt-Backend (Simulation):", url);
+    console.log("🔗 Verbinde zu Haupt-Backend (Simulation & Registry):", url);
     localStorage.setItem('p2_backend_ip', url);
     socket = io(url);
 
     socket.on('connect', () => {
         console.log("✅ Haupt-Backend (8000) verbunden.");
         sendSafe('socketStatusReceiver', true);
-        socket?.emit('get_nfc_status');
+    });
+
+    // NEU: Empfang der Hardware-Liste (Raspberry Pis)
+    socket.on('hardware_update', (data: any) => {
+        console.log("🖥️ Hardware-Registry Update:", data);
+        // Wir senden die Liste der verbundenen Pis an Elm
+        sendSafe('hardwareUpdateReceiver', data);
+    });
+
+    // NEU: Empfang von RFID-Scans, die der Pi an das Backend geschickt hat
+    socket.on('rfid_scanned', (data: any) => {
+        console.log("🎴 RFID Scan vom Pi erhalten:", data);
+        // data.id ist die Karten-ID. Wir nutzen den bestehenden rfidReceiver
+        sendSafe('rfidReceiver', data.id || data);
+        
+        // Optional: Logge den Scan im UI
+        sendSafe('systemLogReceiver', { 
+            message: `RFID Scan auf ${data.pi_id || 'Pi'}: ${data.id}`, 
+            level: "info" 
+        });
     });
 
     socket.on('active_agents', (data) => {
-        console.log("📥 Simulations-Daten erhalten");
-        // Falls die Simulation die Agenten in ein 'agents' Feld wickelt, entpacken wir sie
         const agents = data.agents ? data.agents : data;
         sendSafe('activeAgentsReceiver', agents);
     });
 
     socket.on('path_complete', (data: any) => {
-        console.log("🛤 Pfad berechnet:", data);
         sendSafe('pathCompleteReceiver', data);
     });
 
@@ -117,14 +125,8 @@ subscribeSafe('connectToBackend', (url: string) => {
         sendSafe('systemLogReceiver', data);
     });
 
-    socket.on('rfid_found', (data: string) => {
-        console.log("🎴 RFID Scan erkannt:", data);
-        sendSafe('rfidReceiver', data);
-    });
-
     socket.on('nfc_status', (data: any) => {
         const statusValue = (data && data.status) ? data.status : data;
-        console.log("📡 NFC Hardware Status:", statusValue);
         sendSafe('nfcStatusReceiver', statusValue);
     });
 
@@ -134,20 +136,12 @@ subscribeSafe('connectToBackend', (url: string) => {
     });
 });
 
-// --- STEUERUNGS-PORTS (Elm -> JS -> Backend) ---
+// --- STEUERUNGS-PORTS ---
 
 subscribeSafe('socketEmitPort', (payload: [string, any]) => {
     const [eventName, data] = payload;
-    
-    // Befehle gehen primär an das Simulations-Backend
     if (socket?.connected) {
         socket.emit(eventName, data);
-    }
-    
-    // Spezielle Befehle (wie Herzschlag-Takt) auch an Hardware senden
-    if (rosSocket?.connected && eventName === 'set_heartbeat_rate') {
-        console.log("⚙️ Sende Heartbeat-Rate an Hardware-Bridge");
-        rosSocket.emit(eventName, data);
     }
 });
 
@@ -160,24 +154,17 @@ subscribeSafe('setMode', (mode: string) => {
 subscribeSafe('triggerPlanning', (payload: any) => {
     if (socket?.connected) {
         socket.emit('plan_path', payload);
-    } else {
-        sendSafe('systemLogReceiver', { 
-            message: "Fehler: Nicht mit Backend verbunden!", 
-            level: "error" 
-        });
     }
 });
 
 subscribeSafe('savePlanningWeights', (weights: any) => {
     if (socket?.connected) {
-        console.log("📤 Sende neue Planungs-Gewichte:", weights);
         socket.emit('update_planning_config', weights);
     }
 });
 
 subscribeSafe('writeNfcTrigger', (text: string) => {
     if (socket?.connected) {
-        console.log("📤 Sende Schreibbefehl für NFC:", text);
         socket.emit('write_nfc', { text: text });
     }
 });

@@ -60,7 +60,27 @@ agentMapDecoder =
                 |> Dict.fromList
         )
 
+hardwareDeviceDecoder : Decode.Decoder HardwareDevice
+hardwareDeviceDecoder =
+    Decode.map3 HardwareDevice
+        (Decode.field "pi_id" Decode.string)
+        (Decode.field "rfid_status" Decode.string)
+        (Decode.field "pi_exists" Decode.bool)
+
+hardwareListDecoder : Decode.Decoder (List HardwareDevice)
+hardwareListDecoder =
+    Decode.list hardwareDeviceDecoder
+
 -- --- WEITERE DECODER ---
+
+planningWeightsDecoder : Decode.Decoder PlanningWeights
+planningWeightsDecoder =
+    Decode.map5 PlanningWeights
+        (Decode.field "execution_time_default" Decode.float)
+        (Decode.field "complex_module_time" Decode.float)
+        (Decode.field "human_extra_weight" Decode.float)
+        (Decode.field "proximity_penalty" Decode.float)
+        (Decode.field "hardware_safety_factor" Decode.float)
 
 pathDecoder : Decoder Path
 pathDecoder =

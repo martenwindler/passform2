@@ -129,6 +129,16 @@ update msg model =
                 Err _ ->
                     ( model, Cmd.none )
 
+        -- HARDWARE -- 
+        HandleHardwareUpdate result ->
+            case result of
+                Ok hardwareList ->
+                    ( { model | connectedHardware = hardwareList }, Cmd.none )
+
+                Err error ->
+                    -- Optional: Fehler loggen
+                    ( model, Cmd.none )
+
         -- --- UI & PLANUNG ---
         HandleGridClick cell ->
             case Dict.get ( cell.x, cell.y ) model.agents of

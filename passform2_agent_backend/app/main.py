@@ -22,84 +22,67 @@ from .logic.planner import planner
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("main")
 
+# --- HARDWARE REGISTRY ---
+# Struktur: { sid: { "pi_id": str, "rfid_status": str, "pi_exists": bool } }
+hardware_registry = {}
+
 # --- LIFESPAN MANAGEMENT ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Verwaltet Startup und Shutdown des Backends."""
     logger.info(f"🚀 PassForm Backend startet im Modus: {config.get_current_mode().value}")
     
-    # 0. SSoT laden (config.json)
     agent_manager.load_from_ssot()
 
-    # 1. ROS-Nodes Orchestrierung
     try:
-        # A) Zentralen System-Monitor/Planner starten
         node_manager.start_system_nodes()
-        
-        # B) Agenten-Nodes aus SSoT spawnen
         agents_to_spawn = [a.to_dict() for a in agent_manager.agents.values()]
         node_manager.start_agents_from_config(agents_to_spawn)
-        
         logger.info(f"✅ Orchestrator: System-Nodes und {len(agents_to_spawn)} Agenten gestartet.")
     except Exception as e:
         logger.error(f"❌ Kritischer Fehler beim Starten der ROS-Nodes: {e}")
 
-    # 2. ROS-Client initialisieren
     try:
         get_ros_client()
     except Exception as e:
         logger.warning(f"⚠️ ROS-Client konnte nicht initialisiert werden: {e}")
 
-    # 3. NFC-Reader starten
     if nfc_manager.get_status() == "online":
         nfc_manager.start_reading()
         logger.info("📡 NFC-Hintergrund-Thread gestartet.")
 
-    # 4. NEU: Health-Broadcast-Loop für Signalstärken starten
     health_task = asyncio.create_task(agent_manager.start_health_broadcast_loop())
-    logger.info("💓 Health-Monitoring-Loop für Agenten gestartet.")
     
-    # 5. Callback für neue Socket-Verbindungen (Daten-Synchronisation)
+    # Callback für neue Socket-Verbindungen
     async def sync_state_for_client(sid):
         try:
             logger.info(f"🔗 Synchronisiere neuen Client: {sid}")
-            
-            # NFC & Modus Status
             await socket_manager.emit_event('nfc_status', {"status": nfc_manager.get_status()}, target_sid=sid)
             await socket_manager.emit_event('mode', config.get_current_mode().value, target_sid=sid)
             
-            # Begrüßung & System-Log
+            # WICHTIG: Sende aktuelle Hardware-Registry an den neuen (Browser-)Client
+            await socket_manager.emit_event('hardware_update', list(hardware_registry.values()), target_sid=sid)
+            
             await socket_manager.emit_event('system_log', {
                 "message": f"System bereit (Hz: {config.heartbeat_hz})", 
                 "level": "success"
             }, target_sid=sid)
             
-            # Bestehende Logs senden
-            for log_entry in agent_manager.get_logs_history():
-                await socket_manager.emit_event('system_log', log_entry, target_sid=sid)
-            
-            # Aktuelle Agenten-Topologie inkl. Signalstärke senden
             agent_manager.send_agent_list()
-            
         except Exception as e:
             logger.error(f"❌ Fehler beim Client-Sync: {e}")
 
     socket_manager.set_on_new_client_callback(sync_state_for_client)
     
-    yield # --- App läuft hier ---
+    yield
     
-    # --- SHUTDOWN ---
     logger.info("🛑 PassForm Backend wird beendet...")
-    health_task.cancel() # Hintergrund-Task beenden
+    health_task.cancel()
     nfc_manager.running = False 
     node_manager.kill_all_nodes()
 
 # --- APP SETUP ---
-fastapi_app = FastAPI(
-    title="PassForm Agent Backend",
-    version="1.7.0",
-    lifespan=lifespan
-)
+fastapi_app = FastAPI(title="PassForm Agent Backend", version="1.7.0", lifespan=lifespan)
 
 fastapi_app.add_middleware(
     CORSMiddleware,
@@ -109,7 +92,42 @@ fastapi_app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- SOCKET.IO EVENT HANDLER ---
+# --- SOCKET.IO EVENT HANDLER (PI & HARDWARE) ---
+
+@socket_manager.sio.on('pi_hardware_update')
+async def handle_pi_hardware(sid, data):
+    """Registriert einen Raspberry Pi und dessen Sensoren."""
+    hardware_registry[sid] = data
+    logger.info(f"🖥️ Pi registriert: {data.get('pi_id')} | RFID: {data.get('rfid_status')}")
+    
+    # Sofortiger Broadcast an alle Frontend-Clients
+    await socket_manager.emit_event('hardware_update', list(hardware_registry.values()))
+
+@socket_manager.sio.on('rfid_scanned')
+async def handle_rfid_scanned(sid, data):
+    """Leitet RFID-Scans vom Pi an das Frontend weiter."""
+    # data: {"id": "12345", "pi_id": "PassForM2-Pi5-Client"}
+    logger.info(f"🎴 RFID Scan von {data.get('pi_id')}: {data.get('id')}")
+    
+    # Broadcast an alle (Browser erhält die Info)
+    await socket_manager.emit_event('rfid_scanned', data)
+
+@socket_manager.sio.on('disconnect')
+async def handle_disconnect(sid):
+    """Entfernt Hardware aus der Registry bei Verbindungsverlust."""
+    if sid in hardware_registry:
+        lost_device = hardware_registry.pop(sid)
+        logger.info(f"🖥️ Hardware getrennt: {lost_device.get('pi_id')}")
+        
+        # Sende die nun leere oder aktualisierte Liste an das Frontend
+        await socket_manager.emit_event('hardware_update', list(hardware_registry.values()))
+        
+        await socket_manager.emit_event('system_log', {
+            "message": f"Hardware verloren: {lost_device.get('pi_id')}",
+            "level": "warning"
+        })
+
+# --- SOCKET.IO EVENT HANDLER (PLANUNG & CONTROL) ---
 
 @socket_manager.sio.on('plan_path')
 async def handle_plan_path(sid, payload):
@@ -135,7 +153,6 @@ async def handle_plan_path(sid, payload):
             if path_a and path_b:
                 full_path = path_a + path_b[1:]
                 await socket_manager.emit_event('path_complete', {"status": 0, "cost": float(cost_b), "path": full_path}, target_sid=sid)
-                # Mission asynchron ausführen (Animation/Simulation)
                 asyncio.create_task(agent_manager.execute_mission(ftf_id, full_path, start_tuple, goal_tuple))
             else:
                 agent_manager.log_to_system("Kein Pfad für FTF möglich.", "warning")
@@ -181,20 +198,13 @@ async def handle_set_mode(sid, data):
 @socket_manager.sio.on('set_heartbeat_rate')
 async def handle_set_heartbeat_rate(sid, data):
     try:
-        # Daten können ein Float oder ein Dict sein
         new_hz = float(data if isinstance(data, (int, float)) else data.get("hz", 1.0))
-        
         if config.set_heartbeat_hz(new_hz):
-            # Bestätigung an alle Clients
             await socket_manager.emit_event('system_log', {
                 "message": f"⚡ System-Takt auf {new_hz}Hz geändert.",
                 "level": "info"
             })
-            
-            # WICHTIG: Die Agent-Liste neu senden, damit das UI die 
-            # Signalstärken-Berechnung sofort anpasst
             agent_manager.send_agent_list()
-            
     except Exception as e:
         logger.error(f"Fehler beim Takt-Update: {e}")
 
@@ -209,7 +219,8 @@ async def root():
         "service": "PassForm Backend", 
         "mode": config.get_current_mode().value,
         "heartbeat_ssot": f"{config.heartbeat_hz}Hz",
-        "nodes_active": len(node_manager.processes)
+        "nodes_active": len(node_manager.processes),
+        "connected_hardware": len(hardware_registry)
     }
 
 # --- SOCKET.IO INTEGRATION ---
@@ -218,4 +229,5 @@ app = socket_manager.app_sio
 
 if __name__ == "__main__":
     import uvicorn
+    # Starte den Server (Standardmäßig auf Port 8000)
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

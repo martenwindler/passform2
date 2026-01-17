@@ -9,28 +9,26 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import Ports
 import Types exposing (..)
-import Update -- Importiert die Update-Logik
+import Update 
 import View.Navbar as Navbar
 import View.Sidebar as Sidebar
-import View.Modal as Modal -- Importiert das Kontextmenü
-import View.HardwareStatus as HardwareStatus -- Importiert Alarme und Stati
+import View.Modal as Modal 
+import View.HardwareStatus as HardwareStatus 
 
 
 -- PROGRAM
-
 
 main : Program { backendIP : String, savedConfig : Maybe String } Model Msg
 main =
     Browser.element
         { init = init
         , view = view
-        , update = Update.update -- Delegation an Update.elm
+        , update = Update.update
         , subscriptions = subscriptions
         }
 
 
 -- INIT
-
 
 init : { backendIP : String, savedConfig : Maybe String } -> ( Model, Cmd Msg )
 init flags =
@@ -49,6 +47,7 @@ init flags =
       , connected = True
       , agents = initialAgents
       , savedDefault = initialAgents
+      , connectedHardware = [] -- NEU: Initial leer
       , logs = [ { message = "System bereit. SSoT geladen.", level = "success" } ]
       , pathStart = Nothing
       , pathGoal = Nothing
@@ -70,6 +69,7 @@ init flags =
             , complex_module_time = 3.5
             , human_extra_weight = 1.0
             , proximity_penalty = 0.5
+            , hardware_safety_factor = 1.2 -- Optionaler Hardware-Faktor
             }
       }
     , Ports.connectToBackend flags.backendIP
@@ -77,7 +77,6 @@ init flags =
 
 
 -- SUBSCRIPTIONS
-
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -89,27 +88,28 @@ subscriptions model =
         , Ports.systemLogReceiver (Decode.decodeValue Decoders.decodeSystemLog >> HandleSystemLog)
         , Ports.rfidReceiver (Decode.decodeValue Decoders.decodeRfid >> HandleRfid)
         , Ports.nfcStatusReceiver (Decode.decodeValue Decode.string >> HandleNfcStatus)
+        -- NEU: Empfang der Hardware-Liste vom Raspberry Pi
+        , Ports.hardwareUpdateReceiver (Decode.decodeValue Decoders.hardwareListDecoder >> HandleHardwareUpdate)
         ]
 
 
--- VIEW (Das Layout-Skelett)
-
+-- VIEW
 
 view : Model -> Html Msg
 view model =
     div [ class "app-layout" ]
         [ Navbar.view model
         , div [ class "content-area" ]
-            [ view3D model -- Die 3D Szene bleibt hier (da sie sehr eng mit Ports verknüpft ist)
+            [ view3D model 
             , if model.sidebarOpen then Sidebar.view model else text ""
-            , HardwareStatus.viewAlertOverlay model.alert -- Alarm aus HardwareStatus.elm
+            , HardwareStatus.viewAlertOverlay model.alert 
             ]
-        , Modal.viewActiveMenu model model.activeMenu -- Kontextmenü aus Modal.elm
+        -- Das Modal bekommt nun das ganze Model (inkl. connectedHardware)
+        , Modal.viewActiveMenu model model.activeMenu 
         ]
 
 
 -- HELPER VIEW (3D INTERFACE)
-
 
 view3D : Model -> Html Msg
 view3D model =
@@ -121,7 +121,7 @@ view3D model =
         , attribute "grid-height" (String.fromInt model.gridHeight)
         , attribute "start-pos" (model.pathStart |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
         , attribute "goal-pos" (model.pathGoal |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
-        , Ports.onAgentMoved -- Nutzt Ports zur sauberen Event-Dekodierung
-        , Ports.onCellClicked -- Nutzt Ports zur sauberen Event-Dekodierung
+        , Ports.onAgentMoved 
+        , Ports.onCellClicked 
         ]
         []
