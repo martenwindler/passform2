@@ -48,6 +48,8 @@ init flags =
       , backendIP = flags.backendIP
       , connected = True
       , rosConnected = False
+      , canConnected = False           -- NEU: Initialer Status des CAN-Bus
+      , rangerBattery = Nothing         -- NEU: Noch keine Telemetriedaten vorhanden
       , agents = initialAgents
       , savedDefault = initialAgents
       , connectedHardware = []
@@ -87,6 +89,7 @@ subscriptions model =
     Sub.batch
         [ Ports.socketStatusReceiver SetConnected
         , Ports.rosStatusReceiver SetRosConnected
+        -- Hier könnte später ein Ports.canStatusReceiver stehen
         , Ports.activeAgentsReceiver UpdateAgents
         , Ports.pathCompleteReceiver PlanningResultRaw
         , Ports.configReceived ConfigReceived
@@ -118,12 +121,21 @@ view model =
 
 view3D : Model -> Html Msg
 view3D model =
+    let
+        -- Bestimmt, ob der User im aktuellen Modus interagieren darf
+        -- Im Hardware-Modus (Ranger) wird das Klicken unterbunden
+        allowInteraction =
+            case model.mode of
+                Simulation -> "true"
+                Hardware -> "false"
+    in
     node "three-grid-scene"
         [ attribute "agents" (model.agents |> Decoders.encodeAgentMap |> Encode.encode 0)
         , attribute "path" (Decoders.encodePath model.currentPath |> Encode.encode 0)
         , attribute "is-3d" (if model.is3D then "true" else "false")
         , attribute "grid-width" (String.fromInt model.gridWidth)
         , attribute "grid-height" (String.fromInt model.gridHeight)
+        , attribute "allow-interaction" allowInteraction -- NEU: Steuerung der Interaktion
         , attribute "start-pos" (model.pathStart |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
         , attribute "goal-pos" (model.pathGoal |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
         , Ports.onAgentMoved 

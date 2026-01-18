@@ -67,9 +67,17 @@ viewActiveMenu model maybeMenu =
                         Just pi -> pi.pi_exists && pi.rfid_status == "online"
                         Nothing -> False
                 
-                -- Signalstärke für das UI (basiert weiterhin auf dem Agent-Heartbeat)
+                -- NEU: Signalstärke-Mapping basierend auf dem Pi-Status
+                -- Wir ignorieren hier agent.signal_strength und kopieren den Hardware-Status
+                mappedSignalStrength =
+                    case maybePi of
+                        Just pi ->
+                            if pi.pi_exists then 100 else 0
+                        Nothing ->
+                            0
+
                 agentIsActive =
-                    agent.signal_strength > 0
+                    mappedSignalStrength > 0
             in
             div [ class "modal-overlay" ]
                 [ div [ class "modal-content" ]
@@ -82,8 +90,8 @@ viewActiveMenu model maybeMenu =
                         , viewStatusBadge "RPI 5 Node" piStat piText
                         ]
 
-                    -- Signalstärke des Agenten (Kommunikation zum Controller)
-                    , viewSignalStrength agentIsActive agent.signal_strength
+                    -- Signalstärke des Agenten (Gekoppelt an Pi-Erreichbarkeit)
+                    , viewSignalStrength agentIsActive mappedSignalStrength
 
                     , hr [] []
                     

@@ -36,6 +36,10 @@ type alias Path =
     , path : List AgentModule
     }
 
+{-| 
+Diese Gewichte definieren nach Emil Harlan die Kostenfunktion 
+für das Contract-Net-Verfahren (CNP).
+-}
 type alias PlanningWeights =
     { execution_time_default : Float
     , complex_module_time : Float
@@ -49,8 +53,10 @@ type alias PlanningWeights =
 type alias Model =
     { mode : Mode
     , backendIP : String
-    , connected : Bool            -- Status für Backend-REST (Port 8000)
-    , rosConnected : Bool         -- NEU: Status für Backend-ROS (Port 5000)
+    , connected : Bool             -- Status für Backend-REST (Port 8000)
+    , rosConnected : Bool          -- Status für Backend-ROS (Port 5000)
+    , canConnected : Bool          -- NEU: Status des CAN-Bus für den Ranger
+    , rangerBattery : Maybe Float  -- NEU: Batteriespannung vom CAN-Bus
     , agents : Dict (Int, Int) AgentModule
     , savedDefault : Dict (Int, Int) AgentModule
     , logs : List SystemLog 
@@ -92,6 +98,7 @@ type Msg
     | SetCurrentAsDefault
     | LoadDefaultConfig
     | ClearGrid
+    | SetMode String              -- FIX: Jetzt im Compiler bekannt (für Ranger_Manual etc.)
     | ExportConfig
     | ImportConfigTrigger
     | ConfigReceived String

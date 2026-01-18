@@ -139,3 +139,13 @@ encodePath maybePath =
 
         Nothing ->
             Encode.list identity []
+
+encodeWeights : PlanningWeights -> Encode.Value
+encodeWeights w =
+    Encode.object
+        [ ( "execution_time_default", Encode.float w.execution_time_default )
+        , ( "complex_module_time", Encode.float w.complex_module_time )
+        , ( "human_extra_weight", Encode.float w.human_extra_weight )
+        , ( "proximity_penalty", Encode.float w.proximity_penalty )
+        , ( "hardware_safety_factor", Encode.float w.hardware_safety_factor ) 
+        ]
