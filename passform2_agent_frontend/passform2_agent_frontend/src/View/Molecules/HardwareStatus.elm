@@ -1,73 +1,64 @@
-module View.HardwareStatus exposing (viewStatusBadge, viewSignalStrength, viewAlertOverlay)
+module View.Molecules.HardwareStatus exposing (viewStatusBadge, viewSignalStrength, viewAlertOverlay)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Types exposing (..)
 
-
--- --- HARDWARE BADGES (Pillen-Design) ---
-
-
+{-| Molekül: Ein Status-Badge (Kombination aus Label, Dot und Text).
+Wird im Hardware-Modal und in der Sidebar verwendet.
+-}
 viewStatusBadge : String -> String -> String -> Html Msg
 viewStatusBadge label status text_ =
     let
         statusClass =
             case status of
-                "online" ->
-                    "status-online"
-
-                "missing" ->
-                    "status-missing"
-
-                _ ->
-                    "status-unknown"
+                "online" -> "online"
+                "missing" -> "danger"
+                _ -> "unknown"
     in
-    div [ class "status-pill" ] -- Das weiße Underlay
+    div [ class "status-pill" ]
         [ span [ class "status-label" ] [ text label ]
         , div [ class "status-indicator" ]
-            [ span [ class ("status-dot " ++ statusClass) ] []
+            [ span [ class ("status-dot " ++ statusClass) ] [] -- CSS-Klasse für das Punkt-Atom
             , span [ class "status-text" ] [ text text_ ]
             ]
         ]
 
-
--- --- SIGNALSTÄRKE ---
-
-
+{-| Molekül: Die Signalstärke-Anzeige (Label + Progress-Bar + Wert).
+-}
 viewSignalStrength : Bool -> Int -> Html Msg
 viewSignalStrength isOnline strength =
     let
-        ( displayWidth, color, labelText ) =
+        ( strengthClass, labelText ) =
             if not isOnline then
-                ( "0%", "#bdc3c7", "---" )
-
+                ( "signal-none", "---" )
             else
                 let
-                    c =
-                        if strength > 75 then "#4caf50"
-                        else if strength > 30 then "#ffc107"
-                        else "#f44336"
+                    sClass =
+                        if strength > 75 then "signal-strong"
+                        else if strength > 30 then "signal-fair"
+                        else "signal-weak"
                 in
-                ( String.fromInt strength ++ "%", c, String.fromInt strength ++ "%" )
+                ( sClass, String.fromInt strength ++ "%" )
+        
+        widthStyle = 
+            if isOnline then String.fromInt strength ++ "%" else "0%"
     in
     div [ class "signal-wrapper" ]
-        [ span [ class "signal-label-main" ] [ text "Verbindung:" ]
+        [ span [ class "signal-label-main" ] [ text "Signal:" ]
         , div [ class "signal-bar-container" ]
             [ div
-                [ class "signal-bar-fill"
-                , style "width" displayWidth
-                , style "background-color" color
+                [ class ("signal-bar-fill " ++ strengthClass)
+                , style "width" widthStyle 
                 ]
                 []
             ]
         , span [ class "signal-value" ] [ text labelText ]
         ]
 
-
--- --- ALARM OVERLAY ---
-
-
+{-| Molekül: Ein Alarm-Overlay (Toast).
+-}
 viewAlertOverlay : Maybe String -> Html Msg
 viewAlertOverlay maybeId =
     case maybeId of

@@ -1,0 +1,70 @@
+@use '../base/variables' as *;
+
+// --- RAIL BUTTON MOLECULE ---
+// Das Icon-Molekül für die vertikale Sidebar-Navigation
+
+.rail-btn {
+    position: relative;
+    width: 44px; // Exaktes Quadrat
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border-radius: $border-radius;
+    color: $text-muted;
+    transition: all $transition-speed $transition-curve;
+    cursor: pointer;
+
+    // Das Icon/Emoji im Inneren
+    .rail-icon {
+        font-size: 1.4rem;
+        line-height: 1;
+        transition: transform $transition-speed;
+    }
+
+    // HOVER: Leichtes Aufhellen und dezentes Wachsen
+    &:hover {
+        color: white;
+        background: rgba(255, 255, 255, 0.05);
+        
+        .rail-icon {
+            transform: scale(1.1);
+        }
+    }
+
+    // ACTIVE: Das Photoshop-Highlight (Blaues Glühen)
+    &.active {
+        background: $color-brand-blue;
+        color: white;
+        box-shadow: $shadow-glow-blue;
+
+        // Kleiner optischer Indikator links (optionaler Extra-Style)
+        &::before {
+            content: '';
+            position: absolute;
+            left: -12px; // Schiebt ihn an den Rand der Rail
+            width: 3px;
+            height: 20px;
+            background: white;
+            border-radius: 0 2px 2px 0;
+        }
+    }
+
+    // Spezielle Variante für den Toggle-Button (Ganz unten)
+    &.toggle-btn {
+        margin-top: auto;
+        color: $color-brand-blue;
+        font-weight: bold;
+        border: 1px solid rgba($color-brand-blue, 0.2);
+
+        &:hover {
+            background: rgba($color-brand-blue, 0.1);
+        }
+    }
+}
+
+// Hilfs-Klasse für den vertikalen Abstandhalter
+.rail-spacer {
+    flex-grow: 1;
+}

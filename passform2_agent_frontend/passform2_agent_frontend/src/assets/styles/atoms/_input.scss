@@ -1,0 +1,64 @@
+@use '../base/variables' as *;
+
+// --- INPUT ATOMS ---
+// Speziell für numerische Parameter und Gitter-Konfiguration
+
+// Container für einen Parameter (Label + Input)
+.parameter-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-xs;
+
+    label {
+        font-size: 0.65rem;
+        color: $text-muted;
+        font-weight: 700;
+        text-transform: lowercase;
+        font-variant: small-caps; // Erzeugt den "Pro-Software" Look
+        letter-spacing: 0.5px;
+    }
+}
+
+// Das eigentliche Eingabefeld
+input[type="number"], 
+input[type="text"] {
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: $border-radius-sm;
+    color: white;
+    padding: $space-sm;
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all $transition-speed $transition-curve;
+
+    // Fokus-Zustand (wenn der User reinklickt)
+    &:focus {
+        outline: none;
+        background-color: rgba(0, 0, 0, 0.5);
+        border-color: $color-info;
+        box-shadow: 0 0 0 2px rgba($color-info, 0.2);
+    }
+
+    &:hover:not(:focus) {
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    // Entfernt die hässlichen Browser-Pfeile (Spin-Buttons)
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    appearance: textfield; // Für Firefox
+}
+
+// Layout-Helfer für die Sidebar (Molekül-Ebene)
+.parameter-grid-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr); // Deine 4 Harlan-Parameter
+    gap: $space-sm;
+    margin-bottom: $space-md;
+}

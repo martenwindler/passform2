@@ -5,13 +5,61 @@ import Json.Encode as Encode
 import Dict exposing (Dict)
 import Types exposing (..)
 
+-- --- TYPE-SAFE MAPPERS (Internal) ---
+
+{-| Wandelt JSON-Strings in unsere typsicheren Elm-Typen um. -}
+moduleTypeDecoder : Decoder ModuleType
+moduleTypeDecoder =
+    string |> Decode.map (\s ->
+        case s of
+            "ftf" -> FTF
+            "conveyeur" -> Conveyeur
+            "rollen_ns" -> RollenModul
+            "mensch" -> Mensch
+            "greifer" -> Greifer
+            "tisch" -> Station
+            _ -> UnknownModule s
+    )
+
+logLevelDecoder : Decoder LogLevel
+logLevelDecoder =
+    string |> Decode.map (\s ->
+        case s of
+            "success" -> Success
+            "warning" -> Warning
+            "error" -> Danger
+            _ -> Info
+    )
+
+hardwareStatusDecoder : Decoder HardwareStatus
+hardwareStatusDecoder =
+    string |> Decode.map (\s ->
+        case s of
+            "online" -> Online
+            "missing" -> Missing
+            "error" -> Error
+            _ -> UnknownStatus
+    )
+
+{-| Hilfsfunktion, um Elm-Typen für Ports/JSON wieder in Strings zu verwandeln. -}
+moduleTypeToString : ModuleType -> String
+moduleTypeToString mt =
+    case mt of
+        FTF -> "ftf"
+        Conveyeur -> "conveyeur"
+        RollenModul -> "rollen_ns"
+        Mensch -> "mensch"
+        Greifer -> "greifer"
+        Station -> "tisch"
+        UnknownModule s -> s
+
 -- --- SYSTEM DECODERS ---
 
 decodeSystemLog : Decoder SystemLog
 decodeSystemLog =
     Decode.map2 SystemLog
         (field "message" string)
-        (field "level" string)
+        (field "level" logLevelDecoder)
 
 decodeRfid : Decoder String
 decodeRfid =
@@ -36,7 +84,7 @@ agentModuleDecoder : Decoder AgentModule
 agentModuleDecoder =
     Decode.succeed AgentModule
         |> andMap (field "agent_id" (maybe string))
-        |> andMap (field "module_type" string)
+        |> andMap (field "module_type" moduleTypeDecoder) -- Typsicherer Decoder
         |> andMap (field "position" gridCellDecoder)
         |> andMap 
             (Decode.oneOf 
@@ -47,10 +95,8 @@ agentModuleDecoder =
             )
         |> andMap (Decode.oneOf [ field "is_dynamic" bool, Decode.succeed False ])
         |> andMap (Decode.oneOf [ field "payload" (maybe string), Decode.succeed Nothing ])
-        -- NEU: Signalstärke vom Backend (Default 100, falls Feld fehlt)
         |> andMap (Decode.oneOf [ field "signal_strength" int, Decode.succeed 100 ])
 
--- Erwartet das Objekt {"agents": [...]}
 agentMapDecoder : Decoder (Dict (Int, Int) AgentModule)
 agentMapDecoder =
     field "agents" (list agentModuleDecoder)
@@ -64,7 +110,7 @@ hardwareDeviceDecoder : Decode.Decoder HardwareDevice
 hardwareDeviceDecoder =
     Decode.map3 HardwareDevice
         (Decode.field "pi_id" Decode.string)
-        (Decode.field "rfid_status" Decode.string)
+        (Decode.field "rfid_status" hardwareStatusDecoder) -- Typsicherer Decoder
         (Decode.field "pi_exists" Decode.bool)
 
 hardwareListDecoder : Decode.Decoder (List HardwareDevice)
@@ -113,7 +159,7 @@ encodeAgentModule agent =
                 Just s -> Encode.string s
                 Nothing -> Encode.null 
           )
-        , ( "module_type", Encode.string agent.module_type )
+        , ( "module_type", Encode.string (moduleTypeToString agent.module_type) ) -- Zurück in String wandeln
         , ( "position"
           , Encode.object 
                 [ ("x", Encode.int agent.position.x)
@@ -127,7 +173,6 @@ encodeAgentModule agent =
                 Just p -> Encode.string p
                 Nothing -> Encode.null
           )
-        -- NEU: Auch die Signalstärke für die 3D-View encodieren
         , ( "signal_strength", Encode.int agent.signal_strength )
         ]
 

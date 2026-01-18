@@ -20,7 +20,7 @@ update msg model =
         DismissAlert ->
             ( { model | alert = Nothing }, Cmd.none )
 
-        -- --- AGENTEN UPDATES (SSoT Logik) ---
+        -- --- AGENTEN UPDATES (Hardware-Sync) ---
         UpdateAgents rawJson ->
             if model.mode == Hardware then
                 case Decode.decodeValue Decoders.agentMapDecoder rawJson of
@@ -46,22 +46,28 @@ update msg model =
                 newMode =
                     if model.mode == Simulation then Hardware else Simulation
 
+                -- Port-Kommunikation braucht weiterhin Strings
                 modeStr =
                     if newMode == Simulation then "simulation" else "hardware"
 
                 ( updatedAgents, logEntry ) =
-                    if newMode == Simulation then
-                        ( model.savedDefault, { message = "Simulation aktiv: Lokale Bearbeitung möglich.", level = "info" } )
-                    else
-                        ( Dict.empty, { message = "Hardware aktiv: Synchronisiere mit ROS 2 Nodes...", level = "warning" } )
+                    case newMode of
+                        Simulation ->
+                            ( model.savedDefault
+                            , { message = "Simulation aktiv: Lokale Bearbeitung möglich.", level = Info } 
+                            )
+
+                        Hardware ->
+                            ( Dict.empty
+                            , { message = "Hardware aktiv: Synchronisiere mit ROS 2 Nodes...", level = Warning } 
+                            )
             in
             ( { model | mode = newMode, agents = updatedAgents, logs = logEntry :: model.logs, currentPath = Nothing }
             , Ports.setMode modeStr
             )
 
-        -- --- SIDEBAR NAVIGATION (Photoshop-Style) ---
+        -- --- SIDEBAR NAVIGATION ---
         SwitchSidebarTab tab ->
-            -- Wenn ein Icon geklickt wird, wechseln wir den Tab UND öffnen die Sidebar
             ( { model | activeSidebarTab = tab, sidebarOpen = True }, Cmd.none )
 
         ToggleSidebar -> 
@@ -70,13 +76,16 @@ update msg model =
         -- --- AGENTEN MANAGEMENT (LOKAL) ---
         StartAgent moduleType cell ->
             let
-                newId = moduleType ++ "-" ++ String.fromInt cell.x ++ String.fromInt cell.y
+                -- Generiere ID basierend auf dem String-Repräsentanten des Typs
+                typeStr = Decoders.moduleTypeToString moduleType
+                newId = typeStr ++ "-" ++ String.fromInt cell.x ++ String.fromInt cell.y
+                
                 newAgent =
                     { agent_id = Just newId
                     , module_type = moduleType
                     , position = cell
                     , orientation = 0
-                    , is_dynamic = moduleType == "ftf"
+                    , is_dynamic = (moduleType == FTF) -- Logik basiert auf Typ!
                     , payload = Nothing
                     , signal_strength = 100
                     }
@@ -113,7 +122,7 @@ update msg model =
 
         -- --- HARDWARE INTERAKTION ---
         RequestNfcWrite content ->
-            ( { model | waitingForNfc = True, logs = { message = "NFC: Sende Brennbefehl...", level = "info" } :: model.logs }
+            ( { model | waitingForNfc = True, logs = { message = "NFC: Sende Brennbefehl...", level = Info } :: model.logs }
             , Ports.writeNfcTrigger content 
             )
 
@@ -124,12 +133,12 @@ update msg model =
                         let
                             idOnly = String.dropLeft 8 status
                         in
-                        ( { model | nfcStatus = "online", lastWrittenId = Just idOnly, waitingForNfc = False }, Cmd.none )
+                        ( { model | nfcStatus = Online, lastWrittenId = Just idOnly, waitingForNfc = False }, Cmd.none )
                     else
-                        ( { model | nfcStatus = status, waitingForNfc = False }, Cmd.none )
+                        ( { model | nfcStatus = Error, waitingForNfc = False }, Cmd.none )
                 
                 Err _ -> 
-                    ( { model | nfcStatus = "error", waitingForNfc = False }, Cmd.none )
+                    ( { model | nfcStatus = Error, waitingForNfc = False }, Cmd.none )
 
         -- --- SYSTEM UPDATES ---
         SetConnected status ->
@@ -176,35 +185,15 @@ update msg model =
             ( { model | planningWeights = updatedWeights }, Cmd.none )
 
         SaveWeights ->
-            ( { model | logs = { message = "Planungsparameter aktualisiert.", level = "success" } :: model.logs }
-            , Ports.savePlanningWeights (encodeWeights model.planningWeights) 
+            ( { model | logs = { message = "Planungsparameter aktualisiert.", level = Success } :: model.logs }
+            , Ports.savePlanningWeights (Decoders.encodeWeights model.planningWeights) 
             )
 
-        -- --- NAVIGATION & BOILERPLATE ---
+        -- --- BOILERPLATE ---
         ToggleViewMode -> ( { model | is3D = not model.is3D }, Cmd.none )
         SetPathStart cell -> ( { model | pathStart = Just cell, activeMenu = Nothing }, Cmd.none )
         SetPathGoal cell -> ( { model | pathGoal = Just cell, activeMenu = Nothing }, Cmd.none )
         CloseMenu -> ( { model | activeMenu = Nothing }, Cmd.none )
         NoOp -> ( model, Cmd.none )
         
-        -- Fallbacks für restliche Nachrichten
-        HandleRfid _ -> ( model, Cmd.none )
-        ConfigReceived _ -> ( model, Cmd.none )
-        PlanningResultRaw _ -> ( model, Cmd.none )
-        PlanningResult _ -> ( model, Cmd.none )
-        ModeChanged _ -> ( model, Cmd.none )
-        SetMode _ -> ( model, Cmd.none )
-        
         _ -> ( model, Cmd.none )
-
--- HELPER
-
-encodeWeights : PlanningWeights -> Encode.Value
-encodeWeights w =
-    Encode.object
-        [ ( "execution_time_default", Encode.float w.execution_time_default )
-        , ( "complex_module_time", Encode.float w.complex_module_time )
-        , ( "human_extra_weight", Encode.float w.human_extra_weight )
-        , ( "proximity_penalty", Encode.float w.proximity_penalty )
-        , ( "hardware_safety_factor", Encode.float w.hardware_safety_factor ) 
-        ]

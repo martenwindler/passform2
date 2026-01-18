@@ -1,0 +1,40 @@
+// src/assets/styles/main.scss
+
+// 1. Variablen global verfügbar machen
+@forward 'base/variables';
+
+// 2. Basis-Styles (Nutzen die Variablen)
+@use 'base/variables' as *;
+@use 'base/reset';
+@use 'base/mixins';
+
+// 3. Atome
+@use 'atoms/button';
+@use 'atoms/badge';
+@use 'atoms/input';
+
+// 4. Moleküle
+@use 'molecules/hardware-status';
+@use 'molecules/rail-btn';
+@use 'molecules/status-pill';
+
+// 5. Organismen
+@use 'organisms/navbar';
+@use 'organisms/sidebar';
+@use 'organisms/modal';
+
+// Globales App-Layout
+.app-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    background-color: $bg-dark;
+}
+
+.content-area {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    overflow: hidden;
+}

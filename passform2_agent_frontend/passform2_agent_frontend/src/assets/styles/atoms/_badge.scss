@@ -1,0 +1,74 @@
+@use '../base/variables' as *;
+
+// --- STATUS DOTS ---
+// Die kleinen runden Indikatoren
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    transition: background-color $transition-speed, box-shadow $transition-speed;
+
+    // Varianten basierend auf dem System-Status
+    &.online, &.success {
+        background-color: $color-success;
+        box-shadow: 0 0 8px rgba($color-success, 0.6);
+    }
+
+    &.missing, &.danger {
+        background-color: $color-danger;
+        box-shadow: 0 0 8px rgba($color-danger, 0.6);
+        animation: pulse-red 2s infinite; // Aufmerksamkeit bei Fehlern
+    }
+
+    &.warning {
+        background-color: $color-warning;
+        box-shadow: 0 0 8px rgba($color-warning, 0.6);
+    }
+
+    &.info {
+        background-color: $color-info;
+        box-shadow: 0 0 8px rgba($color-info, 0.6);
+    }
+
+    &.unknown {
+        background-color: $text-gray;
+        box-shadow: none;
+    }
+}
+
+// --- BADGES ---
+// Text-Labels mit Hintergrund (z.B. "Mobil", "Navigation")
+.badge {
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+
+    &.dynamic {
+        background: rgba($color-brand-blue, 0.2);
+        color: $color-brand-blue;
+        border: 1px solid rgba($color-brand-blue, 0.3);
+    }
+
+    &.static {
+        background: rgba($text-gray, 0.1);
+        color: $text-gray;
+        border: 1px solid rgba($text-gray, 0.2);
+    }
+}
+
+// --- ANIMATIONEN ---
+
+@keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba($color-danger, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba($color-danger, 0); }
+    100% { box-shadow: 0 0 0 0 rgba($color-danger, 0); }
+}

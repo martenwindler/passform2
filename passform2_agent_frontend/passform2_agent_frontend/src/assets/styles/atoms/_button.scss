@@ -1,0 +1,24 @@
+@use "sass:color";
+@use '../base/variables' as *;
+
+.btn-primary {
+    background-color: $blue-active;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 4px;
+    transition: all 0.2s;
+
+    &:hover {
+        background-color: color.adjust($blue-active, $lightness: -10%);
+        transform: translateY(-1px);
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
+
+    &.btn-small {
+        padding: 5px 10px;
+        font-size: 0.8rem;
+    }
+}

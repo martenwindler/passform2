@@ -10,14 +10,18 @@ import Json.Encode as Encode
 import Ports
 import Types exposing (..)
 import Update 
-import View.Navbar as Navbar
-import View.Sidebar as Sidebar
-import View.Modal as Modal 
-import View.HardwareStatus as HardwareStatus 
+
+-- --- ATOMIC VIEW IMPORTS ---
+-- Organismen: Komplexe UI-Einheiten
+import View.Organisms.Navbar as Navbar
+import View.Organisms.Sidebar as Sidebar
+import View.Organisms.Modal as Modal 
+
+-- Moleküle: Kleinere funktionale Einheiten
+import View.Molecules.HardwareStatus as HardwareStatus 
 
 
--- PROGRAM
-
+-- --- PROGRAM ---
 
 main : Program { backendIP : String, savedConfig : Maybe String } Model Msg
 main =
@@ -29,8 +33,7 @@ main =
         }
 
 
--- INIT
-
+-- --- INIT ---
 
 init : { backendIP : String, savedConfig : Maybe String } -> ( Model, Cmd Msg )
 init flags =
@@ -53,13 +56,13 @@ init flags =
       , agents = initialAgents
       , savedDefault = initialAgents
       , connectedHardware = []
-      , logs = [ { message = "System bereit. Photoshop-Layout aktiv.", level = "success" } ]
+      , logs = [ { message = "System bereit. ", level = Success } ] 
       , pathStart = Nothing
       , pathGoal = Nothing
       , currentPath = Nothing
       , hoveredCell = Nothing
       , sidebarOpen = False
-      , activeSidebarTab = TabAgents -- NEU: Start-Tab für die Rail
+      , activeSidebarTab = TabAgents 
       , gridWidth = 6
       , gridHeight = 4
       , editing = True
@@ -67,8 +70,8 @@ init flags =
       , loading = False
       , activeMenu = Nothing
       , waitingForNfc = False
-      , nfcStatus = "unknown"
-      , lastWrittenId = Nothing -- Initial auf Nothing, damit Badge erst bei Erfolg kommt
+      , nfcStatus = UnknownStatus 
+      , lastWrittenId = Nothing 
       , currentHz = 1.0
       , alert = Nothing
       , planningWeights =
@@ -83,8 +86,7 @@ init flags =
     )
 
 
--- SUBSCRIPTIONS
-
+-- --- SUBSCRIPTIONS ---
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -101,8 +103,7 @@ subscriptions model =
         ]
 
 
--- VIEW
-
+-- --- VIEW ---
 
 view : Model -> Html Msg
 view model =
@@ -110,15 +111,16 @@ view model =
         [ Navbar.view model
         , div [ class "content-area" ]
             [ view3D model 
-            , Sidebar.view model -- IMMER RENDERN: Die Sidebar steuert intern Rail vs. Content
+            , Sidebar.view model 
+            -- Molekül-Aufruf (Alert Overlay)
             , HardwareStatus.viewAlertOverlay model.alert 
             ]
+        -- Organismus-Aufruf (Aktives Modal)
         , Modal.viewActiveMenu model model.activeMenu 
         ]
 
 
--- HELPER VIEW (3D INTERFACE)
-
+-- --- HELPER VIEW (3D INTERFACE) ---
 
 view3D : Model -> Html Msg
 view3D model =

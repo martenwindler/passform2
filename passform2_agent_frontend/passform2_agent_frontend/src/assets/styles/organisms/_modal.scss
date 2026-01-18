@@ -1,0 +1,201 @@
+@use "sass:color";
+@use '../base/variables' as *;
+
+// --- MODAL ORGANISM ---
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(10, 25, 47, 0.7);
+    -webkit-backdrop-filter: blur(6px); 
+    backdrop-filter: blur(6px); 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    animation: fadeIn $transition-speed ease-out;
+}
+
+.modal-content {
+    background-color: rgba($color-nav-bg, 0.95);
+    border: 1px solid rgba($color-info, 0.3);
+    padding: $space-lg;
+    border-radius: 12px;
+    width: 340px;
+    box-shadow: $shadow-lg, 0 0 20px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: $space-md;
+    color: white; 
+
+    h3 {
+        margin: 0;
+        font-size: 1.2rem;
+        color: white;
+        text-align: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: $space-sm;
+    }
+
+    // --- STATUS INDICATORS & TYPOGRAPHY ---
+    .signal-label-main,
+    .pill-label,
+    .indicator-label,
+    .status-label,
+    .status-text,
+    .status-indicator, 
+    .pill-text,
+    .value,
+    .signal-value {
+        color: white !important;
+        opacity: 1 !important;
+        font-weight: 600;
+    }
+
+    // NEU: Status Dot Integration
+    .status-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+        flex-shrink: 0;
+
+        &.unknown {
+            background-color: #9ca3af; // Neutrales Grau
+            box-shadow: 0 0 8px rgba(156, 163, 175, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        // Optional: Falls du die anderen später auch hier brauchst
+        &.online  { background-color: $color-success; box-shadow: 0 0 8px rgba($color-success, 0.5); }
+        &.offline { background-color: $color-danger;  box-shadow: 0 0 8px rgba($color-danger, 0.5); }
+    }
+
+    // Agenten-Details (ID-Badge)
+    .agent-id-badge {
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.7); 
+        font-family: 'Cascadia Code', monospace;
+        font-size: 0.8rem;
+        padding: 4px 8px;
+        border-radius: 4px;
+        text-align: center;
+        margin-top: -$space-sm; 
+    }
+
+    // --- HARDWARE LAYOUT ---
+    .hardware-status-row {
+        display: flex;
+        justify-content: space-between;
+        gap: $space-sm;
+        margin: $space-sm 0;
+
+        .hardware-pill {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 20px;
+            
+            span, div, .status-text { color: white !important; } 
+        }
+    }
+
+    // --- SIGNALSTÄRKE OVERRIDE ---
+    .signal-wrapper {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        
+        .signal-bar-container {
+            background: rgba(255, 255, 255, 0.1);
+        }
+    }
+
+    // --- NFC FEEDBACK ---
+    .last-written-info {
+        padding: $space-sm;
+        background: rgba($color-success, 0.15);
+        border: 1px solid $color-success;
+        border-radius: $border-radius-sm;
+        color: $color-success;
+        text-align: center;
+        font-size: 0.85rem;
+        font-weight: 600;
+        animation: pulseSuccess 2s infinite;
+    }
+
+    // --- BUTTONS ---
+    .btn-ftf {
+        background-color: $color-warning !important;
+        color: $text-dark !important;
+        font-weight: 800;
+        border: none;
+        &:hover {
+            background-color: color.adjust($color-warning, $lightness: 10%) !important;
+            transform: translateY(-1px);
+        }
+    }
+
+    .btn-nfc-write {
+        background: linear-gradient(135deg, #ed8936, #dd6b20);
+        color: white;
+        font-weight: bold;
+        box-shadow: 0 4px 10px rgba(221, 107, 32, 0.3);
+        border: none;
+        padding: $space-sm;
+        border-radius: $border-radius-sm;
+        &:disabled {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.3);
+            cursor: not-allowed;
+            opacity: 0.5;
+            box-shadow: none;
+        }
+        &:hover:not(:disabled) {
+            background-color: color.adjust($color-warning, $lightness: 10%) !important;
+        }
+    }
+
+    .btn-path-start { color: $color-success; border: 1px solid rgba($color-success, 0.3); }
+    .btn-path-goal  { color: $color-info;    border: 1px solid rgba($color-info, 0.3); }
+    .btn-delete { 
+        color: $color-danger; 
+        border: 1px solid rgba($color-danger, 0.2);
+        &:hover { background: rgba($color-danger, 0.1); }
+    }
+
+    .btn-close {
+        background: transparent;
+        color: rgba(255, 255, 255, 0.5);
+        text-decoration: underline;
+        font-size: 0.8rem;
+        margin-top: $space-xs;
+        text-align: center;
+        border: none;
+        cursor: pointer;
+        &:hover { color: white; }
+    }
+}
+
+// --- ANIMATIONEN ---
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulseSuccess {
+    0% { background: rgba($color-success, 0.1); }
+    50% { background: rgba($color-success, 0.25); }
+    100% { background: rgba($color-success, 0.1); }
+}
+
+@keyframes pulseUnknown {
+    0% { opacity: 0.6; transform: scale(0.95); }
+    50% { opacity: 1; transform: scale(1.05); }
+    100% { opacity: 0.6; transform: scale(0.95); }
+}

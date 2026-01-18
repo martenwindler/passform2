@@ -1,27 +1,31 @@
-module View.Sidebar exposing (view, formatType)
+module View.Organisms.Sidebar exposing (view, formatType)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Dict 
 import Types exposing (..)
-import View.HardwareStatus exposing (viewStatusBadge)
+-- Importe auf die neue Struktur angepasst:
+import View.Molecules.HardwareStatus exposing (viewStatusBadge)
+import View.Atoms.Icons as Icons 
 
 view : Model -> Html Msg
 view model =
     aside [ class "sidebar-container" ]
-        [ -- 1. Navigation Rail (Die schmale Icon-Leiste)
+        [ -- 1. Navigation Rail
           div [ class "sidebar-rail" ]
-            [ railButton "🎯" "Planung" TabPlanning model
-            , railButton "🤖" "Module" TabAgents model
-            , railButton "🔌" "Hardware" TabHardware model
-            , railButton "📜" "Logs" TabLogs model
+            [ button [ class "rail-btn toggle-btn", onClick ToggleSidebar ] 
+                [ text (if model.sidebarOpen then "«" else "»") ]
+            
+            , railButton Icons.iconPlanning "Planung" TabPlanning model
+            , railButton Icons.iconAgents "Module" TabAgents model
+            , railButton Icons.iconHardware "Hardware" TabHardware model
+            , railButton Icons.iconLogs "Logs" TabLogs model
+            
             , div [ class "rail-spacer" ] []
-            , button [ class "rail-btn toggle-btn", onClick ToggleSidebar ] 
-                [ text (if model.sidebarOpen then "»" else "«") ]
             ]
         
-        -- 2. Sidebar Content (Der ausklappbare Bereich)
+        -- 2. Sidebar Content
         , if model.sidebarOpen then
             div [ class "sidebar-content" ]
                 [ viewTabHeader model
@@ -31,16 +35,44 @@ view model =
             text ""
         ]
 
+-- --- HELPERS FÜR TYP-KONVERTIERUNG ---
+
+logLevelToClass : LogLevel -> String
+logLevelToClass level =
+    case level of
+        Success -> "success"
+        Info -> "info"
+        Warning -> "warning"
+        Danger -> "error"
+
+statusToClass : HardwareStatus -> String
+statusToClass status =
+    case status of
+        Online -> "online"
+        Standby -> "warning"
+        Missing -> "missing"
+        Error -> "error"
+        UnknownStatus -> "unknown"
+
+statusToText : HardwareStatus -> String
+statusToText status =
+    case status of
+        Online -> "Online"
+        Standby -> "Standby"
+        Missing -> "Fehlt"
+        Error -> "Fehler"
+        UnknownStatus -> "Unbekannt"
+
 -- --- RAIL HELPERS ---
 
-railButton : String -> String -> SidebarTab -> Model -> Html Msg
+railButton : Html Msg -> String -> SidebarTab -> Model -> Html Msg
 railButton icon label tab model =
     button 
         [ classList [ ("rail-btn", True), ("active", model.activeSidebarTab == tab) ]
         , title label
         , onClick (SwitchSidebarTab tab)
         ] 
-        [ span [ class "rail-icon" ] [ text icon ] ]
+        [ span [ class "rail-icon" ] [ icon ] ]
 
 viewTabHeader : Model -> Html Msg
 viewTabHeader model =
@@ -85,10 +117,13 @@ viewPlanningTab model =
             [ h3 [] [ text "Contract-Net (Harlan)" ]
             , viewContractNetSettings model
             , hr [] []
-            , viewCoordinateStatus "📍 Start" model.pathStart
-            , viewCoordinateStatus "🎯 Ziel" model.pathGoal
+            
+            -- Nutzt die Flagge aus den Atoms für Start und Ziel
+            , viewCoordinateStatus Icons.iconGoal "Start" "status-start" model.pathStart
+            , viewCoordinateStatus Icons.iconGoal "Ziel" "status-goal" model.pathGoal
+            
             , if model.loading then
-                div [ class "planning-status-box" ] [ div [ class "spinner" ] [], text " Verhandle..." ]
+                div [ class "planning-status-box" ] [ div [ class "spinner" ] [], text "Verhandle..." ]
               else text ""
             , button 
                 [ class (if canPlan model && not model.loading then "btn-sidebar-primary" else "btn-disabled")
@@ -103,6 +138,8 @@ viewPlanningTab model =
                 , button [ class "btn-primary btn-small", onClick SetCurrentAsDefault ] [ text "💾 Save" ]
                 , button [ class "btn-secondary btn-small", onClick ExportConfig ] [ text "📤 Export" ]
                 , button [ class "btn-secondary btn-small", onClick ImportConfigTrigger ] [ text "📥 Import" ]
+                , button [ class "btn-danger btn-small", onClick ClearGrid ] 
+                    [ Icons.iconTrash, span [] [ text " Gitter löschen" ] ]
                 ]
             ]
         ]
@@ -117,7 +154,11 @@ viewAgentsTab model =
             p [ class "sidebar-hint" ] [ text "Keine Module im Gitter." ]
           else
             ul [ class "agent-list" ] 
-                (model.agents |> Dict.values |> List.sortBy .module_type |> List.map viewAgentItem)
+                (model.agents 
+                    |> Dict.values 
+                    |> List.sortBy (\a -> formatType a.module_type) 
+                    |> List.map viewAgentItem
+                )
         ]
 
 -- --- TAB: HARDWARE ---
@@ -130,7 +171,7 @@ viewHardwareTab model =
             , div [ class "status-grid" ]
                 [ div [ class "status-item" ] 
                     [ span [ class "label" ] [ text "CAN-Bus: " ]
-                    , span [ class "value status-online" ] [ text "Verbunden" ] 
+                    , span [ class "value online" ] [ text "Verbunden" ] 
                     ]
                 , div [ class "status-item" ]
                     [ span [ class "label" ] [ text "Batterie: " ]
@@ -139,7 +180,7 @@ viewHardwareTab model =
                 ]
             , div [ class "nested-planning-box" ]
                 [ p [ class "sidebar-hint" ] [ text "Hardware-Pfadplanung:" ]
-                , button [ class "btn-sidebar-ranger btn-full-width", onClick (SetMode "Ranger_Execute_Path"), disabled (not (canPlan model)) ] 
+                , button [ class "btn-sidebar-ranger", onClick (SetMode "Ranger_Execute_Path"), disabled (not (canPlan model)) ] 
                     [ text "Pfad an Ranger senden" ]
                 ]
             ]
@@ -153,17 +194,18 @@ viewHardwareTab model =
 
 viewLogsTab : Model -> Html Msg
 viewLogsTab model =
-    div [ class "sidebar-section log-section" ]
-        [ div [ id "log-container", class "log-container" ]
+    div [ class "sidebar-section fill" ] 
+        [ h3 [] [ text "System-Historie" ]
+        , div [ id "log-container", class "log-container" ]
             (List.map (\log -> 
-                div [ class ("log-entry " ++ log.level) ] 
+                div [ class ("log-entry " ++ logLevelToClass log.level) ] 
                     [ span [ class "log-dot" ] []
                     , text log.message 
                     ]
             ) model.logs)
         ]
 
--- --- HILFSFUNKTIONEN (ERHALTEN) ---
+-- --- HILFSFUNKTIONEN ---
 
 viewHardwareItem : HardwareDevice -> Html Msg
 viewHardwareItem hw =
@@ -171,7 +213,7 @@ viewHardwareItem hw =
         [ div [ class "hw-header" ] [ b [] [ text hw.pi_id ] ]
         , div [ class "hw-details" ]
             [ viewStatusBadge "Node" (if hw.pi_exists then "online" else "missing") (if hw.pi_exists then "Online" else "Offline")
-            , viewStatusBadge "RFID" hw.rfid_status hw.rfid_status
+            , viewStatusBadge "RFID" (statusToClass hw.rfid_status) (statusToText hw.rfid_status)
             ]
         ]
 
@@ -185,7 +227,7 @@ viewContractNetSettings model =
             , paramInput "Mensch" weights.human_extra_weight "human_extra_weight"
             , paramInput "Nähe" weights.proximity_penalty "proximity_penalty"
             ]
-        , button [ class "btn-apply btn-very-small", onClick SaveWeights ] [ text "Anwenden" ]
+        , button [ class "btn-secondary btn-very-small", onClick SaveWeights ] [ text "Anwenden" ]
         ]
 
 paramInput : String -> Float -> String -> Html Msg
@@ -208,24 +250,29 @@ viewAgentItem agent =
         , button [ class "btn-icon-delete", onClick (RemoveAgent agent.position) ] [ text "×" ]
         ]
 
-formatType : String -> String
+formatType : ModuleType -> String
 formatType t =
     case t of
-        "ftf" -> "FTF Transport"
-        "conveyeur" -> "Conveyeur"
-        "rollen_ns" -> "Rollen-Modul"
-        "mensch" -> "Mensch"
-        "greifer" -> "Greifer"
-        "tisch" -> "Station"
-        _ -> t
+        FTF -> "FTF Transport"
+        Conveyeur -> "Conveyeur"
+        RollenModul -> "Rollen-Modul"
+        Mensch -> "Mensch"
+        Greifer -> "Greifer"
+        Station -> "Station"
+        UnknownModule s -> s
 
-viewCoordinateStatus : String -> Maybe GridCell -> Html Msg
-viewCoordinateStatus lbl maybeCell =
-    div [ class "coord-item" ]
-        [ span [ class "coord-label" ] [ text (lbl ++ ": ") ]
+viewCoordinateStatus : Html Msg -> String -> String -> Maybe GridCell -> Html Msg
+viewCoordinateStatus icon label statusClass maybeCell =
+    div [ class ("coord-item " ++ statusClass) ]
+        [ span [ class "icon-container" ] [ icon ]
+        , span [ class "coord-label" ] [ text (label ++ ": ") ]
         , case maybeCell of
-            Just cell -> span [ class "text-green" ] [ text ("(" ++ String.fromInt cell.x ++ "," ++ String.fromInt cell.y ++ ")") ]
-            Nothing -> span [ class "text-red" ] [ text "---" ]
+            Just cell -> 
+                span [ class "value text-highlight" ] 
+                    [ text ("(" ++ String.fromInt cell.x ++ "," ++ String.fromInt cell.y ++ ")") ]
+            
+            Nothing -> 
+                span [ class "value text-muted" ] [ text "---" ]
         ]
 
 canPlan : Model -> Bool

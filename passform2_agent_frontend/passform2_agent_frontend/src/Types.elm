@@ -4,6 +4,46 @@ import Dict exposing (Dict)
 import Http
 import Json.Decode as Decode
 
+-- --- DOMAIN TYPES ---
+
+{-| Repräsentiert die verschiedenen Hardware- und Logik-Module im Gitter. -}
+type ModuleType
+    = FTF           
+    | Conveyeur     
+    | RollenModul   
+    | Mensch        
+    | Greifer       
+    | Station       
+    | UnknownModule String
+
+{-| Semantische Zustände für das Logging und die UI-Farben. -}
+type LogLevel
+    = Success       
+    | Info          
+    | Warning       -- Hier bleibt der Name für die Logs erhalten
+    | Danger        
+
+{-| Status der physischen Hardware-Komponenten. 
+Umbenannt von Warning zu Standby, um den Elm Name-Clash zu vermeiden.
+-}
+type HardwareStatus
+    = Online
+    | Standby  -- Nutze dies für den gelben Status (z.B. im Simulations-Modus)
+    | Missing
+    | Error
+    | UnknownStatus
+
+type Mode 
+    = Simulation 
+    | Hardware
+
+type SidebarTab
+    = TabPlanning    
+    | TabAgents      
+    | TabHardware    
+    | TabLogs        
+
+
 -- --- ENTITIES ---
 
 type alias GridCell = 
@@ -11,23 +51,23 @@ type alias GridCell =
 
 type alias SystemLog =
     { message : String
-    , level : String
+    , level : LogLevel
     }
 
 type alias HardwareDevice =
     { pi_id : String
-    , rfid_status : String
+    , rfid_status : HardwareStatus
     , pi_exists : Bool
     }
 
 type alias AgentModule =
     { agent_id : Maybe String
-    , module_type : String
+    , module_type : ModuleType
     , position : GridCell
     , orientation : Int
     , is_dynamic : Bool
     , payload : Maybe String
-    , signal_strength : Int -- 0-100% Signalqualität
+    , signal_strength : Int 
     }
 
 type alias Path =
@@ -48,23 +88,16 @@ type alias PlanningWeights =
     , hardware_safety_factor : Float
     }
 
--- --- SIDEBAR NAVIGATION (NEU) ---
-
-type SidebarTab
-    = TabPlanning    -- Harlan Parameter
-    | TabAgents      -- Aktive Agenten-Liste
-    | TabHardware    -- RPi & CAN-Bus Telemetrie
-    | TabLogs        -- System-Historie
 
 -- --- MODEL ---
 
 type alias Model =
     { mode : Mode
     , backendIP : String
-    , connected : Bool            -- Status für Backend-REST (Port 8000)
-    , rosConnected : Bool          -- Status für Backend-ROS (Port 5000)
-    , canConnected : Bool          -- Status des CAN-Bus für den Ranger
-    , rangerBattery : Maybe Float  -- Batteriespannung vom CAN-Bus
+    , connected : Bool            
+    , rosConnected : Bool          
+    , canConnected : Bool          
+    , rangerBattery : Maybe Float  
     , agents : Dict (Int, Int) AgentModule
     , savedDefault : Dict (Int, Int) AgentModule
     , logs : List SystemLog 
@@ -77,23 +110,22 @@ type alias Model =
     , loading : Bool
     , activeMenu : Maybe MenuType
     , sidebarOpen : Bool
-    , activeSidebarTab : SidebarTab -- NEU: Welcher Tab in der Rail aktiv ist
+    , activeSidebarTab : SidebarTab 
     , gridWidth : Int
     , gridHeight : Int
     , waitingForNfc : Bool
-    , nfcStatus : String
+    , nfcStatus : HardwareStatus   
     , planningWeights : PlanningWeights
-    , currentHz : Float           -- Aktueller System-Takt (SSoT)
-    , alert : Maybe String        -- ID des kritischen Agenten für Warn-Toast
-    , connectedHardware : List HardwareDevice -- Externe RPis
+    , currentHz : Float            
+    , alert : Maybe String         
+    , connectedHardware : List HardwareDevice 
     , lastWrittenId : Maybe String
     }
-
-type Mode = Simulation | Hardware
 
 type MenuType
     = SelectionMenu GridCell
     | SettingsMenu GridCell AgentModule
+
 
 -- --- MESSAGES ---
 
@@ -102,7 +134,7 @@ type Msg
     | ToggleMode
     | ToggleViewMode
     | ToggleSidebar
-    | SwitchSidebarTab SidebarTab -- NEU: Umschalten zwischen Rail-Icons
+    | SwitchSidebarTab SidebarTab
     | SetGridWidth String
     | SetGridHeight String
     | CloseMenu
@@ -113,7 +145,7 @@ type Msg
     | ExportConfig
     | ImportConfigTrigger
     | ConfigReceived String
-    | StartAgent String GridCell
+    | StartAgent ModuleType GridCell 
     | RemoveAgent GridCell
     | RotateAgent GridCell
     | MoveAgent { oldX : Int, oldY : Int, newX : Int, newY : Int }

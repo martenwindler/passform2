@@ -1,0 +1,8 @@
+# Unterstütze alle Browser mit mehr als 0.5% Marktanteil
+> 0.5%
+# Unterstütze die letzten zwei Versionen jedes Browsers
+last 2 versions
+# Firefox Extended Support Release
+Firefox ESR
+# Keine "toten" Browser (Internet Explorer 11 etc.)
+not dead

@@ -1,6 +1,7 @@
 import { Elm } from './src/Main.elm';
 import { io, Socket } from 'socket.io-client';
 import './src/ThreeGridScene';
+import "./src/assets/styles/main.scss";
 
 // --- KONFIGURATION & FLAGS ---
 
