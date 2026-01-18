@@ -10,9 +10,12 @@ view model =
     nav [ class "navbar blue-look" ]
         [ -- Links: Logo und Toggle-Button
           div [ class "navbar-section" ]
-            [ button [ class "btn-icon-sidebar", onClick ToggleSidebar ] 
+          [ 
+            {- 
+            button [ class "btn-icon-sidebar", onClick ToggleSidebar ] 
                 [ text "☰" ]
-            , img [ src "src/assets/images/logo.png", class "navbar-logo", alt "Logo" ] []
+            , -}
+            img [ src "src/assets/images/logo.png", class "navbar-logo", alt "Logo" ] []
             , span [ class "navbar-title" ] [ text "Passform 2.0" ]
             ]
         

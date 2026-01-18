@@ -48,17 +48,18 @@ init flags =
       , backendIP = flags.backendIP
       , connected = True
       , rosConnected = False
-      , canConnected = False           -- NEU: Initialer Status des CAN-Bus
-      , rangerBattery = Nothing         -- NEU: Noch keine Telemetriedaten vorhanden
+      , canConnected = False
+      , rangerBattery = Nothing
       , agents = initialAgents
       , savedDefault = initialAgents
       , connectedHardware = []
-      , logs = [ { message = "System bereit. SSoT geladen.", level = "success" } ]
+      , logs = [ { message = "System bereit. Photoshop-Layout aktiv.", level = "success" } ]
       , pathStart = Nothing
       , pathGoal = Nothing
       , currentPath = Nothing
       , hoveredCell = Nothing
       , sidebarOpen = False
+      , activeSidebarTab = TabAgents -- NEU: Start-Tab für die Rail
       , gridWidth = 6
       , gridHeight = 4
       , editing = True
@@ -67,6 +68,7 @@ init flags =
       , activeMenu = Nothing
       , waitingForNfc = False
       , nfcStatus = "unknown"
+      , lastWrittenId = Nothing -- Initial auf Nothing, damit Badge erst bei Erfolg kommt
       , currentHz = 1.0
       , alert = Nothing
       , planningWeights =
@@ -89,7 +91,6 @@ subscriptions model =
     Sub.batch
         [ Ports.socketStatusReceiver SetConnected
         , Ports.rosStatusReceiver SetRosConnected
-        -- Hier könnte später ein Ports.canStatusReceiver stehen
         , Ports.activeAgentsReceiver UpdateAgents
         , Ports.pathCompleteReceiver PlanningResultRaw
         , Ports.configReceived ConfigReceived
@@ -109,7 +110,7 @@ view model =
         [ Navbar.view model
         , div [ class "content-area" ]
             [ view3D model 
-            , if model.sidebarOpen then Sidebar.view model else text ""
+            , Sidebar.view model -- IMMER RENDERN: Die Sidebar steuert intern Rail vs. Content
             , HardwareStatus.viewAlertOverlay model.alert 
             ]
         , Modal.viewActiveMenu model model.activeMenu 
@@ -122,8 +123,6 @@ view model =
 view3D : Model -> Html Msg
 view3D model =
     let
-        -- Bestimmt, ob der User im aktuellen Modus interagieren darf
-        -- Im Hardware-Modus (Ranger) wird das Klicken unterbunden
         allowInteraction =
             case model.mode of
                 Simulation -> "true"
@@ -135,7 +134,7 @@ view3D model =
         , attribute "is-3d" (if model.is3D then "true" else "false")
         , attribute "grid-width" (String.fromInt model.gridWidth)
         , attribute "grid-height" (String.fromInt model.gridHeight)
-        , attribute "allow-interaction" allowInteraction -- NEU: Steuerung der Interaktion
+        , attribute "allow-interaction" allowInteraction 
         , attribute "start-pos" (model.pathStart |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
         , attribute "goal-pos" (model.pathGoal |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
         , Ports.onAgentMoved 

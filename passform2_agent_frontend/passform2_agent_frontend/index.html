@@ -972,6 +972,318 @@
         .indicator-label {
             font-weight: 500;
         }
+
+        .last-written-badge {
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(72, 187, 120, 0.15);
+            border: 1px solid #48bb78;
+            border-radius: 4px;
+            color: #48bb78;
+            font-size: 0.85em;
+            text-align: center;
+        }
+
+        .sidebar-container {
+            display: flex;
+            height: 100%;
+            position: fixed;
+            right: 0; /* Oder links, je nach Wunsch */
+            top: 0;
+            z-index: 100;
+        }
+
+        .sidebar-rail {
+            width: 50px;
+            background: #1a202c; /* Sehr dunkel */
+            border-left: 1px solid #2d3748;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            gap: 15px;
+        }
+
+        .rail-btn {
+            width: 40px;
+            height: 40px;
+            background: transparent;
+            border: none;
+            color: #a0aec0;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .rail-btn.active {
+            background: #3182ce; /* Blaues Highlight */
+            color: white;
+        }
+
+        .sidebar-content {
+            width: 300px;
+            background: #2d3748; /* Etwas heller als die Rail */
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.3);
+        }
+
+        /* Die gesamte App füllt den Viewport */
+        .app-layout {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            background-color: #1a202c;
+        }
+
+        /* Die Navbar hat eine feste Höhe */
+        .navbar {
+            height: 60px;
+            flex-shrink: 0; /* Verhindert, dass die Navbar gestaucht wird */
+            z-index: 1000;
+        }
+
+        /* Der Bereich unter der Navbar */
+        .content-area {
+            display: flex;
+            flex-direction: row;
+            flex-grow: 1; /* Nimmt den restlichen Platz ein */
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Die neue Sidebar-Struktur */
+        .sidebar-container {
+            display: flex;
+            height: 100%; /* Füllt die content-area, also unter der Navbar */
+            background: #1a202c;
+            border-left: 1px solid #2d3748;
+            flex-shrink: 0;
+        }
+
+        /* Die schmale Icon-Leiste (Rail) */
+        .sidebar-rail {
+            width: 60px;
+            background: #171923;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px 0;
+            gap: 12px;
+            border-right: 1px solid #2d3748;
+        }
+
+        /* Photoshop-Style Buttons in der Rail */
+        .rail-btn {
+            width: 42px;
+            height: 42px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            color: #718096;
+        }
+
+        .rail-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+        }
+
+        .rail-btn.active {
+            background: #3182ce;
+            color: white;
+            box-shadow: 0 0 10px rgba(49, 130, 206, 0.4);
+        }
+
+        /* Der ausklappbare Inhaltsbereich */
+        .sidebar-content {
+            width: 320px;
+            background: #2d3748;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2);
+            animation: slideIn 0.2s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { width: 0; opacity: 0; }
+            to { width: 320px; opacity: 1; }
+        }
+
+        .sidebar-tab-header {
+            padding: 20px;
+            border-bottom: 1px solid #4a5568;
+            background: #2d3748;
+        }
+
+        .tab-body {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        /* 3D Szene nimmt den restlichen Platz links ein */
+        three-grid-scene {
+            flex-grow: 1;
+            height: 100%;
+        }
+
+        /* --- BASIS & LAYOUT --- */
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            overflow: hidden;
+            background-color: #1a202c; /* Hintergrund auf Dunkelblau/Grau */
+        }
+
+        /* Die gesamte App ist ein vertikaler Stapel (Navbar oben, Content unten) */
+        .app-layout {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* --- NAVBAR: Volle Breite, liegt ÜBER der Sidebar --- */
+        .navbar.blue-look {
+            height: 60px;
+            min-height: 60px;
+            background-color: #1a365d;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            z-index: 1000; /* Stellt sicher, dass die Navbar über allem liegt */
+            position: relative;
+        }
+
+        .navbar-section { display: flex; align-items: center; gap: 15px; }
+        .navbar-center {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .navbar-logo { height: 35px; }
+        .navbar-title { font-weight: 600; font-size: 1.1rem; letter-spacing: 0.5px; }
+
+        /* --- CONTENT AREA: Startet automatisch UNTER der Navbar --- */
+        .content-area {
+            display: flex;
+            flex-direction: row;
+            flex: 1; /* Füllt den Rest der Höhe aus */
+            overflow: hidden;
+        }
+
+        /* 3D Szene nimmt den Platz links ein */
+        three-grid-scene {
+            flex: 1;
+            display: block;
+            min-width: 0;
+            height: 100%;
+        }
+
+        /* --- SIDEBAR CONTAINER: Photoshop-Style --- */
+        .sidebar-container {
+            display: flex;
+            height: 100%; /* Bezieht sich auf .content-area, also ab Pixel 61 */
+            background: #1a202c;
+            border-left: 1px solid #2d3748;
+            flex-shrink: 0;
+            position: relative; /* WICHTIG: Kein fixed oder absolute mehr! */
+        }
+
+        /* Die schmale Icon-Leiste (Rail) */
+        .sidebar-rail {
+            width: 60px;
+            background: #171923;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            /* Icons fangen hier etwas weiter unten an */
+            padding-top: 25px; 
+            gap: 15px;
+            border-right: 1px solid #2d3748;
+        }
+
+        /* Die Icons (Buttons) in der Rail */
+        .rail-btn {
+            width: 42px;
+            height: 42px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            color: #718096;
+        }
+
+        .rail-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+        }
+
+        .rail-btn.active {
+            background: #3182ce;
+            color: white;
+            box-shadow: 0 0 10px rgba(49, 130, 206, 0.4);
+        }
+
+        /* Spacer, um den Toggle-Button ganz nach unten zu schieben */
+        .rail-spacer {
+            flex-grow: 1;
+        }
+
+        /* Der ausklappbare Inhaltsbereich (Drawer) */
+        .sidebar-content {
+            width: 320px;
+            background: #2d3748;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2);
+            animation: slideIn 0.2s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { width: 0; opacity: 0; }
+            to { width: 320px; opacity: 1; }
+        }
+
+        .sidebar-tab-header {
+            padding: 20px;
+            border-bottom: 1px solid #4a5568;
+            background: #2d3748;
+        }
+
+        .sidebar-tab-header h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: #63b3ed;
+        }
+
+        .tab-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        /* Modal Overlay Fix */
+        .modal-overlay {
+            z-index: 2000; /* Über Navbar und Sidebar */
+        }
     </style>
 </head>
 <body>

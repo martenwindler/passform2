@@ -59,6 +59,14 @@ update msg model =
             , Ports.setMode modeStr
             )
 
+        -- --- SIDEBAR NAVIGATION (Photoshop-Style) ---
+        SwitchSidebarTab tab ->
+            -- Wenn ein Icon geklickt wird, wechseln wir den Tab UND öffnen die Sidebar
+            ( { model | activeSidebarTab = tab, sidebarOpen = True }, Cmd.none )
+
+        ToggleSidebar -> 
+            ( { model | sidebarOpen = not model.sidebarOpen }, Cmd.none )
+
         -- --- AGENTEN MANAGEMENT (LOKAL) ---
         StartAgent moduleType cell ->
             let
@@ -111,8 +119,17 @@ update msg model =
 
         HandleNfcStatus result ->
             case result of
-                Ok status -> ( { model | nfcStatus = status }, Cmd.none )
-                Err _ -> ( model, Cmd.none )
+                Ok status -> 
+                    if String.startsWith "Success:" status then
+                        let
+                            idOnly = String.dropLeft 8 status
+                        in
+                        ( { model | nfcStatus = "online", lastWrittenId = Just idOnly, waitingForNfc = False }, Cmd.none )
+                    else
+                        ( { model | nfcStatus = status, waitingForNfc = False }, Cmd.none )
+                
+                Err _ -> 
+                    ( { model | nfcStatus = "error", waitingForNfc = False }, Cmd.none )
 
         -- --- SYSTEM UPDATES ---
         SetConnected status ->
@@ -164,7 +181,6 @@ update msg model =
             )
 
         -- --- NAVIGATION & BOILERPLATE ---
-        ToggleSidebar -> ( { model | sidebarOpen = not model.sidebarOpen }, Cmd.none )
         ToggleViewMode -> ( { model | is3D = not model.is3D }, Cmd.none )
         SetPathStart cell -> ( { model | pathStart = Just cell, activeMenu = Nothing }, Cmd.none )
         SetPathGoal cell -> ( { model | pathGoal = Just cell, activeMenu = Nothing }, Cmd.none )
@@ -177,12 +193,11 @@ update msg model =
         PlanningResultRaw _ -> ( model, Cmd.none )
         PlanningResult _ -> ( model, Cmd.none )
         ModeChanged _ -> ( model, Cmd.none )
+        SetMode _ -> ( model, Cmd.none )
         
         _ -> ( model, Cmd.none )
 
-
 -- HELPER
-
 
 encodeWeights : PlanningWeights -> Encode.Value
 encodeWeights w =

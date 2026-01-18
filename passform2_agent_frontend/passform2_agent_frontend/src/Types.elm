@@ -48,15 +48,23 @@ type alias PlanningWeights =
     , hardware_safety_factor : Float
     }
 
+-- --- SIDEBAR NAVIGATION (NEU) ---
+
+type SidebarTab
+    = TabPlanning    -- Harlan Parameter
+    | TabAgents      -- Aktive Agenten-Liste
+    | TabHardware    -- RPi & CAN-Bus Telemetrie
+    | TabLogs        -- System-Historie
+
 -- --- MODEL ---
 
 type alias Model =
     { mode : Mode
     , backendIP : String
-    , connected : Bool             -- Status für Backend-REST (Port 8000)
+    , connected : Bool            -- Status für Backend-REST (Port 8000)
     , rosConnected : Bool          -- Status für Backend-ROS (Port 5000)
-    , canConnected : Bool          -- NEU: Status des CAN-Bus für den Ranger
-    , rangerBattery : Maybe Float  -- NEU: Batteriespannung vom CAN-Bus
+    , canConnected : Bool          -- Status des CAN-Bus für den Ranger
+    , rangerBattery : Maybe Float  -- Batteriespannung vom CAN-Bus
     , agents : Dict (Int, Int) AgentModule
     , savedDefault : Dict (Int, Int) AgentModule
     , logs : List SystemLog 
@@ -69,6 +77,7 @@ type alias Model =
     , loading : Bool
     , activeMenu : Maybe MenuType
     , sidebarOpen : Bool
+    , activeSidebarTab : SidebarTab -- NEU: Welcher Tab in der Rail aktiv ist
     , gridWidth : Int
     , gridHeight : Int
     , waitingForNfc : Bool
@@ -77,6 +86,7 @@ type alias Model =
     , currentHz : Float           -- Aktueller System-Takt (SSoT)
     , alert : Maybe String        -- ID des kritischen Agenten für Warn-Toast
     , connectedHardware : List HardwareDevice -- Externe RPis
+    , lastWrittenId : Maybe String
     }
 
 type Mode = Simulation | Hardware
@@ -92,13 +102,14 @@ type Msg
     | ToggleMode
     | ToggleViewMode
     | ToggleSidebar
+    | SwitchSidebarTab SidebarTab -- NEU: Umschalten zwischen Rail-Icons
     | SetGridWidth String
     | SetGridHeight String
     | CloseMenu
     | SetCurrentAsDefault
     | LoadDefaultConfig
     | ClearGrid
-    | SetMode String              -- FIX: Jetzt im Compiler bekannt (für Ranger_Manual etc.)
+    | SetMode String 
     | ExportConfig
     | ImportConfigTrigger
     | ConfigReceived String
@@ -107,8 +118,8 @@ type Msg
     | RotateAgent GridCell
     | MoveAgent { oldX : Int, oldY : Int, newX : Int, newY : Int }
     | UpdateAgents Decode.Value
-    | SetConnected Bool           -- Setzt REST-Status
-    | SetRosConnected Bool        -- Setzt ROS-Status
+    | SetConnected Bool 
+    | SetRosConnected Bool 
     | LogReceived String
     | HandleGridClick GridCell
     | SetPathStart GridCell

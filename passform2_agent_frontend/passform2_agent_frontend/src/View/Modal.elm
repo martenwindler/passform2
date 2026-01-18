@@ -61,41 +61,57 @@ viewActiveMenu model maybeMenu =
                         Nothing ->
                             ( "unknown", "Kein Pi" )
 
-                -- 4. Übergeordnete Online-Logik (Kombination aus Socket und Pi-Status)
+                -- 4. Übergeordnete Online-Logik (Pi UND Sensor müssen da sein)
                 isHardwareReady =
                     case maybePi of
                         Just pi -> pi.pi_exists && pi.rfid_status == "online"
                         Nothing -> False
                 
-                -- NEU: Signalstärke-Mapping basierend auf dem Pi-Status
-                -- Wir ignorieren hier agent.signal_strength und kopieren den Hardware-Status
+                -- 5. Signalstärke-Mapping (Kopie des Pi-Status)
                 mappedSignalStrength =
                     case maybePi of
-                        Just pi ->
-                            if pi.pi_exists then 100 else 0
-                        Nothing ->
-                            0
+                        Just pi -> if pi.pi_exists then 100 else 0
+                        Nothing -> 0
 
                 agentIsActive =
                     mappedSignalStrength > 0
+
+                -- 6. NEU: Anzeige der zuletzt geschriebenen RFID ID
+                -- Erscheint im Erfolgsfall als grünes Badge
+                lastWrittenView =
+                    case model.lastWrittenId of
+                        Just lastId ->
+                            div [ class "last-written-badge"
+                                , style "margin-top" "10px"
+                                , style "padding" "8px"
+                                , style "background" "rgba(72, 187, 120, 0.15)"
+                                , style "border" "1px solid #48bb78"
+                                , style "border-radius" "4px"
+                                , style "color" "#48bb78"
+                                , style "text-align" "center"
+                                , style "font-size" "0.85em"
+                                ]
+                                [ text ("Zuletzt auf Chip geschrieben: " ++ lastId) ]
+                        Nothing ->
+                            text ""
             in
             div [ class "modal-overlay" ]
                 [ div [ class "modal-content" ]
                     [ h3 [ style "color" "#fff" ] [ text (Sidebar.formatType agent.module_type) ]
                     , div [ class "agent-id-badge" ] [ text ("ID: " ++ aid) ]
 
-                    -- Hardware-Status-Reihe: Hier siehst du jetzt direkt den Pi-Status
+                    -- Hardware-Status-Reihe
                     , div [ class "hardware-status-row" ]
                         [ viewStatusBadge "RC522 Sensor" nfcStat nfcText
                         , viewStatusBadge "RPI 5 Node" piStat piText
                         ]
 
-                    -- Signalstärke des Agenten (Gekoppelt an Pi-Erreichbarkeit)
+                    -- Signalstärke (Mapping von Hardware-Status)
                     , viewSignalStrength agentIsActive mappedSignalStrength
 
                     , hr [] []
                     
-                    -- Der Brenn-Button ist nur aktiv, wenn Pi UND Sensor online sind
+                    -- NFC Schreib-Sektion
                     , button
                         [ onClick (RequestNfcWrite aid)
                         , class "btn-nfc-write"
@@ -103,6 +119,9 @@ viewActiveMenu model maybeMenu =
                         , style "opacity" (if isHardwareReady then "1" else "0.5")
                         ]
                         [ text "ID auf Chip brennen" ]
+                    
+                    -- HIER WIRD DIE ID EINGEBLENDET
+                    , lastWrittenView
 
                     , hr [] []
                     , button [ onClick (RotateAgent cell) ] [ text "Drehen" ]

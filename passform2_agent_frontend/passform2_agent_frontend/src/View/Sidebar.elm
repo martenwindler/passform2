@@ -5,151 +5,194 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Dict 
 import Types exposing (..)
+import View.HardwareStatus exposing (viewStatusBadge)
 
 view : Model -> Html Msg
 view model =
-    aside [ class "sidebar" ]
-        [ h2 [] [ text "Konfiguration" ]
+    aside [ class "sidebar-container" ]
+        [ -- 1. Navigation Rail (Die schmale Icon-Leiste)
+          div [ class "sidebar-rail" ]
+            [ railButton "🎯" "Planung" TabPlanning model
+            , railButton "🤖" "Module" TabAgents model
+            , railButton "🔌" "Hardware" TabHardware model
+            , railButton "📜" "Logs" TabLogs model
+            , div [ class "rail-spacer" ] []
+            , button [ class "rail-btn toggle-btn", onClick ToggleSidebar ] 
+                [ text (if model.sidebarOpen then "»" else "«") ]
+            ]
         
-        -- 1. System-Logs (Immer ganz oben für Feedback)
-        , div [ class "sidebar-section log-section" ]
-            [ h3 [] [ text "System-Meldungen" ]
-            , div [ id "log-container", class "log-container" ]
-                (List.map (\log -> 
-                    div [ class ("log-entry " ++ log.level) ] 
-                        [ span [ class "log-dot" ] []
-                        , text log.message 
-                        ]
-                ) model.logs)
-            ]
+        -- 2. Sidebar Content (Der ausklappbare Bereich)
+        , if model.sidebarOpen then
+            div [ class "sidebar-content" ]
+                [ viewTabHeader model
+                , div [ class "tab-body" ] [ viewActiveTab model ]
+                ]
+          else
+            text ""
+        ]
 
-        -- 3. Aktive Module (Die "Teilnehmer" am Contract-Net)
-        , div [ class "sidebar-section" ]
-            [ h3 [] [ text ("Aktive Module (" ++ String.fromInt (Dict.size model.agents) ++ ")") ]
-            , if Dict.isEmpty model.agents then
-                p [ class "sidebar-hint" ] [ text "Keine Module im Gitter." ]
-              else
-                ul [ class "agent-list" ] 
-                    (model.agents |> Dict.values |> List.sortBy .module_type |> List.map viewAgentItem)
-            ]
+-- --- RAIL HELPERS ---
 
-        -- 4. Hauptabschnitt Gitter (Bündelt Dimensionen & Konfiguration)
-        , div [ class "sidebar-section grid-main-section" ]
-            [ h3 [] [ text "Gitterkonfiguration" ]
-            
-            -- Unterelement A: Dimensionen
+railButton : String -> String -> SidebarTab -> Model -> Html Msg
+railButton icon label tab model =
+    button 
+        [ classList [ ("rail-btn", True), ("active", model.activeSidebarTab == tab) ]
+        , title label
+        , onClick (SwitchSidebarTab tab)
+        ] 
+        [ span [ class "rail-icon" ] [ text icon ] ]
+
+viewTabHeader : Model -> Html Msg
+viewTabHeader model =
+    let
+        titleText =
+            case model.activeSidebarTab of
+                TabPlanning -> "Planung & Gewichte"
+                TabAgents -> "Aktive Module"
+                TabHardware -> "Hardware-Status"
+                TabLogs -> "System-Historie"
+    in
+    div [ class "sidebar-tab-header" ]
+        [ h2 [] [ text titleText ] ]
+
+-- --- TAB ROUTING ---
+
+viewActiveTab : Model -> Html Msg
+viewActiveTab model =
+    case model.activeSidebarTab of
+        TabPlanning -> viewPlanningTab model
+        TabAgents -> viewAgentsTab model
+        TabHardware -> viewHardwareTab model
+        TabLogs -> viewLogsTab model
+
+-- --- TAB: PLANNING ---
+
+viewPlanningTab : Model -> Html Msg
+viewPlanningTab model =
+    div []
+        [ div [ class "sidebar-section" ]
+            [ h3 [] [ text "Gitterdimensionen" ]
             , div [ class "nested-box" ]
-                [ p [ class "sidebar-hint" ] [ text "Gitter-Dimensionen:" ]
-                , div [ class "input-row" ] 
+                [ div [ class "input-row" ] 
                     [ div [ class "input-group" ]
-                        [ label [] [ text "B:" ]
-                        , input [ type_ "number", value (String.fromInt model.gridWidth), onInput SetGridWidth ] []
-                        ]
+                        [ label [] [ text "B:" ], input [ type_ "number", value (String.fromInt model.gridWidth), onInput SetGridWidth ] [] ]
                     , div [ class "input-group" ]
-                        [ label [] [ text "L:" ]
-                        , input [ type_ "number", value (String.fromInt model.gridHeight), onInput SetGridHeight ] []
-                        ]
+                        [ label [] [ text "L:" ], input [ type_ "number", value (String.fromInt model.gridHeight), onInput SetGridHeight ] [] ]
                     ]
                 ]
-
-        -- Unterelement B: Konfiguration / Aktionen
-        , div [ class "nested-box" ]
-            [ p [ class "sidebar-hint" ] [ text "Konfigurations-Management:" ]
+            ]
+        , div [ class "sidebar-section" ]
+            [ h3 [] [ text "Contract-Net (Harlan)" ]
+            , viewContractNetSettings model
+            , hr [] []
+            , viewCoordinateStatus "📍 Start" model.pathStart
+            , viewCoordinateStatus "🎯 Ziel" model.pathGoal
+            , if model.loading then
+                div [ class "planning-status-box" ] [ div [ class "spinner" ] [], text " Verhandle..." ]
+              else text ""
+            , button 
+                [ class (if canPlan model && not model.loading then "btn-sidebar-primary" else "btn-disabled")
+                , onClick (StartPlanning False), disabled (not (canPlan model) || model.loading)
+                ] 
+                [ text "Mission starten" ]
+            ]
+        , div [ class "sidebar-section" ]
+            [ h3 [] [ text "Management" ]
             , div [ class "actions-compact-grid" ]
                 [ button [ class "btn-secondary btn-small", onClick LoadDefaultConfig ] [ text "📂 Default" ]
                 , button [ class "btn-primary btn-small", onClick SetCurrentAsDefault ] [ text "💾 Save" ]
                 , button [ class "btn-secondary btn-small", onClick ExportConfig ] [ text "📤 Export" ]
                 , button [ class "btn-secondary btn-small", onClick ImportConfigTrigger ] [ text "📥 Import" ]
                 ]
-            , button [ class "btn-danger btn-small btn-full-width", style "margin-top" "8px", onClick ClearGrid ] 
-                [ span [] [ text "🗑️" ], text " Gitter leeren" ]
             ]
         ]
 
-        -- 2. Contract-Net-Protokoll (Dezentrale Logik nach Harlan)
-        , div [ class "sidebar-section mission-section" ]
-            [ h3 [] [ text "Contract-Net-Protokoll" ]
-            , viewContractNetSettings model
-            , hr [] []
-            , viewCoordinateStatus "📍 Start-Position" model.pathStart
-            , viewCoordinateStatus "🎯 Ziel-Position" model.pathGoal
-            
-            , if model.loading then
-                div [ class "planning-status-box" ]
-                    [ div [ class "spinner" ] []
-                    , span [] [ text "Verhandle Verträge..." ]
-                    ]
-              else
-                text ""
+-- --- TAB: AGENTS ---
 
-            , button 
-                [ class (if canPlan model && not model.loading then "btn-sidebar-primary" else "btn-disabled")
-                , onClick (StartPlanning False)
-                , disabled (not (canPlan model) || model.loading)
-                ] 
-                [ text (if model.loading then "Ausschreibung läuft..." else "Mission starten") ]
-            ]
+viewAgentsTab : Model -> Html Msg
+viewAgentsTab model =
+    div [ class "sidebar-section" ]
+        [ h3 [] [ text ("Teilnehmer (" ++ String.fromInt (Dict.size model.agents) ++ ")") ]
+        , if Dict.isEmpty model.agents then
+            p [ class "sidebar-hint" ] [ text "Keine Module im Gitter." ]
+          else
+            ul [ class "agent-list" ] 
+                (model.agents |> Dict.values |> List.sortBy .module_type |> List.map viewAgentItem)
+        ]
 
-        -- 5. Agile Robotics Ranger (Ganz unten als Hardware-Schnittstelle)
-        , div [ class "sidebar-section ranger-section highlight-hardware" ]
+-- --- TAB: HARDWARE ---
+
+viewHardwareTab : Model -> Html Msg
+viewHardwareTab model =
+    div []
+        [ div [ class "sidebar-section highlight-hardware" ]
             [ h3 [] [ text "Agile Robotics Ranger" ]
-            
-            -- Status & Telemetrie
             , div [ class "status-grid" ]
                 [ div [ class "status-item" ] 
-                    [ span [ class "label" ] [ text "CAN-Bus:" ]
-                    , span [ class "value status-online" ] [ text " Verbunden" ] 
+                    [ span [ class "label" ] [ text "CAN-Bus: " ]
+                    , span [ class "value status-online" ] [ text "Verbunden" ] 
                     ]
-                , div [ class "status-item" ] 
-                    [ span [ class "label" ] [ text "Modus:" ]
-                    , span [ class "value" ] [ text " Navigation" ] 
+                , div [ class "status-item" ]
+                    [ span [ class "label" ] [ text "Batterie: " ]
+                    , span [ class "value" ] [ text (model.rangerBattery |> Maybe.map (\v -> String.fromFloat v ++ "V") |> Maybe.withDefault "---") ]
                     ]
                 ]
-            
-            -- Ranger Pfadplanung (Zweiter Planner)
             , div [ class "nested-planning-box" ]
                 [ p [ class "sidebar-hint" ] [ text "Hardware-Pfadplanung:" ]
-                , viewCoordinateStatus "📍 Start-Position" model.pathStart
-                , viewCoordinateStatus "🎯 Ziel-Position" model.pathGoal
-                
-                , button 
-                    [ class "btn-sidebar-ranger btn-full-width"
-                    , onClick (SetMode "Ranger_Execute_Path") 
-                    , disabled (not (canPlan model))
-                    ] 
-                    [ text "Ranger Pfad berechnen & ausführen" ]
+                , button [ class "btn-sidebar-ranger btn-full-width", onClick (SetMode "Ranger_Execute_Path"), disabled (not (canPlan model)) ] 
+                    [ text "Pfad an Ranger senden" ]
                 ]
+            ]
+        , div [ class "sidebar-section" ]
+            [ h3 [] [ text "Raspberry Pi Nodes" ]
+            , div [ class "hardware-list" ] (List.map viewHardwareItem model.connectedHardware)
             ]
         ]
 
--- --- HILFSFUNKTIONEN ---
+-- --- TAB: LOGS ---
+
+viewLogsTab : Model -> Html Msg
+viewLogsTab model =
+    div [ class "sidebar-section log-section" ]
+        [ div [ id "log-container", class "log-container" ]
+            (List.map (\log -> 
+                div [ class ("log-entry " ++ log.level) ] 
+                    [ span [ class "log-dot" ] []
+                    , text log.message 
+                    ]
+            ) model.logs)
+        ]
+
+-- --- HILFSFUNKTIONEN (ERHALTEN) ---
+
+viewHardwareItem : HardwareDevice -> Html Msg
+viewHardwareItem hw =
+    div [ class "nested-box hw-item" ]
+        [ div [ class "hw-header" ] [ b [] [ text hw.pi_id ] ]
+        , div [ class "hw-details" ]
+            [ viewStatusBadge "Node" (if hw.pi_exists then "online" else "missing") (if hw.pi_exists then "Online" else "Offline")
+            , viewStatusBadge "RFID" hw.rfid_status hw.rfid_status
+            ]
+        ]
 
 viewContractNetSettings : Model -> Html Msg
 viewContractNetSettings model =
-    let
-        weights = model.planningWeights
-    in
+    let weights = model.planningWeights in
     div [ class "nested-settings" ]
-        [ p [ class "sidebar-hint" ] [ text "Gebotsparameter (Kostenfunktion):" ]
-        , div [ class "parameter-grid-row" ]
-            [ div [ class "parameter-item" ]
-                [ label [] [ text "Basis" ]
-                , input [ type_ "number", step "0.1", value (String.fromFloat weights.execution_time_default), onInput (SetWeight "execution_time_default") ] []
-                ]
-            , div [ class "parameter-item" ]
-                [ label [] [ text "Komplex" ]
-                , input [ type_ "number", step "0.1", value (String.fromFloat weights.complex_module_time), onInput (SetWeight "complex_module_time") ] []
-                ]
-            , div [ class "parameter-item" ]
-                [ label [] [ text "Mensch" ]
-                , input [ type_ "number", step "0.5", value (String.fromFloat weights.human_extra_weight), onInput (SetWeight "human_extra_weight") ] []
-                ]
-            , div [ class "parameter-item" ]
-                [ label [] [ text "Nähe" ]
-                , input [ type_ "number", step "0.1", value (String.fromFloat weights.proximity_penalty), onInput (SetWeight "proximity_penalty") ] []
-                ]
+        [ div [ class "parameter-grid-row" ]
+            [ paramInput "Basis" weights.execution_time_default "execution_time_default"
+            , paramInput "Komp." weights.complex_module_time "complex_module_time"
+            , paramInput "Mensch" weights.human_extra_weight "human_extra_weight"
+            , paramInput "Nähe" weights.proximity_penalty "proximity_penalty"
             ]
-        , button [ class "btn-apply btn-very-small", onClick SaveWeights ] [ text "Gewichte anwenden" ]
+        , button [ class "btn-apply btn-very-small", onClick SaveWeights ] [ text "Anwenden" ]
+        ]
+
+paramInput : String -> Float -> String -> Html Msg
+paramInput lbl val field =
+    div [ class "parameter-item" ]
+        [ label [] [ text lbl ]
+        , input [ type_ "number", step "0.1", value (String.fromFloat val), onInput (SetWeight field) ] []
         ]
 
 viewAgentItem : AgentModule -> Html Msg
@@ -158,18 +201,9 @@ viewAgentItem agent =
         [ div [ class "agent-info" ]
             [ div [ class "agent-header" ] 
                 [ span [ class "agent-label" ] [ text (formatType agent.module_type) ]
-                , if agent.is_dynamic then 
-                    span [ class "badge dynamic" ] [ text "Mobil" ]
-                  else 
-                    text ""
+                , if agent.is_dynamic then span [ class "badge dynamic" ] [ text "Mobil" ] else text ""
                 ]
-            , span [ class "agent-coords" ] 
-                [ text ("(" ++ String.fromInt agent.position.x ++ "," ++ String.fromInt agent.position.y ++ ") | " ++ String.fromInt agent.orientation ++ "°") ]
-            , case agent.payload of
-                Just pId -> 
-                    div [ class "agent-payload" ] [ text ("📦 Trägt: " ++ pId) ]
-                Nothing -> 
-                    text ""
+            , span [ class "agent-coords" ] [ text ("(" ++ String.fromInt agent.position.x ++ "," ++ String.fromInt agent.position.y ++ ")") ]
             ]
         , button [ class "btn-icon-delete", onClick (RemoveAgent agent.position) ] [ text "×" ]
         ]
@@ -178,20 +212,20 @@ formatType : String -> String
 formatType t =
     case t of
         "ftf" -> "FTF Transport"
-        "conveyeur" -> "Conveyeur-Modul"
+        "conveyeur" -> "Conveyeur"
         "rollen_ns" -> "Rollen-Modul"
-        "mensch" -> "Mensch (Bediener)"
-        "greifer" -> "Greifer-Einheit"
-        "tisch" -> "Arbeitsstation"
+        "mensch" -> "Mensch"
+        "greifer" -> "Greifer"
+        "tisch" -> "Station"
         _ -> t
 
 viewCoordinateStatus : String -> Maybe GridCell -> Html Msg
-viewCoordinateStatus labelTitle maybeCell =
+viewCoordinateStatus lbl maybeCell =
     div [ class "coord-item" ]
-        [ span [ class "coord-label" ] [ text (labelTitle ++ ": ") ]
+        [ span [ class "coord-label" ] [ text (lbl ++ ": ") ]
         , case maybeCell of
             Just cell -> span [ class "text-green" ] [ text ("(" ++ String.fromInt cell.x ++ "," ++ String.fromInt cell.y ++ ")") ]
-            Nothing -> span [ class "text-red" ] [ text "Nicht gewählt" ]
+            Nothing -> span [ class "text-red" ] [ text "---" ]
         ]
 
 canPlan : Model -> Bool
