@@ -30,8 +30,20 @@ help:
 
 # --- EINZELSTART ---
 
+install:
+	@echo ">>> Erstelle Virtual Environment mit ROS-Anbindung..."
+	python3 -m venv $(VENV) --system-site-packages
+	@echo ">>> Installiere Python-Abhängigkeiten..."
+	$(PYTHON) -m pip install --upgrade pip
+	$(PYTHON) -m pip install python-socketio eventlet flask-cors flask
+	@echo ">>> Installiere Frontend-Abhängigkeiten..."
+	# Hier stellen wir sicher, dass elm-test auch wirklich da ist
+	cd $(FRONTEND_DIR) && npm install && npm install --save-dev elm-test
+	@echo "✅ Installation abgeschlossen. Nutze 'make start-all' zum Starten."
+
+# Der frontend-Befehl bleibt so, da er das Skript aufruft
 frontend:
-	@echo ">>> Starte Frontend..."
+	@echo ">>> Starte Frontend & Tests..."
 	cd $(FRONTEND_DIR) && ./../start__frontend.sh
 
 backend-rest:

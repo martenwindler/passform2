@@ -3,22 +3,22 @@ module Main exposing (main)
 import Browser
 import Decoders
 import Dict exposing (Dict)
+-- ODER (entsprechend deiner Pfadangabe):
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ports
 import Types exposing (..)
-import Update 
+import Types.Domain exposing (..)
 
--- --- ATOMIC VIEW IMPORTS ---
--- Organismen: Komplexe UI-Einheiten
-import View.Organisms.Navbar as Navbar
-import View.Organisms.Sidebar as Sidebar
-import View.Organisms.Modal as Modal 
+-- LOGIK-IMPORTE
+import Update.Planning as Planning
+import Update.Hardware as Hardware
+import Update.Agents as Agents
 
--- Moleküle: Kleinere funktionale Einheiten
-import View.Molecules.HardwareStatus as HardwareStatus 
+-- VIEW-IMPORTE
+import View.Layouts.MainLayout as MainLayout
 
 
 -- --- PROGRAM ---
@@ -28,7 +28,7 @@ main =
     Browser.element
         { init = init
         , view = view
-        , update = Update.update
+        , update = update
         , subscriptions = subscriptions
         }
 
@@ -44,7 +44,6 @@ init flags =
                     case Decode.decodeString Decoders.agentMapDecoder json of
                         Ok agents -> agents
                         Err _ -> Dict.empty
-
                 Nothing -> Dict.empty
     in
     ( { mode = Simulation
@@ -86,20 +85,39 @@ init flags =
     )
 
 
--- --- SUBSCRIPTIONS ---
+-- --- UPDATE (Dispatcher) ---
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        PlanningMsg pMsg ->
+            Planning.update pMsg model
+
+        HardwareMsg hMsg ->
+            Hardware.update hMsg model
+
+        AgentsMsg aMsg ->
+            Agents.update aMsg model
+
+        NoOp ->
+            ( model, Cmd.none )
+
+
+-- --- SUBSCRIPTIONS (Gemappt auf Domänen) ---
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Ports.socketStatusReceiver SetConnected
-        , Ports.rosStatusReceiver SetRosConnected
-        , Ports.activeAgentsReceiver UpdateAgents
-        , Ports.pathCompleteReceiver PlanningResultRaw
-        , Ports.configReceived ConfigReceived
-        , Ports.systemLogReceiver (Decode.decodeValue Decoders.decodeSystemLog >> HandleSystemLog)
-        , Ports.rfidReceiver (Decode.decodeValue Decoders.decodeRfid >> HandleRfid)
-        , Ports.nfcStatusReceiver (Decode.decodeValue Decode.string >> HandleNfcStatus)
-        , Ports.hardwareUpdateReceiver (Decode.decodeValue Decoders.hardwareListDecoder >> HandleHardwareUpdate)
+        [ Ports.socketStatusReceiver (SetConnected >> HardwareMsg)
+        , Ports.rosStatusReceiver (SetRosConnected >> HardwareMsg)
+        , Ports.activeAgentsReceiver (UpdateAgents >> AgentsMsg)
+        , Ports.pathCompleteReceiver (PlanningResultRaw >> PlanningMsg)
+        , Ports.configReceived (ConfigReceived >> PlanningMsg)
+        -- Decodierung erfolgt sicher in der Subscription-Schleife
+        , Ports.systemLogReceiver (\val -> HardwareMsg (HandleSystemLog (Decode.decodeValue Decoders.decodeSystemLog val)))
+        , Ports.rfidReceiver (\val -> HardwareMsg (HandleRfid (Decode.decodeValue Decoders.decodeRfid val)))
+        , Ports.nfcStatusReceiver (\val -> HardwareMsg (HandleNfcStatus (Decode.decodeValue Decode.string val)))
+        , Ports.hardwareUpdateReceiver (\val -> HardwareMsg (HandleHardwareUpdate (Decode.decodeValue Decoders.hardwareListDecoder val)))
         ]
 
 
@@ -107,17 +125,7 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-    div [ class "app-layout" ]
-        [ Navbar.view model
-        , div [ class "content-area" ]
-            [ view3D model 
-            , Sidebar.view model 
-            -- Molekül-Aufruf (Alert Overlay)
-            , HardwareStatus.viewAlertOverlay model.alert 
-            ]
-        -- Organismus-Aufruf (Aktives Modal)
-        , Modal.viewActiveMenu model model.activeMenu 
-        ]
+    MainLayout.view model (view3D model)
 
 
 -- --- HELPER VIEW (3D INTERFACE) ---
@@ -139,7 +147,8 @@ view3D model =
         , attribute "allow-interaction" allowInteraction 
         , attribute "start-pos" (model.pathStart |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
         , attribute "goal-pos" (model.pathGoal |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
-        , Ports.onAgentMoved 
-        , Ports.onCellClicked 
+        -- Ports rufen nun Funktionen auf, die Nachrichten generieren
+        , Ports.onAgentMoved (MoveAgent >> AgentsMsg)
+        , Ports.onCellClicked (HandleGridClick >> AgentsMsg) 
         ]
         []

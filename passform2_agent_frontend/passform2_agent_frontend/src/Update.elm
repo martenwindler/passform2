@@ -1,199 +1,27 @@
 module Update exposing (update)
 
-import Dict
-import Json.Decode as Decode
-import Json.Encode as Encode
-import Ports
 import Types exposing (..)
-import Decoders 
+import Types.Domain exposing (..)
+import Update.Planning as Planning
+import Update.Hardware as Hardware
+import Update.Agents as Agents
 
+{-| 
+  Zentraler Dispatcher: 
+  Leitet die Nachrichten an die spezialisierten Module weiter.
+  Da die Unter-Module bereits Cmd Msg zurückgeben, ist kein Cmd.map mehr nötig.
+-}
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        -- --- SYSTEM-TAKT (SSoT) ---
-        ChangeHz newHz ->
-            ( { model | currentHz = newHz }
-            , Ports.socketEmit "set_heartbeat_rate" (Encode.float newHz)
-            )
+        PlanningMsg subMsg ->
+            Planning.update subMsg model
 
-        -- --- ALARM MANAGEMENT ---
-        DismissAlert ->
-            ( { model | alert = Nothing }, Cmd.none )
+        HardwareMsg subMsg ->
+            Hardware.update subMsg model
 
-        -- --- AGENTEN UPDATES (Hardware-Sync) ---
-        UpdateAgents rawJson ->
-            if model.mode == Hardware then
-                case Decode.decodeValue Decoders.agentMapDecoder rawJson of
-                    Ok newAgentsDict ->
-                        let
-                            criticalAgentId =
-                                newAgentsDict
-                                    |> Dict.values
-                                    |> List.filter (\a -> a.signal_strength < 20)
-                                    |> List.head
-                                    |> Maybe.andThen .agent_id
-                        in
-                        ( { model | agents = newAgentsDict, alert = criticalAgentId }, Cmd.none )
+        AgentsMsg subMsg ->
+            Agents.update subMsg model
 
-                    Err _ ->
-                        ( model, Cmd.none )
-            else
-                ( model, Cmd.none )
-
-        -- --- MODUS-STEUERUNG (Simulation vs. Hardware) ---
-        ToggleMode ->
-            let
-                newMode =
-                    if model.mode == Simulation then Hardware else Simulation
-
-                -- Port-Kommunikation braucht weiterhin Strings
-                modeStr =
-                    if newMode == Simulation then "simulation" else "hardware"
-
-                ( updatedAgents, logEntry ) =
-                    case newMode of
-                        Simulation ->
-                            ( model.savedDefault
-                            , { message = "Simulation aktiv: Lokale Bearbeitung möglich.", level = Info } 
-                            )
-
-                        Hardware ->
-                            ( Dict.empty
-                            , { message = "Hardware aktiv: Synchronisiere mit ROS 2 Nodes...", level = Warning } 
-                            )
-            in
-            ( { model | mode = newMode, agents = updatedAgents, logs = logEntry :: model.logs, currentPath = Nothing }
-            , Ports.setMode modeStr
-            )
-
-        -- --- SIDEBAR NAVIGATION ---
-        SwitchSidebarTab tab ->
-            ( { model | activeSidebarTab = tab, sidebarOpen = True }, Cmd.none )
-
-        ToggleSidebar -> 
-            ( { model | sidebarOpen = not model.sidebarOpen }, Cmd.none )
-
-        -- --- AGENTEN MANAGEMENT (LOKAL) ---
-        StartAgent moduleType cell ->
-            let
-                -- Generiere ID basierend auf dem String-Repräsentanten des Typs
-                typeStr = Decoders.moduleTypeToString moduleType
-                newId = typeStr ++ "-" ++ String.fromInt cell.x ++ String.fromInt cell.y
-                
-                newAgent =
-                    { agent_id = Just newId
-                    , module_type = moduleType
-                    , position = cell
-                    , orientation = 0
-                    , is_dynamic = (moduleType == FTF) -- Logik basiert auf Typ!
-                    , payload = Nothing
-                    , signal_strength = 100
-                    }
-            in
-            ( { model | agents = Dict.insert ( cell.x, cell.y ) newAgent model.agents, activeMenu = Nothing, currentPath = Nothing }
-            , Cmd.none 
-            )
-
-        RotateAgent cell ->
-            let
-                newAgents =
-                    Dict.update ( cell.x, cell.y ) (Maybe.map (\a -> { a | orientation = modBy 360 (a.orientation + 90) })) model.agents
-            in
-            ( { model | agents = newAgents, currentPath = Nothing }, Cmd.none )
-
-        RemoveAgent cell ->
-            ( { model | agents = Dict.remove ( cell.x, cell.y ) model.agents, activeMenu = Nothing, currentPath = Nothing }
-            , Cmd.none 
-            )
-
-        MoveAgent { oldX, oldY, newX, newY } ->
-            if Dict.member ( newX, newY ) model.agents then
-                ( model, Cmd.none )
-            else
-                case Dict.get ( oldX, oldY ) model.agents of
-                    Just agent ->
-                        let
-                            tempAgents = Dict.remove ( oldX, oldY ) model.agents
-                            updatedAgent = { agent | position = { x = newX, y = newY } }
-                            newAgents = Dict.insert ( newX, newY ) updatedAgent tempAgents
-                        in
-                        ( { model | agents = newAgents, currentPath = Nothing }, Cmd.none )
-                    Nothing -> ( model, Cmd.none )
-
-        -- --- HARDWARE INTERAKTION ---
-        RequestNfcWrite content ->
-            ( { model | waitingForNfc = True, logs = { message = "NFC: Sende Brennbefehl...", level = Info } :: model.logs }
-            , Ports.writeNfcTrigger content 
-            )
-
-        HandleNfcStatus result ->
-            case result of
-                Ok status -> 
-                    if String.startsWith "Success:" status then
-                        let
-                            idOnly = String.dropLeft 8 status
-                        in
-                        ( { model | nfcStatus = Online, lastWrittenId = Just idOnly, waitingForNfc = False }, Cmd.none )
-                    else
-                        ( { model | nfcStatus = Error, waitingForNfc = False }, Cmd.none )
-                
-                Err _ -> 
-                    ( { model | nfcStatus = Error, waitingForNfc = False }, Cmd.none )
-
-        -- --- SYSTEM UPDATES ---
-        SetConnected status ->
-            ( { model | connected = status }, Cmd.none )
-
-        SetRosConnected status ->
-            ( { model | rosConnected = status }, Cmd.none )
-
-        HandleSystemLog result ->
-            case result of
-                Ok logEntry ->
-                    ( { model | logs = List.take 30 (logEntry :: model.logs), waitingForNfc = False }, Cmd.none )
-                Err _ ->
-                    ( model, Cmd.none )
-
-        HandleHardwareUpdate result ->
-            case result of
-                Ok hardwareList ->
-                    ( { model | connectedHardware = hardwareList }, Cmd.none )
-                Err _ ->
-                    ( model, Cmd.none )
-
-        -- --- UI & PLANUNG ---
-        HandleGridClick cell ->
-            case Dict.get ( cell.x, cell.y ) model.agents of
-                Just agent -> ( { model | activeMenu = Just (SettingsMenu cell agent) }, Cmd.none )
-                Nothing ->
-                    if model.editing then ( { model | activeMenu = Just (SelectionMenu cell) }, Cmd.none )
-                    else ( model, Cmd.none )
-
-        SetWeight field val ->
-            let
-                newVal = String.toFloat val |> Maybe.withDefault 0.0
-                oldWeights = model.planningWeights
-                updatedWeights =
-                    case field of
-                        "execution_time_default" -> { oldWeights | execution_time_default = newVal }
-                        "complex_module_time" -> { oldWeights | complex_module_time = newVal }
-                        "human_extra_weight" -> { oldWeights | human_extra_weight = newVal }
-                        "proximity_penalty" -> { oldWeights | proximity_penalty = newVal }
-                        "hardware_safety_factor" -> { oldWeights | hardware_safety_factor = newVal }
-                        _ -> oldWeights
-            in
-            ( { model | planningWeights = updatedWeights }, Cmd.none )
-
-        SaveWeights ->
-            ( { model | logs = { message = "Planungsparameter aktualisiert.", level = Success } :: model.logs }
-            , Ports.savePlanningWeights (Decoders.encodeWeights model.planningWeights) 
-            )
-
-        -- --- BOILERPLATE ---
-        ToggleViewMode -> ( { model | is3D = not model.is3D }, Cmd.none )
-        SetPathStart cell -> ( { model | pathStart = Just cell, activeMenu = Nothing }, Cmd.none )
-        SetPathGoal cell -> ( { model | pathGoal = Just cell, activeMenu = Nothing }, Cmd.none )
-        CloseMenu -> ( { model | activeMenu = Nothing }, Cmd.none )
-        NoOp -> ( model, Cmd.none )
-        
-        _ -> ( model, Cmd.none )
+        NoOp ->
+            ( model, Cmd.none )

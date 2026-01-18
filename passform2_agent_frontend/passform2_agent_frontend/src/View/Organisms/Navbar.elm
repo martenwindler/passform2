@@ -4,20 +4,21 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Types exposing (..)
+import Types.Domain exposing (..)
 
 {-| Organismus: Die Haupt-Navigationsleiste.
-Besteht aus Logo (Atom), Status-Pille (Molekül-Gruppe) und Steuerung (Atoms).
+Wir nutzen hier Html AgentsMsg, da die Steuerung (Rechts) diese Nachrichten produziert.
 -}
-view : Model -> Html Msg
+view : Model -> Html AgentsMsg
 view model =
     nav [ class "navbar blue-look" ]
-        [ -- 1. Links: Logo und Titel
+        [ -- 1. Links: Logo und Titel (Statische Elemente passen sich dem Typ an)
           div [ class "navbar-section" ]
             [ img [ src "src/assets/images/logo.png", class "navbar-logo", alt "Logo" ] []
             , span [ class "navbar-title" ] [ text "Passform 2.0" ]
             ]
         
-        -- 2. Mitte: Status-Pille (Zentralisiertes Monitoring)
+        -- 2. Mitte: Status-Pille (Monitoring)
         , div [ class "navbar-center" ]
             [ div [ class "status-pill combined-status" ]
                 [ -- REST API Verbindung
@@ -47,7 +48,7 @@ view model =
                 ]
             ]
 
-        -- 3. Rechts: Ansichts-Steuerung
+        -- 3. Rechts: Ansichts-Steuerung (Nutzt AgentsMsg Konstruktoren)
         , div [ class "navbar-actions" ]
             [ button [ class "btn-mode-switch", onClick ToggleMode ] 
                 [ text (if model.mode == Simulation then "Hardware Modus" else "Simulation") ]
@@ -55,6 +56,7 @@ view model =
                 [ text (if model.is3D then "2D Ansicht" else "3D Ansicht") ]
             ]
         ]
+
 
 -- --- HELPER (Intern für diesen Organismus) ---
 
@@ -68,8 +70,10 @@ statusToClass status =
         Missing -> "offline"
         UnknownStatus -> "offline"
 
-{-| Erstellt einen Status-Indikator (Molekül-Struktur). -}
-statusIndicator : HardwareStatus -> String -> Html Msg
+{-| Erstellt einen Status-Indikator (Molekül-Struktur). 
+Gibt jetzt Html AgentsMsg zurück, um mit der Navbar kompatibel zu sein.
+-}
+statusIndicator : HardwareStatus -> String -> Html AgentsMsg
 statusIndicator status label =
     span [ class "indicator-group" ]
         [ div [ class ("status-dot-small " ++ statusToClass status) ] []

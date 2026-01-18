@@ -4,11 +4,12 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Types exposing (..)
+import Types.Domain exposing (..)
 
 {-| Molekül: Ein Status-Badge (Kombination aus Label, Dot und Text).
-Wird im Hardware-Modal und in der Sidebar verwendet.
+Gibt jetzt Html HardwareMsg zurück, um typsicher mit der Hardware-Domäne zu sein.
 -}
-viewStatusBadge : String -> String -> String -> Html Msg
+viewStatusBadge : String -> String -> String -> Html HardwareMsg
 viewStatusBadge label status text_ =
     let
         statusClass =
@@ -20,14 +21,14 @@ viewStatusBadge label status text_ =
     div [ class "status-pill" ]
         [ span [ class "status-label" ] [ text label ]
         , div [ class "status-indicator" ]
-            [ span [ class ("status-dot " ++ statusClass) ] [] -- CSS-Klasse für das Punkt-Atom
+            [ span [ class ("status-dot " ++ statusClass) ] [] 
             , span [ class "status-text" ] [ text text_ ]
             ]
         ]
 
 {-| Molekül: Die Signalstärke-Anzeige (Label + Progress-Bar + Wert).
 -}
-viewSignalStrength : Bool -> Int -> Html Msg
+viewSignalStrength : Bool -> Int -> Html HardwareMsg
 viewSignalStrength isOnline strength =
     let
         ( strengthClass, labelText ) =
@@ -58,8 +59,9 @@ viewSignalStrength isOnline strength =
         ]
 
 {-| Molekül: Ein Alarm-Overlay (Toast).
+Nutzt DismissAlert, welches ein Konstruktor von HardwareMsg ist.
 -}
-viewAlertOverlay : Maybe String -> Html Msg
+viewAlertOverlay : Maybe String -> Html HardwareMsg
 viewAlertOverlay maybeId =
     case maybeId of
         Just id ->

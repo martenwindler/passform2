@@ -5,6 +5,7 @@ import Html.Events exposing (on)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Types exposing (..)
+import Types.Domain exposing (..)
 
 
 -- --- OUTGOING (Elm -> JS) ---
@@ -34,10 +35,8 @@ socketEmit eventName data =
 
 -- --- INCOMING (JS -> Elm) ---
 
--- Status für das Haupt-Backend (Port 8000)
 port socketStatusReceiver : (Bool -> msg) -> Sub msg
 
--- NEU: Status für die ROS-Bridge (Port 5000)
 port rosStatusReceiver : (Bool -> msg) -> Sub msg
 
 port activeAgentsReceiver : (Decode.Value -> msg) -> Sub msg
@@ -55,18 +54,23 @@ port nfcStatusReceiver : (Decode.Value -> msg) -> Sub msg
 port hardwareUpdateReceiver : (Decode.Value -> msg) -> Sub msg
 
 
--- --- EVENT-HELPER FÜR DIE 3D-VIEW ---
+-- --- EVENT-HELPER FÜR DIE 3D-VIEW (KORRIGIERT) ---
 
-onAgentMoved : Attribute Msg
-onAgentMoved =
-    on "agent-moved" (Decode.map MoveAgent decodeAgentMove)
+{-| 
+  Nimmt eine Funktion entgegen, die die Daten in eine Nachricht umwandelt.
+  Dadurch wird der Helper flexibel für verschiedene Msg-Typen.
+-}
+onAgentMoved : ( { oldX : Int, oldY : Int, newX : Int, newY : Int } -> msg ) -> Attribute msg
+onAgentMoved toMsg =
+    on "agent-moved" (Decode.map toMsg decodeAgentMove)
 
-onCellClicked : Attribute Msg
-onCellClicked =
-    on "cell-clicked" (Decode.map HandleGridClick decodeCellClick)
+
+onCellClicked : (GridCell -> msg) -> Attribute msg
+onCellClicked toMsg =
+    on "cell-clicked" (Decode.map toMsg decodeCellClick)
 
 
--- --- INTERNE DECODER ---
+-- --- INTERNE DECODER (Bleiben gleich) ---
 
 decodeAgentMove : Decode.Decoder { oldX : Int, oldY : Int, newX : Int, newY : Int }
 decodeAgentMove =

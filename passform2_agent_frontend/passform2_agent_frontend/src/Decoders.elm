@@ -4,10 +4,10 @@ import Json.Decode as Decode exposing (Decoder, bool, field, float, int, list, m
 import Json.Encode as Encode
 import Dict exposing (Dict)
 import Types exposing (..)
+import Types.Domain exposing (..)
 
 -- --- TYPE-SAFE MAPPERS (Internal) ---
 
-{-| Wandelt JSON-Strings in unsere typsicheren Elm-Typen um. -}
 moduleTypeDecoder : Decoder ModuleType
 moduleTypeDecoder =
     string |> Decode.map (\s ->
@@ -41,7 +41,6 @@ hardwareStatusDecoder =
             _ -> UnknownStatus
     )
 
-{-| Hilfsfunktion, um Elm-Typen für Ports/JSON wieder in Strings zu verwandeln. -}
 moduleTypeToString : ModuleType -> String
 moduleTypeToString mt =
     case mt of
@@ -68,7 +67,7 @@ decodeRfid =
         , string 
         ]
 
--- --- AGENT DECODERS (JSON -> Elm) ---
+-- --- AGENT DECODERS ---
 
 gridCellDecoder : Decoder GridCell
 gridCellDecoder =
@@ -84,7 +83,7 @@ agentModuleDecoder : Decoder AgentModule
 agentModuleDecoder =
     Decode.succeed AgentModule
         |> andMap (field "agent_id" (maybe string))
-        |> andMap (field "module_type" moduleTypeDecoder) -- Typsicherer Decoder
+        |> andMap (field "module_type" moduleTypeDecoder)
         |> andMap (field "position" gridCellDecoder)
         |> andMap 
             (Decode.oneOf 
@@ -110,14 +109,14 @@ hardwareDeviceDecoder : Decode.Decoder HardwareDevice
 hardwareDeviceDecoder =
     Decode.map3 HardwareDevice
         (Decode.field "pi_id" Decode.string)
-        (Decode.field "rfid_status" hardwareStatusDecoder) -- Typsicherer Decoder
+        (Decode.field "rfid_status" hardwareStatusDecoder)
         (Decode.field "pi_exists" Decode.bool)
 
 hardwareListDecoder : Decode.Decoder (List HardwareDevice)
 hardwareListDecoder =
     Decode.list hardwareDeviceDecoder
 
--- --- WEITERE DECODER ---
+-- --- PLANNING & PATH DECODERS ---
 
 planningWeightsDecoder : Decode.Decoder PlanningWeights
 planningWeightsDecoder =
@@ -135,15 +134,7 @@ pathDecoder =
         (field "cost" float)
         (field "path" (list agentModuleDecoder))
 
-decodeCellClick : Decoder GridCell
-decodeCellClick =
-    Decode.at ["detail"] 
-        (Decode.map2 GridCell
-            (field "x" int)
-            (field "y" int)
-        )
-
--- --- ENCODERS (Elm -> JSON / Ports) ---
+-- --- ENCODERS ---
 
 encodeAgentMap : Dict (Int, Int) AgentModule -> Encode.Value
 encodeAgentMap agents =
@@ -154,36 +145,27 @@ encodeAgentMap agents =
 encodeAgentModule : AgentModule -> Encode.Value
 encodeAgentModule agent =
     Encode.object
-        [ ( "agent_id"
-          , case agent.agent_id of
-                Just s -> Encode.string s
-                Nothing -> Encode.null 
-          )
-        , ( "module_type", Encode.string (moduleTypeToString agent.module_type) ) -- Zurück in String wandeln
-        , ( "position"
-          , Encode.object 
-                [ ("x", Encode.int agent.position.x)
-                , ("y", Encode.int agent.position.y) 
-                ] 
-          )
+        [ ( "agent_id", agent.agent_id |> Maybe.map Encode.string |> Maybe.withDefault Encode.null )
+        , ( "module_type", Encode.string (moduleTypeToString agent.module_type) )
+        , ( "position", encodeGridCell agent.position )
         , ( "orientation", Encode.int agent.orientation )
         , ( "is_dynamic", Encode.bool agent.is_dynamic )
-        , ( "payload"
-          , case agent.payload of
-                Just p -> Encode.string p
-                Nothing -> Encode.null
-          )
+        , ( "payload", agent.payload |> Maybe.map Encode.string |> Maybe.withDefault Encode.null )
         , ( "signal_strength", Encode.int agent.signal_strength )
+        ]
+
+encodeGridCell : GridCell -> Encode.Value
+encodeGridCell cell =
+    Encode.object 
+        [ ("x", Encode.int cell.x)
+        , ("y", Encode.int cell.y) 
         ]
 
 encodePath : Maybe Path -> Encode.Value
 encodePath maybePath =
     case maybePath of
-        Just p ->
-            Encode.list encodeAgentModule p.path
-
-        Nothing ->
-            Encode.list identity []
+        Just p -> Encode.list encodeAgentModule p.path
+        Nothing -> Encode.list identity []
 
 encodeWeights : PlanningWeights -> Encode.Value
 encodeWeights w =
@@ -193,4 +175,14 @@ encodeWeights w =
         , ( "human_extra_weight", Encode.float w.human_extra_weight )
         , ( "proximity_penalty", Encode.float w.proximity_penalty )
         , ( "hardware_safety_factor", Encode.float w.hardware_safety_factor ) 
+        ]
+
+{-| NEU: Encodiert alle Daten für den triggerPlanning Port. -}
+encodePlanningData : { start : Maybe GridCell, goal : Maybe GridCell, weights : PlanningWeights, isRanger : Bool } -> Encode.Value
+encodePlanningData data =
+    Encode.object
+        [ ( "start", data.start |> Maybe.map encodeGridCell |> Maybe.withDefault Encode.null )
+        , ( "goal", data.goal |> Maybe.map encodeGridCell |> Maybe.withDefault Encode.null )
+        , ( "weights", encodeWeights data.weights )
+        , ( "isRanger", Encode.bool data.isRanger )
         ]

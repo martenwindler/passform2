@@ -17,6 +17,7 @@
     "autoprefixer": "^10.4.23",
     "cssnano": "^7.1.2",
     "elm": "^0.19.1-6",
+    "elm-test": "^0.19.1-revision17",
     "postcss": "^8.5.6",
     "sass-embedded": "^1.97.2",
     "typescript": "^5.0.0",
