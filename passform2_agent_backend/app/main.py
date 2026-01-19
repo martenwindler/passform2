@@ -159,35 +159,91 @@ async def handle_rfid_scanned(sid, data):
     logger.info(f"🎴 RFID Scan: {data.get('id')}")
     await socket_manager.emit_event('rfid_scanned', data)
 
-@socket_manager.sio.on('plan_path')
-async def handle_plan_path(sid, payload):
+# --- PFADPLANUNG LOGIK-HANDLER ---
+
+async def handle_plan_path_socket_io(sid, data):
     try:
-        start, goal = payload.get("start"), payload.get("goal")
-        elm_agents = payload.get("agents", {}) 
-        raw_agents = elm_agents.values() if isinstance(elm_agents, dict) else elm_agents
-        grid = { (int(a.get("x")), int(a.get("y"))): a for a in raw_agents if a }
+        inner_payload = data.get("payload", {})
+        start = inner_payload.get("start")
+        goal = inner_payload.get("goal")
         
+        # 1. Versuche Agenten aus dem Frontend-Payload zu lesen
+        elm_agents = inner_payload.get("agents", {})
+        
+        if elm_agents:
+            # Falls Elm ein Dictionary oder eine Liste schickt
+            raw_agents = elm_agents.values() if isinstance(elm_agents, dict) else elm_agents
+            grid = { (int(a.get("x")), int(a.get("y"))): a for a in raw_agents if a }
+        else:
+            # 2. Fallback: Nutze die SSoT vom Backend (AgentManager)
+            from app.managers.agent_manager import agent_manager
+            grid = { (a.x, a.y): a.to_dict() for a in agent_manager.agents.values() }
+
+        if not start or not goal:
+            return
+
         start_t = (int(start["x"]), int(start["y"]))
         goal_t = (int(goal["x"]), int(goal["y"]))
-        
-        ftf_agent = next((a for a in grid.values() if a.get("module_type") == "ftf"), None)
 
-        if ftf_agent:
-            ftf_id = ftf_agent["agent_id"]
-            ftf_pos = (int(ftf_agent["x"]), int(ftf_agent["y"]))
-            path_a, _, _ = planner.a_star(ftf_pos, start_t, grid, travel_mode="ftf")
-            path_b, cost_b, _ = planner.a_star(start_t, goal_t, grid, travel_mode="ftf")
-            
-            if path_a and path_b:
-                full_path = path_a + path_b[1:]
-                await socket_manager.emit_event('path_complete', {"status": 0, "cost": float(cost_b), "path": full_path}, target_sid=sid)
-                asyncio.create_task(agent_manager.execute_mission(ftf_id, full_path, start_t, goal_t))
+        logger.info(f"🔮 Planung: {start_t} -> {goal_t} | Module im Grid: {len(grid)}")
+
+        path, cost, msg = planner.a_star(start_t, goal_t, grid, travel_mode="chain")
+
+        if path:
+            formatted_path = []
+            for step in path:
+                formatted_path.append({
+                    "agent_id": str(step.get("agent_id", "unknown")),
+                    "module_type": str(step.get("module_type", "unknown")),
+                    "position": {"x": int(step.get("x", 0)), "y": int(step.get("y", 0))},
+                    "orientation": int(step.get("orientation", 0)),
+                    "is_dynamic": bool(step.get("is_dynamic", False)),
+                    "payload": None,
+                    "signal_strength": 100
+                })
+
+            await socket_manager.emit_event('path_complete', {
+                "status": 200, "cost": float(cost), "path": formatted_path
+            }, target_sid=sid)
+            logger.info(f"✅ Pfad mit {len(formatted_path)} Modulen gesendet.")
         else:
-            path, cost, _ = planner.a_star(start_t, goal_t, grid, travel_mode="chain")
-            if path:
-                await socket_manager.emit_event('path_complete', {"status": 0, "cost": float(cost), "path": path}, target_sid=sid)
+            # Spinner im Frontend stoppen
+            await socket_manager.emit_event('path_complete', {"status": 404, "cost": 0.0, "path": []}, target_sid=sid)
+            logger.warning(f"⚠️ {msg}")
+
     except Exception as e:
-        logger.error(f"❌ Pfadplanung Fehler: {e}")
+        logger.error(f"❌ Fehler: {e}", exc_info=True)
+
+async def handle_plan_path_ros(sid, payload):
+    """ROS-basierte Pfadplanung (CNP) - Vorbereitet für später."""
+    try:
+        from .managers.path_manager import path_manager, PlanPathRequest, Position
+        import time
+        start_data = payload.get("start")
+        goal_data = payload.get("goal")
+        request_id = f"ros_cnp_{int(time.time())}"
+        req = PlanPathRequest(
+            request_id=request_id,
+            start=Position(x=start_data["x"], y=start_data["y"]),
+            goal=Position(x=goal_data["x"], y=goal_data["y"])
+        )
+        path_manager.request_path(req)
+        logger.info(f"📡 ROS-Ausschreibung (CNP) initiiert: {request_id}")
+    except Exception as e:
+        logger.error(f"❌ Fehler in handle_plan_path_ros: {e}")
+
+# --- SOCKET.IO EVENT ROUTING ---
+
+@socket_manager.sio.on('plan_path')
+async def handle_plan_path_routing(sid, payload):
+    # Das hier MUSS im Terminal erscheinen, wenn der Button gedrückt wird
+    print("\n" + "="*50)
+    print(f"🔥 PLAN_PATH EVENT GEFEUERT!")
+    print(f"FROM SID: {sid}")
+    print(f"PAYLOAD: {payload}")
+    print("="*50 + "\n")
+    
+    await handle_plan_path_socket_io(sid, payload)
 
 @socket_manager.sio.on('set_mode')
 async def handle_set_mode(sid, data):

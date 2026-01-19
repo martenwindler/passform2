@@ -73,7 +73,12 @@ canPlan model =
     let
         hasPoints =
             case ( model.pathStart, model.pathGoal ) of
-                ( Just _, Just _ ) -> True
-                _ -> False
+                ( Just _, Just _ ) ->
+                    True
+
+                _ ->
+                    False
     in
-    hasPoints && model.rosConnected && model.connected
+    -- Wir haben 'model.rosConnected' hier entfernt, 
+    -- damit du auch ohne ROS-Bridge planen kannst.
+    hasPoints && model.connected

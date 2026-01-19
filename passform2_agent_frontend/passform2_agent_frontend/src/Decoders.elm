@@ -181,17 +181,13 @@ hardwareListDecoder =
 
 -- --- PLANNING & PATH DECODERS ---
 
-{-| 
-Dekodiert das Ergebnis einer CNP-Ausschreibung (Zuschlag).
-Wir nutzen hier den Typ 'Path', da dieser die benötigten Felder 
-(cost und path) bereits bereitstellt.
--}
 decodePathResult : Decoder Path
 decodePathResult =
     Decode.map3 Path
-        (Decode.succeed 200) -- Wir setzen den Status fest auf 200 (Success)
+        (Decode.oneOf [ field "status" int, Decode.succeed 200 ])
         (field "cost" float)
         (field "path" (list agentModuleDecoder))
+
 
 planningWeightsDecoder : Decode.Decoder PlanningWeights
 planningWeightsDecoder =
@@ -213,9 +209,28 @@ pathDecoder =
 
 -- --- ENCODERS ---
 
+{-| NEU: Erzeugt das JSON für eine CNP-Aufgabenankündigung.
+    Inklusive Agents-Liste, damit das Backend die Weltkarte kennt.
+-}
+encodeCnpAnnouncement : Model -> Encode.Value
+encodeCnpAnnouncement model =
+    Encode.object
+        [ ( "type", Encode.string "CNP_TASK_ANNOUNCEMENT" )
+        , ( "payload"
+          , Encode.object
+                [ ( "start", model.pathStart |> Maybe.map encodeGridCell |> Maybe.withDefault Encode.null )
+                , ( "goal", model.pathGoal |> Maybe.map encodeGridCell |> Maybe.withDefault Encode.null )
+                , ( "weights", encodeWeights model.planningWeights )
+                , ( "agents", encodeAgentMap model.agents )
+                ]
+          )
+        ]
+
 
 encodeAgentMap : Dict (Int, Int) AgentModule -> Encode.Value
 encodeAgentMap agents =
+    -- Wir senden die Agenten als Liste, da das Backend dies in 'handle_plan_path' 
+    -- über raw_agents = elm_agents.values() verarbeiten kann.
     agents
         |> Dict.values
         |> Encode.list encodeAgentModule
@@ -226,6 +241,8 @@ encodeAgentModule agent =
     Encode.object
         [ ( "agent_id", agent.agent_id |> Maybe.map Encode.string |> Maybe.withDefault Encode.null )
         , ( "module_type", Encode.string (moduleTypeToString agent.module_type) )
+        , ( "x", Encode.int agent.position.x )
+        , ( "y", Encode.int agent.position.y )
         , ( "position", encodeGridCell agent.position )
         , ( "orientation", Encode.int agent.orientation )
         , ( "is_dynamic", Encode.bool agent.is_dynamic )
@@ -263,22 +280,6 @@ encodeWeights w =
         ]
 
 
-{-| NEU: Erzeugt das JSON für eine CNP-Aufgabenankündigung (Ausschreibung). -}
-encodeCnpAnnouncement : Model -> Encode.Value
-encodeCnpAnnouncement model =
-    Encode.object
-        [ ( "type", Encode.string "CNP_TASK_ANNOUNCEMENT" )
-        , ( "payload"
-          , Encode.object
-                [ ( "start", model.pathStart |> Maybe.map encodeGridCell |> Maybe.withDefault Encode.null )
-                , ( "goal", model.pathGoal |> Maybe.map encodeGridCell |> Maybe.withDefault Encode.null )
-                , ( "weights", encodeWeights model.planningWeights )
-                ]
-          )
-        ]
-
-
-{-| Encodiert alle Daten für den triggerPlanning Port (Bestands-Logik). -}
 encodePlanningData : { start : Maybe GridCell, goal : Maybe GridCell, weights : PlanningWeights, isRanger : Bool } -> Encode.Value
 encodePlanningData data =
     Encode.object

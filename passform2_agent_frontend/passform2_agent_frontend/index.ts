@@ -105,11 +105,10 @@ const setupMainSocket = (url: string) => {
     console.log("🔗 Verbindungsaufbau Haupt-Backend:", socketUrl);
     
     socket = io(socketUrl, {
-        transports: ['websocket'], 
-        upgrade: false,
+        transports: ['polling', 'websocket'], // Zuerst Polling, dann Upgrade (stabiler)
         reconnection: true,
-        reconnectionDelay: 2000, 
-        timeout: 10000,
+        reconnectionDelay: 1000,
+        timeout: 20000,
         path: "/socket.io/",
         forceNew: true 
     });
@@ -176,7 +175,30 @@ subscribeSafe('setMode', (mode: string) => {
 });
 
 subscribeSafe('triggerPlanning', (payload: any) => {
-    if (socket?.connected) socket.emit('plan_path', payload);
+    console.log("🚀 Elm will Planung starten!", payload);
+    
+    if (!socket) {
+        console.error("❌ Socket-Objekt existiert gar nicht!");
+        return;
+    }
+
+    if (!socket.connected) {
+        console.warn("⚠️ Socket ist laut JS nicht verbunden, versuche trotzdem zu senden...");
+    }
+
+    socket.emit('plan_path', payload);
+    console.log("📤 Nachricht 'plan_path' wurde an den Äther übergeben.");
+});
+
+subscribeSafe('sendCnpRequest', (payload: any) => {
+    console.log("🚀 Port 'sendCnpRequest' gefeuert!", payload);
+    
+    if (socket && socket.connected) {
+        socket.emit('plan_path', payload);
+        console.log("📤 'plan_path' an Backend gesendet.");
+    } else {
+        console.error("❌ Socket nicht verbunden. Senden fehlgeschlagen.");
+    }
 });
 
 subscribeSafe('savePlanningWeights', (weights: any) => {
