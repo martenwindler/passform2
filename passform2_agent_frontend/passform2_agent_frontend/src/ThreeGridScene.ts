@@ -7,7 +7,8 @@ export class ThreeGridScene extends HTMLElement {
     
     private helperScene: THREE.Scene;
     private helperCamera: THREE.PerspectiveCamera;
-    
+    private resizeObserver: ResizeObserver | null = null; // HINZUGEFÜGT
+
     private raycaster: THREE.Raycaster;
     private gridHelper: THREE.GridHelper | null = null;
     
@@ -43,7 +44,6 @@ export class ThreeGridScene extends HTMLElement {
         this.scene.add(dirLight);
 
         this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-        // HINZUGEFÜGT: alpha: true für transparenten Helper-Viewport
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         this.raycaster = new THREE.Raycaster();
 
@@ -52,7 +52,6 @@ export class ThreeGridScene extends HTMLElement {
         this.helperCamera.position.set(0, 0, 4); 
 
         const axes = new THREE.AxesHelper(2);
-        // HINZUGEFÜGT: Tiefentest aus, damit Kreuz immer oben liegt
         (axes.material as THREE.Material).depthTest = false;
         axes.renderOrder = 1000;
         this.helperScene.add(axes);
@@ -73,26 +72,50 @@ export class ThreeGridScene extends HTMLElement {
                 case 'path': this.drawPath(JSON.parse(newVal)); break;
                 case 'start-pos':
                 case 'goal-pos': this.updateMarkers(); break;
-                // HINZUGEFÜGT: Cursor Reset bei Moduswechsel
                 case 'allow-interaction': this.style.cursor = 'default'; break;
             }
         } catch (e) { console.error(`Attribute update error (${name}):`, e); }
     }
 
     connectedCallback() {
-        // Standard-Styles ohne Cursor-Manipulation
         const style = document.createElement('style');
-        style.textContent = `canvas { display: block; width: 100%; height: 100%; outline: none; } :host { display: block; width: 100%; height: 100%; }`;
+        style.textContent = `
+            canvas { display: block; width: 100%; height: 100%; outline: none; } 
+            :host { display: block; width: 100%; height: 100%; overflow: hidden; }
+        `;
         this.shadowRoot?.appendChild(style);
-
         this.shadowRoot?.appendChild(this.renderer.domElement);
-        this.resize();
-        window.addEventListener('resize', () => this.resize());
+
+        // KORREKTUR: ResizeObserver statt Window-Event
+        // Er erkennt Größenänderungen durch die Sidebar-Animation in Echtzeit
+        this.resizeObserver = new ResizeObserver(() => this.resize());
+        this.resizeObserver.observe(this);
+
         this.renderer.domElement.addEventListener('mousedown', (e) => this.onMouseDown(e));
         window.addEventListener('mousemove', (e) => this.onMouseMove(e));
         window.addEventListener('mouseup', (e) => this.onMouseUp(e));
+        
         this.animate();
         this.updateGrid();
+    }
+
+    // HINZUGEFÜGT: Cleanup um Memory Leaks zu vermeiden
+    disconnectedCallback() {
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+        }
+    }
+
+    private resize() {
+        // Wir nehmen die Maße direkt von der Komponente selbst
+        const width = this.clientWidth;
+        const height = this.clientHeight;
+
+        if (width === 0 || height === 0) return;
+
+        this.renderer.setSize(width, height, false);
+        this.camera.aspect = width / height;
+        this.camera.updateProjectionMatrix();
     }
 
     private isInteractionAllowed(): boolean {
@@ -106,7 +129,6 @@ export class ThreeGridScene extends HTMLElement {
     }
 
     private onMouseMove(event: MouseEvent) {
-        // HINZUGEFÜGT: Hover-Kreuz Logik
         const interactionAllowed = this.isInteractionAllowed();
         const coords = this.getMouseCoords(event);
         this.raycaster.setFromCamera(coords, this.camera);
@@ -136,7 +158,11 @@ export class ThreeGridScene extends HTMLElement {
             const ground = this.raycaster.intersectObjects(this.gridCells.flat());
             if (ground.length > 0) {
                 const mesh = this.agentMeshes.get(this.draggedAgentKey);
-                if (mesh) { mesh.position.x = ground[0].object.userData.gridX + 0.5; mesh.position.z = ground[0].object.userData.gridY + 0.5; mesh.position.y = 0.5; }
+                if (mesh) { 
+                    mesh.position.x = ground[0].object.userData.gridX + 0.5; 
+                    mesh.position.z = ground[0].object.userData.gridY + 0.5; 
+                    mesh.position.y = 0.5; 
+                }
             }
         }
     }
@@ -176,7 +202,11 @@ export class ThreeGridScene extends HTMLElement {
     private updateGrid() {
         const w = Math.max(1, parseInt(this.getAttribute('grid-width') || '10'));
         const h = Math.max(1, parseInt(this.getAttribute('grid-height') || '10'));
-        this.gridCells.flat().forEach(cell => { this.scene.remove(cell); cell.geometry.dispose(); (cell.material as THREE.Material).dispose(); });
+        this.gridCells.flat().forEach(cell => { 
+            this.scene.remove(cell); 
+            cell.geometry.dispose(); 
+            (cell.material as THREE.Material).dispose(); 
+        });
         this.gridCells = [];
         const geometry = new THREE.PlaneGeometry(1, 1);
         geometry.rotateX(-Math.PI / 2);
@@ -217,9 +247,9 @@ export class ThreeGridScene extends HTMLElement {
     }
 
     private updateAgents(agents: any[]) {
-        const currentIds = new Set(agents.map(a => a.agent_id));
+        const currentIds = new Set(agents.map((a: any) => a.agent_id));
         const toRemove = new Set([...this.agentMeshes.keys()].filter(id => !currentIds.has(id)));
-        agents.forEach(agent => {
+        agents.forEach((agent: any) => {
             const id = agent.agent_id;
             let mesh = this.agentMeshes.get(id);
             if (!mesh) {
@@ -322,35 +352,33 @@ export class ThreeGridScene extends HTMLElement {
 
     private getMouseCoords(e: MouseEvent) {
         const r = this.renderer.domElement.getBoundingClientRect();
-        return { x: ((e.clientX - r.left) / r.width) * 2 - 1, y: -((e.clientY - r.top) / r.height) * 2 + 1 };
-    }
-
-    private resize() {
-        const p = this.parentElement;
-        if (p) { this.renderer.setSize(p.clientWidth, p.clientHeight); this.camera.aspect = p.clientWidth / p.clientHeight; this.camera.updateProjectionMatrix(); }
+        return { 
+            x: ((e.clientX - r.left) / r.width) * 2 - 1, 
+            y: -((e.clientY - r.top) / r.height) * 2 + 1 
+        };
     }
 
     private animate() {
         requestAnimationFrame(() => this.animate());
         this.camera.position.lerp(this.targetCameraPos, this.lerpSpeed);
-        const w = parseInt(this.getAttribute('grid-width') || '10'), h = parseInt(this.getAttribute('grid-height') || '10');
+        const w = parseInt(this.getAttribute('grid-width') || '10');
+        const h = parseInt(this.getAttribute('grid-height') || '10');
         this.camera.lookAt(w / 2, 0, h / 2);
 
-        // HINZUGEFÜGT: Viewport-Steuerung für zwei Ebenen
         this.renderer.setScissorTest(false);
-        this.renderer.setViewport(0, 0, this.renderer.domElement.clientWidth, this.renderer.domElement.clientHeight);
+        this.renderer.setViewport(0, 0, this.clientWidth, this.clientHeight);
         this.renderer.render(this.scene, this.camera);
         this.renderAxesHelper();
     }
 
     private renderAxesHelper() {
         this.renderer.autoClear = false;
-        // HINZUGEFÜGT: Scissor Test verhindert die weiße Box
         this.renderer.setScissorTest(true);
         const size = 100;
+        // Helper unten links fixieren
         this.renderer.setScissor(10, 10, size, size);
         this.renderer.setViewport(10, 10, size, size);
-        this.renderer.clearDepth(); // Legt den Helper über das Gitter
+        this.renderer.clearDepth();
 
         this.helperCamera.quaternion.copy(this.camera.quaternion);
         this.renderer.render(this.helperScene, this.helperCamera);

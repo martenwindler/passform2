@@ -1,45 +1,41 @@
 @use '../base/variables' as *;
 
 :root {
-  --rail-width: 58px;   // Exakt dein Maß für die Bündigkeit
+  --rail-width: 58px; 
   --drawer-width: 320px;
 }
 
 // --- HAUPT-LAYOUT (Grid System) ---
 .content-area {
     display: grid;
-    // Spalte 1: Gitter (flexibel), Spalte 2: Sidebar (fest/auto)
     grid-template-columns: 1fr auto;
-    height: calc(100vh - 60px); // Navbar-Höhe abgezogen
+    height: calc(100vh - 60px);
     overflow: hidden;
 }
 
 .grid-viewport {
     @apply h-full w-full relative overflow-hidden;
-    min-width: 0; // Erlaubt dem Gitter das Schrumpfen
+    min-width: 0;
 }
 
 // --- SIDEBAR ORGANISM ---
 .sidebar-container {
     display: flex;
-    flex-direction: row; // Rail links, Drawer rechts
+    flex-direction: row; // Rail links (1.), Drawer rechts (2.)
     @apply h-full shrink-0 relative text-white bg-bg-main;
     
-    // Animation der Gesamtbreite reserviert Platz im Grid
     transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: width;
     overflow: hidden; 
 
-    // Status: Geschlossen
     width: var(--rail-width);
 
     &.sidebar-open {
-        // Status: Offen (378px Gesamtbreite)
         width: calc(var(--drawer-width) + var(--rail-width));
     }
 }
 
-// 1. NAVIGATION RAIL (Der Anker)
+// 1. NAVIGATION RAIL
 .sidebar-rail {
     @apply h-full bg-rail-bg flex flex-col items-center py-lg gap-md 
            border-l border-white/5 shrink-0;
@@ -50,7 +46,6 @@
 
     .rail-btn {
         @apply transition-all duration-200 text-muted opacity-60 flex items-center justify-center rounded-industrial;
-        // Große Icons in der schmalen Leiste
         width: 48px;
         height: 48px;
         
@@ -59,10 +54,7 @@
             height: 24px;
         }
 
-        &.active { 
-            @apply opacity-100 text-info bg-white/5;
-        }
-        
+        &.active { @apply opacity-100 text-info bg-white/5; }
         &:hover { @apply opacity-100 text-white bg-white/10; }
     }
 
@@ -73,7 +65,7 @@
     }
 }
 
-// 2. CONTENT DRAWER (Ganz rechts)
+// 2. CONTENT DRAWER
 .sidebar-content {
     @apply h-full bg-drawer-bg flex flex-col shadow-2xl shrink-0;
     width: var(--drawer-width);
@@ -83,5 +75,41 @@
     .sidebar-tab-header {
         @apply bg-black/20 border-b border-white/5 shrink-0;
         h2 { @apply px-lg py-5 text-[1.1rem] font-bold text-info m-0 whitespace-nowrap; }
+    }
+
+    // HIER: Fix für die Panel-Breite
+    .tab-body {
+        @apply flex-1 flex flex-col overflow-y-auto overflow-x-hidden;
+        
+        // Damit die Inhalte (Planning, Agents etc.) die volle Breite nutzen
+        > div {
+            @apply w-full;
+        }
+    }
+}
+
+.sidebar-content {
+    @apply h-full bg-drawer-bg flex flex-col shadow-2xl shrink-0;
+    width: var(--drawer-width);
+    min-width: var(--drawer-width); 
+    max-width: var(--drawer-width); // Harte Grenze nach rechts
+    overflow-x: hidden; // WICHTIG: Nichts darf rechts rausstehen
+    border-l: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+// 3. INNERE SEKTIONEN (Fix für das "nach rechts gerückt" Gefühl)
+// Diese Klassen werden in deinen Tabs (Planning, Agents etc.) genutzt
+.sidebar-tab-content, .sidebar-section {
+    @apply w-full flex flex-col gap-4 py-lg;
+
+    // Standard-Padding für alle Texte und Inputs
+    h3, h4, .coord-display, .planning-section, label, .sidebar-section-item {
+        @apply px-lg;
+    }
+
+    // Spezieller Fix: Damit Buttons und Inputs im Panel wirklich mittig/voll sind
+    input, button.btn-full, .btn-primary {
+        @apply mx-lg; // Zentriert sie mit Margin, falls Breite nicht 100% ist
+        width: calc(100% - 2 * var(--spacing-lg, 1.5rem)); 
     }
 }

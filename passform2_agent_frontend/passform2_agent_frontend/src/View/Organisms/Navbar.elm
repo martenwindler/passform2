@@ -9,13 +9,13 @@ import Types.Domain exposing (..)
 view : Model -> Html Msg
 view model =
     nav [ class "navbar blue-look" ]
-        [ -- 1. Links: Logo und Titel (Pfad wieder auf src/... korrigiert)
+        [ -- 1. Links: Logo und Titel
           div [ class "navbar-section" ]
             [ img [ src "src/assets/images/logo.png", class "navbar-logo", alt "Logo" ] []
             , span [ class "navbar-title hidden sm:inline" ] [ text "Passform 2.0" ]
             ]
         
-        , -- 2. Mitte: Status-Pille
+        , -- 2. Mitte: Status-Pille (bleibt zentriert)
           div [ class "navbar-center hidden md:flex" ]
             [ div [ class "status-pill combined-status" ]
                 [ viewIndicator "REST" (if model.connected then Online else Error)
@@ -34,7 +34,7 @@ view model =
                 ]
             ]
 
-        , -- 3. Rechts: Actions
+        , -- 3. Rechts: Actions (hier greift das gap-xl aus dem SCSS)
           div [ class "navbar-actions" ]
             [ button 
                 [ class "btn-mode-switch"
@@ -55,7 +55,6 @@ view model =
 
 viewIndicator : String -> HardwareStatus -> Html Msg
 viewIndicator label status =
-    -- Geändert von span zu div für stabileres Flex-Layout
     div [ class "indicator-group" ]
         [ div [ class ("status-dot-small " ++ statusToClass status) ] []
         , span [ class "indicator-label" ] [ text label ]

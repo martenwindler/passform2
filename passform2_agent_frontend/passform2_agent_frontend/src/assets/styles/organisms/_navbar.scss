@@ -3,30 +3,24 @@
 // --- NAVBAR ORGANISM ---
 
 .navbar.blue-look {
-    // Grundgerüst
     @apply h-nav bg-nav-bg text-white flex items-center justify-between 
            px-lg shadow-md z-[1000] relative;
 
-    // 1. Linke Sektion (Logo & Titel)
     .navbar-section {
         @apply flex items-center gap-md z-10;
 
         .navbar-logo {
-            // Verstärkter Glow für das Logo
             @apply h-[35px] drop-shadow-[0_0_8px_rgba(255,255,255,0.4)];
         }
 
         .navbar-title {
-            // Weißer Text mit leichtem Glow-Effekt
             @apply font-semibold text-[1.1rem] tracking-[0.5px] text-white;
             text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
         }
     }
 
-    // 2. Mittlere Sektion (Status-Pille)
     .navbar-center {
         @apply absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2;
-        // Klicks gehen durch den Container durch, außer auf die Pille selbst
         pointer-events: none; 
 
         .status-pill.combined-status {
@@ -38,7 +32,6 @@
                 @apply flex items-center gap-2.5;
 
                 .indicator-label {
-                    // Hochwertiges, fettes Label
                     @apply text-[0.7rem] font-extrabold text-white/90 uppercase tracking-wider;
                 }
             }
@@ -46,32 +39,25 @@
             .status-dot-small {
                 @apply w-2.5 h-2.5 rounded-full block shrink-0;
                 
-                // Wir nutzen hier die spezifischen Tailwind-Klassen
                 &.online {
-                    background-color: #48bb78; // Fallback für SASS
+                    background-color: #48bb78;
                     @apply bg-success;
                     box-shadow: 0 0 12px rgba(72, 187, 120, 0.9);
                 }
 
                 &.offline {
-                    background-color: #f56565; // Fallback
+                    background-color: #f56565;
                     @apply bg-danger;
                     box-shadow: 0 0 12px rgba(245, 101, 101, 0.9);
                 }
 
                 &.warning {
-                    background-color: #ecc94b; // Fallback
+                    background-color: #ecc94b;
                     @apply bg-warning;
                     box-shadow: 0 0 12px rgba(236, 201, 75, 0.9);
                 }
             }
 
-            .indicator-group {
-                // Wir erzwingen Flexbox, damit der Punkt und der Text nebeneinander Platz haben
-                @apply flex items-center gap-2;
-            }
-
-            // Sichtbarer Trenner
             .status-divider {
                 @apply w-[1px] h-3 bg-white/20 block;
             }
@@ -80,7 +66,10 @@
 
     // 3. Rechte Sektion (Actions)
     .navbar-actions {
-        @apply flex items-center gap-md z-10;
+        @apply flex items-center z-10;
+        
+        // FIX: Wir nutzen natives CSS Gap (ca. 32px), um Tailwind-Probleme zu umgehen
+        gap: 2rem; 
 
         .btn-mode-switch, .btn-view-toggle {
             @apply bg-white/5 text-white/80 border border-white/10 
@@ -94,6 +83,11 @@
             &:active {
                 @apply translate-y-0 opacity-70;
             }
+        }
+
+        // ZWEITER FIX: Falls das Grid/Gap aus irgendeinem Grund ignoriert wird
+        .btn-view-toggle {
+            margin-left: 0.5rem; 
         }
     }
 }

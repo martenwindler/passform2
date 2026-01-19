@@ -28,6 +28,10 @@
 @tailwind components;
 @tailwind utilities;
 
+* {
+    box-sizing: border-box; 
+}
+
 // 3. ZULETZT: Deine globalen Layout-Klassen
 // Letzte Instanz: Alles innerhalb der App ist standardmäßig weiß
 .app-layout {
@@ -41,46 +45,44 @@
     color: white !important;
 }
 
-.main-layout-wrapper {
-    display: flex;
-    overflow-x: hidden; // Absolut kritisch für den Slide-Effekt!
-    width: 100vw;
-    height: 100vh;
+// 2. Global Fixes
+* {
+    box-sizing: border-box; 
 }
 
-.app-wrapper {
-    display: flex;
-    width: 100vw;
-    height: 100vh;
-    overflow: hidden;
-
-    // Der Hauptbereich (Karte, Gitter, etc.)
-    .main-content {
-        flex: 1;
-        height: 100%;
-        transition: margin-right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        will-change: margin-right;
-
-        // Standardmäßig ist nur die Rail sichtbar
-        margin-right: $rail-width;
-
-        // Wenn die Sidebar offen ist, schrumpft der Bereich
-        // Wir nutzen hier eine Klasse, die am besten am gemeinsamen Parent hängt
-        .sidebar-open & {
-            margin-right: calc(#{$drawer-width} + #{$rail-width});
-        }
-    }
+.app-layout {
+    @apply text-white flex flex-col h-screen w-screen overflow-hidden bg-bg-main;
 }
 
+// 3. Der Content-Bereich (Das Herzstück)
 .content-area {
-    display: grid;
-    // Das Gitter nimmt den Rest (1fr), die Sidebar nimmt nur was sie braucht (auto)
-    grid-template-columns: 1fr auto;
-    flex: 1;
-    overflow: hidden;
+    @apply flex flex-1 flex-row overflow-hidden relative;
+    // Wir nutzen Flexbox, weil flex: 1 am Gitter perfekt auf die Breite der Sidebar reagiert
 }
 
 .grid-viewport {
-    @apply h-full w-full relative overflow-hidden;
-    min-width: 0; // Erlaubt das Schrumpfen im Grid
+    // flex-1 sorgt dafür, dass dieser Bereich den restlichen Platz einnimmt
+    @apply h-full relative flex-1;
+    
+    // min-width: 0 ist KRITISCH, damit Flexbox den Bereich schmaler machen darf
+    min-width: 0; 
+    overflow: hidden;
+
+    // Sanfter Übergang, wenn die Sidebar den Platz beansprucht
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+    three-grid-scene {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+}
+
+// 4. Sidebar Integration (Zustandskontrolle)
+.sidebar-container {
+    // Die Sidebar behält ihre eigene Breiten-Animation (aus der sidebar.scss)
+    // Da sie im selben Flex-Container wie .grid-viewport sitzt,
+    // "drückt" sie das Gitter automatisch nach links.
+    @apply h-full shrink-0;
 }
