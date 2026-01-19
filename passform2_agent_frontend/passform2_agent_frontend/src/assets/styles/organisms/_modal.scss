@@ -4,87 +4,129 @@
 // --- MODAL ORGANISM ---
 
 .modal-overlay {
-    // Fullscreen Overlay mit Blur-Effekt
-    @apply fixed inset-0 w-screen h-screen bg-black/70 backdrop-blur-md 
-           flex justify-center items-center z-[2000] animate-fadeIn;
+    @apply fixed inset-0 w-screen h-screen bg-black/80 backdrop-blur-md 
+           flex justify-center items-center z-[2000] p-4;
+    
+    animation: modalFadeIn 0.3s ease-out;
 }
 
 .modal-content {
-    // Container: Dark Theme, Border-Glow und Flex-Layout
-    @apply bg-nav-bg/95 border border-info/30 p-lg rounded-xl w-[340px] 
-           shadow-2xl shadow-black/50 flex flex-col gap-md text-white;
+    display: flex !important;
+    flex-direction: column !important;
+    // REDUZIERT: Ein Viertel vom ursprünglichen Abstand (0.5rem = 8px)
+    gap: 0.5rem !important; 
+
+    @apply bg-nav-bg/95 border border-info/30 p-lg rounded-xl 
+           w-full max-w-[420px] max-h-[90vh]
+           shadow-2xl shadow-black/50 text-white relative;
 
     h3 {
-        @apply m-0 text-[1.2rem] text-center border-b border-white/10 pb-sm font-semibold;
+        // Padding unten ebenfalls leicht reduziert für die Kompaktheit
+        @apply m-0 text-[1.3rem] text-center border-b border-white/10 pb-4 
+               font-bold uppercase tracking-widest text-info;
     }
 
-    // --- TYPOGRAPHY FORCING ---
-    // Wir erzwingen Weiß für alle Status-Labels innerhalb des Modals
-    .signal-label-main, .pill-label, .indicator-label, .status-label,
-    .status-text, .status-indicator, .pill-text, .value, .signal-value {
-        @apply text-white opacity-100 font-semibold !important;
+    .modal-body {
+        @apply overflow-y-auto pr-2 flex flex-col;
+        
+        &::-webkit-scrollbar { @apply w-1; }
+        &::-webkit-scrollbar-track { @apply bg-transparent; }
+        &::-webkit-scrollbar-thumb { @apply bg-white/10 rounded-full; }
     }
 
-    // Status Dot Overrides für das Modal
-    .status-dot {
-        @apply inline-block w-2 h-2 rounded-full mr-1.5 shrink-0;
+    // Container für Buttons und Formulare
+    .settings-form {
+        display: flex !important;
+        flex-direction: column !important;
+        // REDUZIERT: Ein Viertel vom ursprünglichen Abstand (0.5rem = 8px)
+        gap: 0.5rem !important; 
+        
+        @apply w-full;
+    }
 
-        &.unknown {
-            @apply bg-gray-400 shadow-[0_0_8px_rgba(156,163,175,0.4)] border border-white/20;
+    // --- DIE BUTTONS (Volle Breite bleibt erhalten) ---
+    .btn-full {
+        display: block !important;
+        width: 100% !important;
+        flex-shrink: 0 !important;
+
+        // Padding leicht angepasst (py-3 statt py-4) für den kompakteren Look
+        @apply py-3 px-6 rounded-industrial-sm font-black 
+               transition-all duration-200 text-center border-none cursor-pointer
+               text-[0.95rem] uppercase tracking-wider shadow-lg;
+        
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+
+        &:hover:not(:disabled) {
+            @apply -translate-y-1 brightness-110;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        &:active:not(:disabled) {
+            @apply translate-y-0 scale-[0.98];
+        }
+
+        &:disabled {
+            @apply opacity-30 cursor-not-allowed shadow-none;
         }
     }
 
-    // Agenten-Details (ID-Badge)
-    .agent-id-badge {
-        @apply bg-white/5 text-white/70 font-mono text-[0.8rem] 
-               py-1 px-2 rounded-industrial-sm text-center -mt-sm;
+    // --- AGENT TYPEN FARBEN ---
+    .btn-ftf { @apply bg-warning text-black !important; }
+
+    .btn-secondary { 
+        @apply bg-white/5 text-white border border-white/10 !important; 
+        &:hover { @apply bg-white/10 border-white/20; }
     }
 
-    // --- HARDWARE LAYOUT ---
-    .hardware-status-row {
-        @apply flex justify-between gap-sm my-sm;
-
-        .hardware-pill {
-            @apply bg-white/5 border border-white/10 flex items-center 
-                   py-1 px-2.5 rounded-full;
-            
-            span, div, .status-text { @apply text-white !important; } 
-        }
-    }
-
-    // --- NFC FEEDBACK ---
-    .last-written-info {
-        @apply p-sm bg-success/15 border border-success rounded-industrial-sm 
-               text-success text-center text-[0.85rem] font-semibold animate-pulse;
-    }
-
-    // --- BUTTON VARIANTEN ---
-    .btn-ftf {
-        @apply bg-warning text-text-dark font-extrabold border-none !important;
-        &:hover { @apply brightness-110 -translate-y-px; }
-    }
+    .btn-path-start { @apply bg-success/20 text-success border border-success/30 !important; }
+    .btn-path-goal { @apply bg-info/20 text-info border border-info/30 !important; }
 
     .btn-nfc-write {
         @apply bg-gradient-to-br from-[#ed8936] to-[#dd6b20] text-white font-bold 
-               shadow-[0_4px_10px_rgba(221,107,32,0.3)] border-none p-sm rounded-industrial-sm;
-        
-        &:disabled {
-            @apply bg-white/10 text-white/30 cursor-not-allowed opacity-50 shadow-none;
-        }
-        &:hover:not(:disabled) { @apply brightness-110; }
+               shadow-[0_4px_12px_rgba(221,107,32,0.4)] !important;
     }
 
-    .btn-path-start { @apply text-success border border-success/30; }
-    .btn-path-goal  { @apply text-info border border-info/30; }
-    
-    .btn-delete { 
-        @apply text-danger border border-danger/20;
-        &:hover { @apply bg-danger/10; }
+    // --- TYPOGRAPHY & BADGES ---
+    .agent-id-badge {
+        @apply bg-white/5 text-info font-mono text-[0.85rem] 
+               py-2 px-3 rounded-industrial-sm text-center border border-info/20;
+    }
+
+    .status-text, .signal-value { 
+        @apply text-white opacity-100 font-bold !important; 
+    }
+
+    .last-written-info {
+        @apply p-sm bg-success/10 border border-success/30 rounded-industrial-sm 
+               text-success text-center text-[0.85rem] font-bold animate-pulse;
+    }
+
+    // Footer & Schließen
+    .modal-footer {
+        @apply w-full flex justify-center mt-2;
     }
 
     .btn-close {
-        @apply bg-transparent text-white/50 underline text-[0.8rem] 
-               mt-xs text-center border-none cursor-pointer;
+        @apply bg-transparent text-white/40 underline text-[0.85rem] 
+               border-none cursor-pointer transition-colors;
         &:hover { @apply text-white; }
     }
+}
+
+// Fix für die Hardware-Pills (Horizontaler Gap von 1rem bleibt für die Lesbarkeit)
+.hardware-status-row {
+    display: flex !important;
+    flex-direction: row !important;
+    @apply gap-4 w-full;
+    
+    .hardware-pill {
+        @apply flex-1 flex items-center justify-center py-2 px-4 
+               bg-white/5 border border-white/10 rounded-lg;
+    }
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
 }

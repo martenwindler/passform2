@@ -87,6 +87,7 @@ type AgentsMsg
     | ToggleSidebar
     | SwitchSidebarTab SidebarTab
     | CloseMenu
+    | OpenMenu Int Int -- NEU: Für das Öffnen des Modals via Grid-Koordinaten
     | SetCurrentAsDefault
     | LoadDefaultConfig
     | ClearGrid

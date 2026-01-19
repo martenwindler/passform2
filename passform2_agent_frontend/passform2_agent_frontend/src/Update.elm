@@ -25,3 +25,6 @@ update msg model =
 
         NoOp ->
             ( model, Cmd.none )
+
+        OpenMenu x y ->
+            ( { model | activeMenu = Just (SelectionMenu ( x, y )) }, Cmd.none )
