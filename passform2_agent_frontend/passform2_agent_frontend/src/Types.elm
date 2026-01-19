@@ -63,6 +63,7 @@ type PlanningMsg
     | SetWeight String String
     | SaveWeights
     | StartPlanning Bool
+    | SetPathResult Path
     | PlanningResultRaw Decode.Value
     | ConfigReceived String
 
@@ -87,19 +88,16 @@ type AgentsMsg
     | ToggleSidebar
     | SwitchSidebarTab SidebarTab
     | CloseMenu
-    | OpenMenu Int Int -- NEU: Für das Öffnen des Modals via Grid-Koordinaten
+    | OpenMenu Int Int
     | SetCurrentAsDefault
     | LoadDefaultConfig
     | ClearGrid
     | ExportConfig
     | ImportConfigTrigger
-    -- Konstruktoren für Agenten-Handling
     | StartAgent ModuleType GridCell
     | RemoveAgent GridCell
     | RotateAgent GridCell
-    -- NEU: UpdateAgent für manuelle Änderungen (Singular, für das Modal)
     | UpdateAgent GridCell AgentModule
-    -- UpdateAgents für JSON-Schnittstelle (Plural, für API-Updates)
     | UpdateAgents Decode.Value
     | MoveAgent { oldX : Int, oldY : Int, newX : Int, newY : Int }
     | HandleGridClick GridCell

@@ -96,7 +96,6 @@ update msg model =
             Hardware.update hMsg model
 
         AgentsMsg aMsg ->
-            -- Hier wird die neue Update-Logik in das Untermodul delegiert
             Agents.update aMsg model
 
         NoOp ->
@@ -111,7 +110,7 @@ subscriptions model =
         [ Ports.socketStatusReceiver (SetConnected >> HardwareMsg)
         , Ports.rosStatusReceiver (SetRosConnected >> HardwareMsg)
         , Ports.activeAgentsReceiver (UpdateAgents >> AgentsMsg)
-        , Ports.pathCompleteReceiver (PlanningResultRaw >> PlanningMsg)
+        , Ports.pathCompleteReceiver handlePathComplete
         , Ports.configReceived (ConfigReceived >> PlanningMsg)
         , Ports.systemLogReceiver (\val -> HardwareMsg (HandleSystemLog (Decode.decodeValue Decoders.decodeSystemLog val)))
         , Ports.rfidReceiver (\val -> HardwareMsg (HandleRfid (Decode.decodeValue Decoders.decodeRfid val)))
@@ -119,13 +118,26 @@ subscriptions model =
         , Ports.hardwareUpdateReceiver (\val -> HardwareMsg (HandleHardwareUpdate (Decode.decodeValue Decoders.hardwareListDecoder val)))
         ]
 
+{-| 
+Hilfsfunktion, um das CNP-Ergebnis vom Port zu verarbeiten.
+Nutzt den typsicheren Decoder und schickt das Ergebnis an SetPathResult.
+-}
+handlePathComplete : Decode.Value -> Msg
+handlePathComplete rawValue =
+    case Decode.decodeValue Decoders.decodePathResult rawValue of
+        Ok validPath ->
+            -- Wir nutzen die neue, typsichere Msg aus deiner Types.elm
+            PlanningMsg (SetPathResult validPath)
+
+        Err _ ->
+            -- Im Fehlerfall machen wir nichts (oder man könnte einen Log-Eintrag schicken)
+            NoOp
+
 
 -- --- VIEW ---
 
 view : Model -> Html Msg
 view model =
-    -- Das MainLayout nimmt das Model (für Sidebar/Navbar) 
-    -- und den Hauptinhalt (view3D) entgegen.
     MainLayout.view model (view3D model)
 
 
@@ -139,7 +151,6 @@ view3D model =
                 Simulation -> "true"
                 Hardware -> "false"
     in
-    -- Web Component Interop (Three.js Scene)
     node "three-grid-scene"
         [ attribute "agents" (model.agents |> Decoders.encodeAgentMap |> Encode.encode 0)
         , attribute "path" (Decoders.encodePath model.currentPath |> Encode.encode 0)
@@ -149,7 +160,6 @@ view3D model =
         , attribute "allow-interaction" allowInteraction 
         , attribute "start-pos" (model.pathStart |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
         , attribute "goal-pos" (model.pathGoal |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
-        -- Events von der 3D Szene
         , Ports.onAgentMoved (MoveAgent >> AgentsMsg)
         , Ports.onCellClicked (HandleGridClick >> AgentsMsg) 
         ]

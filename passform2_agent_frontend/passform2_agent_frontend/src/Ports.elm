@@ -16,6 +16,9 @@ port setMode : String -> Cmd msg
 
 port triggerPlanning : Decode.Value -> Cmd msg
 
+{-| Sendet die CNP-Ausschreibung (Task Announcement) an das Backend/ROS -}
+port sendCnpRequest : Encode.Value -> Cmd msg
+
 port saveToLocalStorage : String -> Cmd msg
 
 port exportConfig : String -> Cmd msg
@@ -41,6 +44,7 @@ port rosStatusReceiver : (Bool -> msg) -> Sub msg
 
 port activeAgentsReceiver : (Decode.Value -> msg) -> Sub msg
 
+{-| Empfängt das Ergebnis der Verhandlung (den Pfad des Gewinner-Agenten) -}
 port pathCompleteReceiver : (Decode.Value -> msg) -> Sub msg
 
 port systemLogReceiver : (Decode.Value -> msg) -> Sub msg
@@ -56,10 +60,6 @@ port hardwareUpdateReceiver : (Decode.Value -> msg) -> Sub msg
 
 -- --- EVENT-HELPER FÜR DIE 3D-VIEW (KORRIGIERT) ---
 
-{-| 
-  Nimmt eine Funktion entgegen, die die Daten in eine Nachricht umwandelt.
-  Dadurch wird der Helper flexibel für verschiedene Msg-Typen.
--}
 onAgentMoved : ( { oldX : Int, oldY : Int, newX : Int, newY : Int } -> msg ) -> Attribute msg
 onAgentMoved toMsg =
     on "agent-moved" (Decode.map toMsg decodeAgentMove)
@@ -70,7 +70,7 @@ onCellClicked toMsg =
     on "cell-clicked" (Decode.map toMsg decodeCellClick)
 
 
--- --- INTERNE DECODER (Bleiben gleich) ---
+-- --- INTERNE DECODER ---
 
 decodeAgentMove : Decode.Decoder { oldX : Int, oldY : Int, newX : Int, newY : Int }
 decodeAgentMove =

@@ -77,3 +77,15 @@ type alias PlanningWeights =
     , proximity_penalty : Float
     , hardware_safety_factor : Float
     }
+
+type alias Bid =
+    { agentId : String
+    , cost : Float
+    , position : GridCell
+    }
+
+type alias CNPResult =
+    { winnerId : String
+    , fullPath : List GridCell
+    , totalCost : Float
+    }

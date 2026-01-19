@@ -56,32 +56,28 @@ const connectToRosBridge = () => {
         rosSocket.disconnect();
     }
     
-    console.log("🤖 Initialisiere Verbindung zu ROS-Bridge (Hardware)...");
+    console.log("🤖 Versuche Verbindung zu ROS-Bridge...");
     
-    rosSocket = io(rosBridgeUrl, {
+    // Versuche es ohne http:// falls http://127.0.0.1:5000 nicht klappt
+    rosSocket = io('ws://127.0.0.1:5000', { 
         transports: ['websocket'],
         reconnection: true,
-        reconnectionDelay: 1000,
+        reconnectionDelay: 2000,
         timeout: 5000
     });
 
     rosSocket.on('connect', () => {
-        console.log("✅ ROS-Bridge (5000) Online");
+        console.log("✅ ROS-Bridge verbunden!");
         sendSafe('rosStatusReceiver', true);
     });
 
-    rosSocket.on('active_agents', (data) => {
-        if (data) sendSafe('activeAgentsReceiver', data);
-    });
-
     rosSocket.on('connect_error', (err) => {
-        console.warn("❌ ROS-Bridge (5000) Fehler:", err.message);
+        console.error("❌ ROS-Bridge Verbindungsfehler:", err);
         sendSafe('rosStatusReceiver', false);
     });
 
-    // NEU: Disconnect Handler für ROS
-    rosSocket.on('disconnect', (reason) => {
-        console.warn("⚠️ ROS-Bridge getrennt:", reason);
+    rosSocket.on('disconnect', () => {
+        console.warn("⚠️ ROS-Bridge verloren.");
         sendSafe('rosStatusReceiver', false);
     });
 };
