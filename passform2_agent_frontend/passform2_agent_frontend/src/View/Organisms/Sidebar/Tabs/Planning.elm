@@ -3,52 +3,29 @@ module View.Organisms.Sidebar.Tabs.Planning exposing (view)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Types exposing (..)
+import View.Organisms.Sidebar.Sections.GridSection as GridSection
+import View.Organisms.Sidebar.Sections.WeightsSection as WeightsSection
+import View.Organisms.Sidebar.Sections.StationAgentMissionSection as MissionSection
+import View.Organisms.Sidebar.Sections.FileConfigSection as FileConfigSection
 
+{-| 
+Das Planning-Tab ist jetzt ein reiner Orchestrator. 
+Jede Sektion ist in ein eigenes Modul im Ordner 'Sections' ausgelagert.
+-}
 view : Model -> Html Msg
 view model =
-    -- Der Hauptcontainer: Erbt 'text-white' und setzt das Padding
-    div [ class "sidebar-tab-content" ]
+    div [ class "sidebar-tab-content scrollbar-hide flex flex-col gap-6" ]
         [ h3 [] [ text "Missions-Planung" ]
         
-        , -- Sektion 1: Gewichtungen
-          div [ class "planning-section" ]
-            [ h4 [] [ text "Gewichtungen" ]
-            , viewParamInput "Standard-Zeit (s)" "0.1"
-            , viewParamInput "Komplexe Module" "0.1"
-            , viewParamInput "Mensch-Faktor" "0.1"
-            ]
-        
-        , -- Sektion 2: Navigation
-          div [ class "planning-section" ]
-            [ h4 [] [ text "Navigation" ]
-            , div [ class "coord-display" ]
-                [ label [] [ text "Startpunkt:" ]
-                , span [] [ text "Nicht gesetzt" ]
-                ]
-            , div [ class "coord-display" ]
-                [ label [] [ text "Zielpunkt:" ]
-                , span [] [ text "Nicht gesetzt" ]
-                ]
-            ]
-            
-        , -- Der große Action-Button (btn-primary btn-full nutzen die Stile von btn-apply)
-          button 
-            [ class "btn-primary btn-full"
-            , disabled True -- Logik hier einfügen, ob Button aktiv sein darf
-            ] 
-            [ text "Optimierung starten" ]
-        ]
+        , -- A: Gitter-Dimensionen (B/L)
+          GridSection.view model
 
--- --- HELPER ---
+        , -- B: Contract-Net Gewichte (Kostenfunktion)
+          WeightsSection.view model
 
-viewParamInput : String -> String -> Html Msg
-viewParamInput labelText stepVal =
-    -- sidebar-section sorgt für 70% weißes Label und gestylten Input
-    div [ class "sidebar-section" ]
-        [ label [] [ text labelText ]
-        , input 
-            [ type_ "number"
-            , step stepVal
-            , value "1.0" -- Beispielwert
-            ] []
+        , -- C: Navigation, Status & Start-Button (Mit SVG-Icons)
+          MissionSection.view model
+
+        , -- D: Datei-Management (Save/Load/Export/Clear)
+          FileConfigSection.view model
         ]

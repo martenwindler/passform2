@@ -1,39 +1,117 @@
 @use '../../../base/variables' as *;
 
-// --- SYSTEM LOGS TERMINAL ---
+// --- SYSTEM LOGS TERMINAL (GRID-MASTER PASSFORM 2.0) ---
+
+.sidebar-tab-content.h-full {
+    display: grid;
+    grid-template-rows: auto 1fr; 
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    padding: 0; 
+
+    h3 {
+        @apply px-lg pt-4 mb-4 shrink-0 text-info font-bold uppercase tracking-widest;
+    }
+}
 
 .sidebar-section.fill {
-    @apply flex-1 flex flex-col min-h-0 overflow-hidden mb-0; // mb-0 entfernt unteren Abstand
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; 
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .log-container {
-    // Layout: Maximale Höhe, interner Scroll
-    @apply flex-1 flex flex-col min-h-0 overflow-y-auto bg-black/40 p-2.5
-           border border-white/5 rounded-industrial-sm;
+    flex: 1;
+    overflow-y: auto;
+    width: 100%;
+    
+    padding-top: 1.5rem; 
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+    padding-bottom: 2.5rem;
 
-    // Typografie
-    @apply font-mono text-[0.75rem] leading-relaxed text-white;
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
 
-    // Custom Scrollbar für den Terminal-Look
-    &::-webkit-scrollbar { @apply w-1; }
-    &::-webkit-scrollbar-track { @apply bg-transparent; }
-    &::-webkit-scrollbar-thumb { @apply bg-white/10 rounded-full; }
+    &::-webkit-scrollbar { width: 4px; }
+    &::-webkit-scrollbar-thumb { 
+        background: rgba(255, 255, 255, 0.1); 
+        border-radius: 10px; 
+    }
 
     .log-entry {
-        @apply py-1 border-b border-white/[0.03] flex items-start gap-3 transition-colors;
-        
-        &:hover { @apply bg-white/[0.02]; }
-        &:last-child { @apply border-none; }
+        display: flex;
+        align-items: start;
+        gap: 1.25rem; // Der gewollte große Abstand
+        padding: 0.4rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        width: 100%;
+        transition: background 0.2s ease;
 
+        &:hover { background: rgba(255, 255, 255, 0.03); }
+        &:last-child { border-bottom: none; }
+
+        // --- DAS HERZSTÜCK: DER LOG-DOT ---
         .log-dot {
-            @apply w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 bg-white/20;
+            width: 0.5rem;   // Etwas präsenter
+            height: 0.5rem;
+            border-radius: 50%;
+            
+            // Perfekte vertikale Ausrichtung zur ersten Textzeile
+            // Bei line-height 1.6 und font-size 0.75rem ist 0.45rem der "Sweet Spot"
+            margin-top: 0.45rem; 
+            margin-left: 0.85rem;
+            
+            flex-shrink: 0;
+            background-color: rgba(255, 255, 255, 0.2); // Default Farbe (gedimmt)
+            transition: all 0.3s ease;
         }
 
-        // Semantische Farben (Direkte Zuweisung für maximale Stabilität)
-        &.error   { color: #f56565; .log-dot { background-color: #f56565; box-shadow: 0 0 5px #f56565; } }
-        &.warning { color: #ecc94b; .log-dot { background-color: #ecc94b; } }
-        &.success { color: #48bb78; .log-dot { background-color: #48bb78; } }
-        &.info    { color: #63b3ed; .log-dot { background-color: #63b3ed; } }
+        .log-message {
+            flex: 1;
+            word-break: break-all;
+        }
+
+        // --- FARBDYNAMIK & GLOW-EFFEKTE ---
+        
+        &.danger { 
+            color: #f56565; 
+            .log-dot { 
+                background-color: #f56565; 
+                // Ein kräftiger Glow für kritische Fehler
+                box-shadow: 0 0 8px rgba(245, 101, 101, 0.6), 0 0 2px rgba(245, 101, 101, 0.8);
+            } 
+        }
+        
+        &.warning { 
+            color: #ecc94b; 
+            .log-dot { 
+                background-color: #ecc94b; 
+                // Ein dezenterer Glow für Warnungen
+                box-shadow: 0 0 6px rgba(236, 201, 75, 0.4);
+            } 
+        }
+        
+        &.success { 
+            color: #48bb78; 
+            .log-dot { 
+                background-color: #48bb78; 
+                // Erfolg leuchtet nicht, ist aber klar grün
+            } 
+        }
+        
+        &.info { 
+            color: #63b3ed; 
+            .log-dot { 
+                background-color: #63b3ed; 
+            } 
+        }
     }
 }
