@@ -23,6 +23,11 @@
 @use 'organisms/sidebar/tabs/agents';
 @use 'organisms/sidebar/tabs/hardware';
 
+// Sidebar-Tabs-Sections
+@use "organisms/sidebar/sections/planning-planer";
+@use "organisms/sidebar/sections/planning-weights";
+@use "organisms/sidebar/sections/planning-result";
+
 // 2. DANACH: Tailwind Schichten injizieren
 @tailwind base;
 @tailwind components;

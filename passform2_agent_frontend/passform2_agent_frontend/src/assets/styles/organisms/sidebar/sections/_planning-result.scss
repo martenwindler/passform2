@@ -1,0 +1,48 @@
+@use '../../../base/variables' as *;
+
+.planning-result-section {
+
+    .result-card {
+        @apply bg-success/[0.03] border border-success/20 rounded-industrial-sm p-3 mt-1;
+
+        .path-list {
+            @apply max-h-40 overflow-y-auto pr-2 flex flex-col gap-1 custom-scrollbar;
+            
+            // Deine Scrollbar-Logik (falls vorhanden, sonst hier)
+            &::-webkit-scrollbar { @apply w-1; }
+            &::-webkit-scrollbar-thumb { @apply bg-success/20 rounded; }
+        }
+
+        .path-step {
+            @apply flex justify-between items-center py-1.5 border-b border-white/[0.03] font-mono text-[0.7rem];
+            
+            .step-index { @apply text-white/20; }
+            .step-pos { @apply text-success/80 font-bold; }
+            
+            &:last-child { @apply border-0; }
+        }
+    }
+
+    .result-footer {
+        @apply mt-2 pt-2 border-t border-success/20 flex justify-between items-center;
+        
+        .footer-label { @apply text-[0.6rem] uppercase text-white/40 font-bold; }
+        .footer-value { @apply text-success font-mono font-bold text-sm; }
+    }
+
+    // Die Status-Boxen für "Initial" und "Veraltet"
+    .status-box {
+        @apply p-4 border rounded-industrial-sm text-center flex flex-col gap-1;
+        
+        &.required { 
+            @apply bg-warning/5 border-warning/20 text-warning/80; 
+            .status-msg { @apply font-bold uppercase text-[0.65rem]; }
+        }
+        
+        &.initial { 
+            @apply bg-white/[0.01] border-white/5 text-white/20 border-dashed; 
+        }
+        
+        .status-hint { @apply text-[0.6rem] italic opacity-60; }
+    }
+}

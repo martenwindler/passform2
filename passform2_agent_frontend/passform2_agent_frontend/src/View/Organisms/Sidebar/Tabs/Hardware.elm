@@ -5,44 +5,47 @@ import Html.Attributes exposing (..)
 import Types exposing (..)
 import Types.Domain exposing (..) 
 import View.Molecules.HardwareStatus as StatusDisplay
+-- NEU: Import der Management-Sektion
+import View.Organisms.Sidebar.Sections.FileConfigSection as FileConfigSection
 
 {-| 
-Hardware-Tab: Zeigt System-Verbindungen und Edge-Devices.
-Nutzt das neue Grid-System für die Kacheln oben.
+Hardware-Tab: Zeigt System-Verbindungen, Edge-Devices und System-Management.
 -}
 view : Model -> Html Msg
 view model =
-    div [ class "sidebar-tab-content" ]
+    div [ class "sidebar-tab-content scrollbar-hide flex flex-col gap-6" ]
         [ h3 [] [ text "System-Hardware" ]
         
-        , -- Globaler Status (Backend & ROS) im 2-spaltigen Grid
-          div [ class "status-grid" ]
-            [ div [ class "status-card" ]
-                [ label [] [ text "Backend API" ]
-                , div [ class "mt-1" ] [ StatusDisplay.view (if model.connected then Online else Error) ]
+        , -- Globaler Status (Backend & ROS)
+          div [ class "status-grid grid grid-cols-2 gap-3" ]
+            [ div [ class "status-card bg-white/5 border border-white/10 p-3 rounded-industrial-sm" ]
+                [ label [ class "text-[0.6rem] uppercase text-white/40 font-bold mb-1 block" ] [ text "Backend API" ]
+                , div [ class "flex items-center" ] [ StatusDisplay.view (if model.connected then Online else Error) ]
                 ]
-            , div [ class "status-card" ]
-                [ label [] [ text "ROS 2 Bridge" ]
-                , div [ class "mt-1" ] [ StatusDisplay.view (if model.rosConnected then Online else Error) ]
+            , div [ class "status-card bg-white/5 border border-white/10 p-3 rounded-industrial-sm" ]
+                [ label [ class "text-[0.6rem] uppercase text-white/40 font-bold mb-1 block" ] [ text "ROS 2 Bridge" ]
+                , div [ class "flex items-center" ] [ StatusDisplay.view (if model.rosConnected then Online else Error) ]
                 ]
             ]
 
         , -- Liste der Pis
-          div [ class "planning-section mt-6" ]
-            [ h4 [] [ text "Verbundene Einheiten" ]
+          div [ class "planning-section" ]
+            [ h4 [ class "mb-3" ] [ text "Verbundene Einheiten" ]
             , if List.isEmpty model.connectedHardware then
-                p [ class "text-muted italic text-[0.8rem] px-2" ] 
-                    [ text "Suche nach aktiven Edge-Devices..." ]
+                div [ class "p-4 border border-dashed border-white/10 rounded-sm text-center" ]
+                    [ p [ class "text-white/20 italic text-[0.75rem]" ] 
+                        [ text "Suche nach aktiven Edge-Devices..." ] 
+                    ]
               else
                 div [ class "device-list flex flex-col gap-2" ] 
                     (List.map viewDevice model.connectedHardware)
             ]
+
+        , -- NEU: Datei-Management & System-Reset (Save/Load/Export/Clear)
+          -- Hier sitzt jetzt das System-Management
+          FileConfigSection.view model
         ]
 
-{-| 
-Darstellung eines einzelnen Pis.
-Wir orientieren uns am agent-item Design für Konsistenz.
--}
 viewDevice : HardwareDevice -> Html Msg
 viewDevice device =
     div [ class "device-item flex justify-between items-center bg-white/5 border border-white/10 p-3 rounded-industrial-sm" ]
@@ -50,6 +53,5 @@ viewDevice device =
             [ span [ class "font-bold text-sm tracking-wide text-white" ] [ text device.pi_id ]
             , span [ class "text-[0.7rem] text-white/40 font-mono" ] [ text "ID: EDGE-PI-NODE" ]
             ]
-        , -- Status-LED des Pis
-          StatusDisplay.view device.rfid_status
+        , StatusDisplay.view device.rfid_status
         ]

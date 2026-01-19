@@ -9,20 +9,19 @@ import Json.Encode as Encode
 
 {-| 
     Logik-Domäne: Planung & Gitter-Konfiguration.
-    Sichert jetzt die Gitter-Dimensionen hart zwischen 0 und 100 ab.
+    Sichert Gitter-Dimensionen ab und steuert den Lebenszyklus von Pfad-Resultaten.
 -}
 update : PlanningMsg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         SetGridWidth val ->
             let
-                -- String zu Int wandeln, bei Fehler alten Wert nutzen, dann auf 0-100 begrenzen
                 newWidth = 
                     String.toInt val 
                         |> Maybe.withDefault model.gridWidth 
                         |> clamp 0 100
             in
-            ( { model | gridWidth = newWidth }, Cmd.none )
+            ( { model | gridWidth = newWidth, currentPath = Nothing }, Cmd.none )
 
         SetGridHeight val ->
             let
@@ -31,13 +30,15 @@ update msg model =
                         |> Maybe.withDefault model.gridHeight 
                         |> clamp 0 100
             in
-            ( { model | gridHeight = newHeight }, Cmd.none )
+            ( { model | gridHeight = newHeight, currentPath = Nothing }, Cmd.none )
 
         SetPathStart cell ->
-            ( { model | pathStart = Just cell, activeMenu = Nothing }, Cmd.none )
+            -- Pfad zurücksetzen, da sich die Route durch neuen Start ändert
+            ( { model | pathStart = Just cell, currentPath = Nothing, activeMenu = Nothing }, Cmd.none )
 
         SetPathGoal cell ->
-            ( { model | pathGoal = Just cell, activeMenu = Nothing }, Cmd.none )
+            -- Pfad zurücksetzen, da sich die Route durch neues Ziel ändert
+            ( { model | pathGoal = Just cell, currentPath = Nothing, activeMenu = Nothing }, Cmd.none )
 
         SetWeight field value ->
             let
@@ -52,7 +53,8 @@ update msg model =
                         "hardware_safety_factor" -> { oldWeights | hardware_safety_factor = newVal }
                         _ -> oldWeights
             in
-            ( { model | planningWeights = newWeights }, Cmd.none )
+            -- Auch bei Gewichtsänderungen setzen wir den Pfad zurück, da die Kosten neu berechnet werden müssen
+            ( { model | planningWeights = newWeights, currentPath = Nothing }, Cmd.none )
 
         SaveWeights ->
             ( { model | logs = { message = "Planungsparameter aktualisiert.", level = Success } :: model.logs }
@@ -61,7 +63,7 @@ update msg model =
 
         StartPlanning isRanger ->
             if canPlan model then
-                ( { model | loading = True }
+                ( { model | loading = True, currentPath = Nothing }
                 , Ports.triggerPlanning 
                     (Decoders.encodePlanningData 
                         { start = model.pathStart
@@ -79,7 +81,7 @@ update msg model =
                 Ok path ->
                     ( { model | currentPath = Just path, loading = False }, Cmd.none )
                 Err _ ->
-                    ( { model | loading = False }, Cmd.none )
+                    ( { model | loading = False, currentPath = Nothing }, Cmd.none )
 
         ConfigReceived _ ->
             ( model, Cmd.none )

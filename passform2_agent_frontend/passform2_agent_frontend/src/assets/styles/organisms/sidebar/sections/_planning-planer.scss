@@ -1,0 +1,44 @@
+@use '../../../base/variables' as *;
+
+/* Hinweis: Die Basis-Styles von .planning-section und .btn-primary 
+   werden direkt über die Elm-Klassenliste vererbt. 
+*/
+
+.planning-planer-section {
+    // Hier können spezifische Overrides für die Sektion rein
+    @apply mb-2; 
+
+    .planer-coords-container {
+        @apply flex flex-col gap-1;
+        
+        .coord-display {
+            @apply border-white/10; 
+            
+            // Falls das Label im coord-display angepasst werden muss
+            label {
+                @apply text-white/40;
+            }
+
+            span.is-empty {
+                @apply text-danger/60 italic text-[0.7rem];
+            }
+            
+            span.is-set {
+                @apply text-success font-bold font-mono;
+            }
+        }
+    }
+
+    // Spezifische Ergänzungen für den Start-Button
+    .btn-start-optimization {
+        @apply shadow-lg transition-all duration-300;
+        
+        &:not(:disabled):hover {
+            @apply brightness-110 shadow-success/20;
+        }
+
+        &.loading {
+            @apply cursor-wait opacity-80;
+        }
+    }
+}

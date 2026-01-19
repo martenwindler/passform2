@@ -1,0 +1,25 @@
+@use '../../../base/variables' as *;
+
+.planning-weights-section {
+    // Falls hier noch ein @extend .planning-section steht, auch löschen!
+
+    .weights-grid {
+        // @extend .parameter-grid-row;  <-- DIESE ZEILE LÖSCHEN
+        
+        // Du kannst hier spezifische Anpassungen lassen, falls nötig:
+        .parameter-item {
+            label {
+                @apply text-white/30; 
+            }
+        }
+    }
+
+    .btn-apply-weights {
+        @apply w-full mt-2 py-2 border border-white/10 text-white/40 text-[0.65rem] 
+               uppercase font-bold transition-all rounded-industrial-sm;
+        
+        &:hover {
+            @apply bg-white/5 text-white border-white/20;
+        }
+    }
+}
