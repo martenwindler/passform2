@@ -1,0 +1,28 @@
+@use '../../../base/variables' as *;
+
+// --- HARDWARE STATUS TAB ---
+
+.status-grid {
+    // 2-spaltiges Grid mit 10px Abstand (2.5 * 4px) und 20px Abstand nach unten
+    @apply grid grid-cols-2 gap-2.5 mb-5;
+}
+
+.status-card {
+    // Hintergrund aus Config, konsistentes Padding und abgerundete Ecken
+    @apply bg-drawer-bg p-2.5 rounded-industrial-sm text-center
+           border border-white/5 transition-colors duration-200;
+    
+    // Kleiner Hover-Effekt für mehr Interaktivität
+    &:hover {
+        @apply border-white/10 bg-white/5;
+    }
+
+    label { 
+        @apply block text-[0.7rem] text-text-muted uppercase font-bold mb-1; 
+    }
+
+    // Falls Werte direkt in der Karte stehen (z.B. Temperatur)
+    .status-value {
+        @apply text-sm font-semibold text-white;
+    }
+}

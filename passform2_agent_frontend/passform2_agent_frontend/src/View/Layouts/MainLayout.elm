@@ -2,39 +2,24 @@ module View.Layouts.MainLayout exposing (view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Types exposing (..)
-import Types.Domain exposing (..)
-
--- Import der Organismen
 import View.Organisms.Navbar as Navbar
 import View.Organisms.Sidebar as Sidebar
 import View.Organisms.Modal as Modal
+import Types exposing (..)
 
--- Import der Moleküle
-import View.Molecules.HardwareStatus as HardwareStatus
-
-
-{-| Layout: Das Grundgerüst der Anwendung.
-Hier führen wir die modularisierten Views zusammen.
--}
 view : Model -> Html Msg -> Html Msg
-view model centralContent =
-    div [ class "app-layout" ]
-        [ -- 1. Navbar: Liefert Html AgentsMsg -> Muss gemappt werden
-          Html.map AgentsMsg (Navbar.view model)
+view model gridContent =
+    div [ class "app-layout flex flex-col h-screen w-screen overflow-hidden bg-bg-main" ]
+        [ -- NAVBAR (Immer oben, fixe Höhe)
+          Navbar.view model
         
-        , -- 2. Hauptbereich
-          div [ class "content-area" ]
-            [ -- Content: Kommt von Main.elm bereits als Html Msg
-              centralContent 
+        , -- CONTENT AREA (Das Grid-System)
+          div [ class "content-area" ] 
+            [ -- GRID VIEWPORT
+              div [ class "grid-viewport" ] 
+                [ gridContent ] 
             
-            , -- Sidebar: Liefert JETZT Html Msg (Mapping passiert intern in Sidebar.elm)
-              Sidebar.view model 
-            
-            , -- Alert: Liefert Html HardwareMsg -> Muss gemappt werden
-              Html.map HardwareMsg (HardwareStatus.viewAlertOverlay model.alert) 
+              -- SIDEBAR (Rail links, Drawer rechts)
+            , Sidebar.view model 
             ]
-        
-        , -- 3. Modals: Liefert JETZT Html Msg (Mapping passiert intern in Modal.elm)
-          Modal.viewActiveMenu model model.activeMenu 
         ]

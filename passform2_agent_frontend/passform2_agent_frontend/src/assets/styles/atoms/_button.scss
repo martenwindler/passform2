@@ -1,24 +1,30 @@
+// src/assets/styles/atoms/_button.scss
 @use "sass:color";
 @use '../base/variables' as *;
 
 .btn-primary {
-    background-color: $blue-active;
-    color: white;
-    padding: 10px 20px;
-    border-radius: 4px;
-    transition: all 0.2s;
+    // Tailwind ersetzt Padding, BG, Radius und Transition
+    @apply flex items-center justify-center px-5 py-2.5 rounded-industrial 
+           bg-brand-blue text-white transition-all duration-200 font-semibold;
 
     &:hover {
-        background-color: color.adjust($blue-active, $lightness: -10%);
-        transform: translateY(-1px);
+        @apply brightness-110 -translate-y-0.5 shadow-md;
     }
 
     &:active {
-        transform: translateY(0);
+        @apply translate-y-0 shadow-none;
     }
 
-    &.btn-small {
-        padding: 5px 10px;
-        font-size: 0.8rem;
+    &.btn-full {
+        @apply w-full;
+    }
+}
+
+.btn-danger {
+    @apply flex items-center justify-center px-5 py-2.5 rounded-industrial 
+           bg-danger/10 text-danger border border-danger/20 transition-all;
+
+    &:hover {
+        @apply bg-danger/20 border-danger/40;
     }
 }

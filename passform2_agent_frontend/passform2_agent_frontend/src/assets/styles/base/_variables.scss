@@ -1,58 +1,53 @@
-// --- 1. FARBPALETTE (Core Colors) ---
+// --- 1. LAYOUT DIMENSIONS ---
+$nav-height: 60px;
+$rail-width: 60px;
+$drawer-width: 320px;
 
-// Hintergründe & Oberflächen
-$bg-dark:            #1a202c; 
-$color-bg-main:      #1a202c; // Sidebar-Container
-$color-nav-bg:       #1a365d; // Navbar & Modals
-$color-rail-bg:      #171923; // Icon-Leiste
-$color-drawer-bg:    #2d3748; // Sidebar Content
-$color-surface-white: #ffffff; // Hardware-Pillen
+// --- 2. COLORS (Brand & UI States) ---
+$color-info:    #3182ce; // Brand Blue
+$color-success: #48bb78;
+$color-warning: #ecc94b;
+$color-danger:  #f56565;
 
-// Akzentfarben (Aktionen)
-$color-brand-blue:   #3182ce;
-$blue-active:        #3182ce; // Alias für Buttons
+// Backgrounds
+$bg-dark:       #0a0b10; // Tiefstes Schwarz/Blau
+$color-bg-main: #0f111a;
+$color-rail-bg: #141622;
+$color-drawer-bg: #1a1d2c;
+$color-nav-bg:  #141622;
 
-// Status-Farben (Semantik)
-$color-success:      #48bb78;
-$color-danger:       #f56565;
-$color-warning:      #ecc94b;
-$color-info:         #63b3ed;
+// Text Colors
+$text-main:     #ffffff;
+$text-muted:    #a0aec0;
+$text-dark:     #1a202c;
 
-// Text-Farben
-$text-main:          #e2e8f0;
-$text-muted:         #a0aec0;
-$text-dark:          #1a202c;
-$text-gray:          #a0aec0; // Für Badge-Default
+// --- 3. SPACING SYSTEM (8px Grid) ---
+$space-xs: 4px;
+$space-sm: 8px;
+$space-md: 16px;
+$space-lg: 24px;
+$space-xl: 32px;
 
+// --- 4. BORDERS & RADIUS ---
+$border-radius-sm: 4px;
+$border-radius-md: 8px;
+$border-color: rgba(255, 255, 255, 0.05);
 
-// --- 2. ABSTÄNDE (Spacing System) ---
-// Wichtig: Deine Organismen nutzen diese Werte intensiv!
+// --- 5. ANIMATION CONSTANTS ---
+$transition-speed: 0.3s;
+$transition-curve: cubic-bezier(0.4, 0, 0.2, 1);
 
-$space-xs:           4px;
-$space-sm:           8px;
-$space-md:           16px;
-$space-lg:           24px;
-$space-xl:           32px;
+// --- 6. Z-INDEX SYSTEM ---
+$z-index-nav: 1000;
+$z-index-sidebar: 1500;
+$z-index-modal: 2000;
 
-
-// --- 3. LAYOUT-MAẞE ---
-
-$nav-height:         60px;
-$rail-width:         60px;
-$drawer-width:       320px;
-$border-radius:      8px;
-$border-radius-sm:   4px;
-
-
-// --- 4. SCHATTEN (Depth) ---
-
-$shadow-sm:          0 1px 3px rgba(0,0,0,0.12);
-$shadow-md:          0 4px 6px rgba(0,0,0,0.3);
-$shadow-lg:          0 10px 15px rgba(0,0,0,0.4);
-$shadow-glow-blue:   0 0 10px rgba(49, 130, 206, 0.4);
-
-
-// --- 5. ANIMATIONEN ---
-
-$transition-speed:   0.2s;
-$transition-curve:   cubic-bezier(0.4, 0, 0.2, 1);
+// --- 7. CSS CUSTOM PROPERTIES (:root) ---
+// Ermöglicht Zugriff via JavaScript oder CSS-Variablen im Browser
+:root {
+    --color-info: #{$color-info};
+    --nav-height: #{$nav-height};
+    --rail-width: #{$rail-width};
+    --drawer-width: #{$drawer-width};
+    --transition-speed: #{$transition-speed};
+}

@@ -1,88 +1,50 @@
 @use '../base/variables' as *;
 
-// --- HARDWARE PILL (Optimiert für Dark-UI / Modal) ---
+// --- HARDWARE PILL ---
 .hardware-pill {
-    // Hintergrund auf transparentes Dunkel geändert für den "Glassmorphism"-Look
-    background-color: rgba(255, 255, 255, 0.05); 
-    padding: $space-sm;
-    border-radius: 12px; // Etwas kantiger für den industriellen Look
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    // Subtiler Rahmen statt Schatten für bessere Definition auf dunklem Grund
-    border: 1px solid rgba(255, 255, 255, 0.1); 
-    box-shadow: none; 
-    min-width: 100px;
-    text-align: center;
+    // Basis-Layout & Glassmorphism
+    @apply flex flex-col items-center justify-center min-w-[100px] p-sm 
+           bg-white/5 border border-white/10 rounded-xl text-center shadow-none;
 
     .pill-label {
-        font-size: 0.6rem;
-        text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.5); // Dezentes Weiß für das Label
-        font-weight: 800;
-        letter-spacing: 0.8px;
-        margin-bottom: 4px;
+        @apply text-[0.6rem] uppercase font-extrabold tracking-[0.8px] 
+               text-white/50 mb-1;
     }
 
     .pill-content {
-        display: flex;
-        align-items: center;
-        gap: $space-sm;
+        @apply flex items-center gap-sm;
     }
 
     .pill-text {
-        font-size: 0.85rem;
-        font-weight: 700;
-        color: white; // Text jetzt in Reinweiß für maximalen Kontrast
-        white-space: nowrap;
+        @apply text-[0.85rem] font-bold text-white whitespace-nowrap;
     }
 }
 
-// --- SIGNALSTÄRKE (Voll-Weiß Kontrast) ---
+// --- SIGNALSTÄRKE ---
 .signal-wrapper {
-    display: flex;
-    align-items: center;
-    gap: $space-md;
-    // Hintergrund etwas deutlicher vom Modal abheben
-    background: rgba(0, 0, 0, 0.3); 
-    padding: $space-sm $space-lg;
-    border-radius: $border-radius;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    margin: $space-md 0;
+    @apply flex items-center gap-md bg-black/30 py-sm px-lg 
+           rounded-industrial border border-white/5 my-md;
 
     .signal-label-main {
-        font-size: 0.75rem;
-        color: white; // Beschriftung "Signal" jetzt weiß
-        text-transform: uppercase;
-        font-weight: 700;
-        opacity: 0.8;
+        @apply text-[0.75rem] text-white uppercase font-bold opacity-80;
     }
 
     .signal-bar-container {
-        flex: 1;
-        height: 6px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 3px;
-        overflow: hidden;
+        @apply flex-1 h-[6px] bg-white/10 rounded-[3px] overflow-hidden;
     }
 
     .signal-bar-fill {
-        height: 100%;
-        transition: width 0.5s $transition-curve, background-color 0.3s ease;
+        @apply h-full transition-all duration-500 ease-industrial;
         
-        // Farben bleiben semantisch erhalten, leuchten aber auf dunklem Grund mehr
-        &.signal-strong { background-color: $color-success; }
-        &.signal-fair   { background-color: $color-warning; }
-        &.signal-weak   { background-color: $color-danger; }
-        &.signal-none   { background-color: rgba(255, 255, 255, 0.2); }
+        // Semantische Farben aus deiner Config
+        &.signal-strong { @apply bg-success; }
+        &.signal-fair   { @apply bg-warning; }
+        &.signal-weak   { @apply bg-danger; }
+        &.signal-none   { @apply bg-white/20; }
     }
 
     .signal-value {
-        font-family: 'Cascadia Code', monospace;
-        font-size: 0.85rem;
-        color: white; // Prozentwert jetzt weiß
-        font-weight: 600;
-        min-width: 40px;
+        @apply text-[0.85rem] font-bold text-white min-w-[40px];
+        font-family: 'Cascadia Code', monospace; // Spezielle Fonts bleiben im SASS
     }
 }

@@ -3,7 +3,6 @@ module Main exposing (main)
 import Browser
 import Decoders
 import Dict exposing (Dict)
--- ODER (entsprechend deiner Pfadangabe):
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Json.Decode as Decode
@@ -12,12 +11,12 @@ import Ports
 import Types exposing (..)
 import Types.Domain exposing (..)
 
--- LOGIK-IMPORTE
+-- LOGIK-IMPORTE (Dispatcher-Zielmodule)
 import Update.Planning as Planning
 import Update.Hardware as Hardware
 import Update.Agents as Agents
 
--- VIEW-IMPORTE
+-- VIEW-IMPORTE (Das neue Layout-System)
 import View.Layouts.MainLayout as MainLayout
 
 
@@ -55,7 +54,7 @@ init flags =
       , agents = initialAgents
       , savedDefault = initialAgents
       , connectedHardware = []
-      , logs = [ { message = "System bereit. ", level = Success } ] 
+      , logs = [ { message = "System bereit.", level = Success } ] 
       , pathStart = Nothing
       , pathGoal = Nothing
       , currentPath = Nothing
@@ -97,13 +96,14 @@ update msg model =
             Hardware.update hMsg model
 
         AgentsMsg aMsg ->
+            -- Hier wird die neue Update-Logik in das Untermodul delegiert
             Agents.update aMsg model
 
         NoOp ->
             ( model, Cmd.none )
 
 
--- --- SUBSCRIPTIONS (Gemappt auf Domänen) ---
+-- --- SUBSCRIPTIONS ---
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -113,7 +113,6 @@ subscriptions model =
         , Ports.activeAgentsReceiver (UpdateAgents >> AgentsMsg)
         , Ports.pathCompleteReceiver (PlanningResultRaw >> PlanningMsg)
         , Ports.configReceived (ConfigReceived >> PlanningMsg)
-        -- Decodierung erfolgt sicher in der Subscription-Schleife
         , Ports.systemLogReceiver (\val -> HardwareMsg (HandleSystemLog (Decode.decodeValue Decoders.decodeSystemLog val)))
         , Ports.rfidReceiver (\val -> HardwareMsg (HandleRfid (Decode.decodeValue Decoders.decodeRfid val)))
         , Ports.nfcStatusReceiver (\val -> HardwareMsg (HandleNfcStatus (Decode.decodeValue Decode.string val)))
@@ -125,10 +124,12 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
+    -- Das MainLayout nimmt das Model (für Sidebar/Navbar) 
+    -- und den Hauptinhalt (view3D) entgegen.
     MainLayout.view model (view3D model)
 
 
--- --- HELPER VIEW (3D INTERFACE) ---
+-- --- HELPER VIEW (3D Scene Interop) ---
 
 view3D : Model -> Html Msg
 view3D model =
@@ -138,6 +139,7 @@ view3D model =
                 Simulation -> "true"
                 Hardware -> "false"
     in
+    -- Web Component Interop (Three.js Scene)
     node "three-grid-scene"
         [ attribute "agents" (model.agents |> Decoders.encodeAgentMap |> Encode.encode 0)
         , attribute "path" (Decoders.encodePath model.currentPath |> Encode.encode 0)
@@ -147,7 +149,7 @@ view3D model =
         , attribute "allow-interaction" allowInteraction 
         , attribute "start-pos" (model.pathStart |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
         , attribute "goal-pos" (model.pathGoal |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
-        -- Ports rufen nun Funktionen auf, die Nachrichten generieren
+        -- Events von der 3D Szene
         , Ports.onAgentMoved (MoveAgent >> AgentsMsg)
         , Ports.onCellClicked (HandleGridClick >> AgentsMsg) 
         ]

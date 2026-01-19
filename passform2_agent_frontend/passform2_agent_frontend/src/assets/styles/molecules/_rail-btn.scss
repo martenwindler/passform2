@@ -1,70 +1,50 @@
 @use '../base/variables' as *;
 
 // --- RAIL BUTTON MOLECULE ---
-// Das Icon-Molekül für die vertikale Sidebar-Navigation
 
 .rail-btn {
-    position: relative;
-    width: 44px; // Exaktes Quadrat
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border-radius: $border-radius;
-    color: $text-muted;
-    transition: all $transition-speed $transition-curve;
-    cursor: pointer;
+    // Basis-Styling: 44px Quadrat, Zentrierung, Transition
+    @apply relative w-11 h-11 flex items-center justify-center bg-transparent
+           rounded-industrial text-text-muted cursor-pointer
+           transition-all duration-200 ease-industrial;
 
     // Das Icon/Emoji im Inneren
     .rail-icon {
-        font-size: 1.4rem;
-        line-height: 1;
-        transition: transform $transition-speed;
+        @apply text-[1.4rem] leading-none transition-transform duration-200;
     }
 
-    // HOVER: Leichtes Aufhellen und dezentes Wachsen
+    // HOVER: Leichtes Aufhellen und dezentes Wachsen des Icons
     &:hover {
-        color: white;
-        background: rgba(255, 255, 255, 0.05);
+        @apply text-white bg-white/5;
         
         .rail-icon {
-            transform: scale(1.1);
+            @apply scale-110;
         }
     }
 
-    // ACTIVE: Das Photoshop-Highlight (Blaues Glühen)
+    // ACTIVE: Das Highlight mit deinem Custom-Shadow aus der Config
     &.active {
-        background: $color-brand-blue;
-        color: white;
-        box-shadow: $shadow-glow-blue;
+        @apply bg-brand-blue text-white shadow-glow-blue;
 
-        // Kleiner optischer Indikator links (optionaler Extra-Style)
+        // Optischer Indikator links (Positionierung relativ zur Rail)
         &::before {
             content: '';
-            position: absolute;
-            left: -12px; // Schiebt ihn an den Rand der Rail
-            width: 3px;
-            height: 20px;
-            background: white;
-            border-radius: 0 2px 2px 0;
+            @apply absolute -left-3 w-[3px] h-5 bg-white rounded-r-industrial-sm;
+            // -left-3 entspricht exakt deinen -12px
         }
     }
 
     // Spezielle Variante für den Toggle-Button (Ganz unten)
     &.toggle-btn {
-        margin-top: auto;
-        color: $color-brand-blue;
-        font-weight: bold;
-        border: 1px solid rgba($color-brand-blue, 0.2);
+        @apply mt-auto text-brand-blue font-bold border border-brand-blue/20;
 
         &:hover {
-            background: rgba($color-brand-blue, 0.1);
+            @apply bg-brand-blue/10;
         }
     }
 }
 
 // Hilfs-Klasse für den vertikalen Abstandhalter
 .rail-spacer {
-    flex-grow: 1;
+    @apply flex-grow;
 }

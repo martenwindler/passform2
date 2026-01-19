@@ -4,52 +4,32 @@
 // Kombiniert .status-dot (Atom) mit Label-Text
 
 .status-pill {
-    display: inline-flex;
-    align-items: center; // Zentriert alles vertikal auf einer Linie
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.2);
-    padding: $space-xs $space-md;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    gap: $space-sm;
-    transition: all $transition-speed $transition-curve;
-    
-    // Verhindert, dass die Pille durch unterschiedliche Textlängen hüpft
-    min-height: 32px; 
+    // Basis-Styling: Flex-Layout, Glass-Background, Abgerundet
+    @apply inline-flex items-center justify-center bg-black/20 
+           px-md py-xs rounded-full border border-white/10 gap-sm 
+           transition-all duration-200 ease-industrial min-h-[32px];
 
     &.combined-status {
-        gap: $space-sm; // Etwas engerer Gap, da der Divider den Raum füllt
-        padding: 4px 16px;
+        // Etwas engerer Gap für die Multi-Status-Anzeige in der Navbar
+        @apply gap-sm px-4 py-1; 
     }
 
     &:hover {
-        background: rgba(0, 0, 0, 0.3);
-        border-color: rgba($color-info, 0.4);
+        @apply bg-black/30 border-info/40;
     }
 }
 
 // --- INDICATOR GROUP ---
 .indicator-group {
-    display: flex;
-    align-items: center; // Wichtig: Auch hier den Punkt und Text zentrieren
-    gap: 6px;
-    line-height: 1; // Verhindert, dass Zeilenabstände die Höhe verzerren
+    @apply flex items-center gap-[6px] leading-none;
 
     .indicator-label {
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: $text-main;
-        white-space: nowrap;
+        @apply text-[0.85rem] font-medium text-text-main whitespace-nowrap;
     }
 }
 
-// --- DIVIDER (Der Fix) ---
+// --- DIVIDER (Vertikale Trennlinie) ---
 .status-divider {
-    width: 1px;
-    height: 14px; // Feste Höhe für die Linie
-    background-color: rgba(255, 255, 255, 0.2);
-    display: block; // Block oder Inline-Block
-    margin: 0 $space-xs; // Gleichmäßiger Abstand links und rechts
-    flex-shrink: 0; // Verhindert, dass der Strich gestaucht wird
-    align-self: center; // Erzwingt die Zentrierung im Flex-Container
+    // Präzise Maße über Tailwind JIT-Klassen
+    @apply w-[1px] h-[14px] bg-white/20 block mx-xs shrink-0 self-center;
 }

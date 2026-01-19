@@ -1,40 +1,86 @@
-// src/assets/styles/main.scss
-
-// 1. Variablen global verfügbar machen
-@forward 'base/variables';
-
-// 2. Basis-Styles (Nutzen die Variablen)
+// 1. ZUERST: Alle SASS-Dateien laden (Absolut oben!)
 @use 'base/variables' as *;
 @use 'base/reset';
-@use 'base/mixins';
 
-// 3. Atome
+// Atome
 @use 'atoms/button';
 @use 'atoms/badge';
 @use 'atoms/input';
 
-// 4. Moleküle
+// Moleküle
 @use 'molecules/hardware-status';
 @use 'molecules/rail-btn';
 @use 'molecules/status-pill';
 
-// 5. Organismen
+// Organismen
 @use 'organisms/navbar';
 @use 'organisms/sidebar';
 @use 'organisms/modal';
 
-// Globales App-Layout
+// Sidebar-Tabs
+@use 'organisms/sidebar/tabs/logs';
+@use 'organisms/sidebar/tabs/planning';
+@use 'organisms/sidebar/tabs/agents';
+@use 'organisms/sidebar/tabs/hardware';
+
+// 2. DANACH: Tailwind Schichten injizieren
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+// 3. ZULETZT: Deine globalen Layout-Klassen
+// Letzte Instanz: Alles innerhalb der App ist standardmäßig weiß
 .app-layout {
+    @apply text-white;
+    color: white !important;
+}
+
+// Sicherstellen, dass die Sidebar keine schwarzen Texte erlaubt
+.sidebar-container {
+    @apply text-white;
+    color: white !important;
+}
+
+.main-layout-wrapper {
     display: flex;
-    flex-direction: column;
-    height: 100vh;
+    overflow-x: hidden; // Absolut kritisch für den Slide-Effekt!
     width: 100vw;
-    background-color: $bg-dark;
+    height: 100vh;
+}
+
+.app-wrapper {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+
+    // Der Hauptbereich (Karte, Gitter, etc.)
+    .main-content {
+        flex: 1;
+        height: 100%;
+        transition: margin-right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: margin-right;
+
+        // Standardmäßig ist nur die Rail sichtbar
+        margin-right: $rail-width;
+
+        // Wenn die Sidebar offen ist, schrumpft der Bereich
+        // Wir nutzen hier eine Klasse, die am besten am gemeinsamen Parent hängt
+        .sidebar-open & {
+            margin-right: calc(#{$drawer-width} + #{$rail-width});
+        }
+    }
 }
 
 .content-area {
-    display: flex;
-    flex-direction: row;
+    display: grid;
+    // Das Gitter nimmt den Rest (1fr), die Sidebar nimmt nur was sie braucht (auto)
+    grid-template-columns: 1fr auto;
     flex: 1;
     overflow: hidden;
+}
+
+.grid-viewport {
+    @apply h-full w-full relative overflow-hidden;
+    min-width: 0; // Erlaubt das Schrumpfen im Grid
 }

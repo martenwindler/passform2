@@ -1,74 +1,44 @@
 @use '../base/variables' as *;
 
 // --- STATUS DOTS ---
-// Die kleinen runden Indikatoren
-
 .status-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    display: inline-block;
-    transition: background-color $transition-speed, box-shadow $transition-speed;
+    // Basis-Styling (Size, Shape, Transition)
+    @apply w-2.5 h-2.5 rounded-full inline-block transition-all duration-300;
 
-    // Varianten basierend auf dem System-Status
     &.online, &.success {
-        background-color: $color-success;
-        box-shadow: 0 0 8px rgba($color-success, 0.6);
+        @apply bg-success shadow-[0_0_8px_rgba(72,187,120,0.6)];
     }
 
     &.missing, &.danger {
-        background-color: $color-danger;
-        box-shadow: 0 0 8px rgba($color-danger, 0.6);
-        animation: pulse-red 2s infinite; // Aufmerksamkeit bei Fehlern
+        // Hier nutzen wir die in der tailwind.config definierte Animation
+        @apply bg-danger shadow-[0_0_8px_rgba(245,101,101,0.6)] animate-pulse-fast;
     }
 
     &.warning {
-        background-color: $color-warning;
-        box-shadow: 0 0 8px rgba($color-warning, 0.6);
+        @apply bg-warning shadow-[0_0_8px_rgba(236,201,75,0.6)];
     }
 
     &.info {
-        background-color: $color-info;
-        box-shadow: 0 0 8px rgba($color-info, 0.6);
+        @apply bg-info shadow-[0_0_8px_rgba(99,179,237,0.6)];
     }
 
     &.unknown {
-        background-color: $text-gray;
-        box-shadow: none;
+        @apply bg-muted shadow-none;
     }
 }
 
 // --- BADGES ---
-// Text-Labels mit Hintergrund (z.B. "Mobil", "Navigation")
 .badge {
-    padding: 2px 8px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-radius: 12px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
+    // Basis-Typografie und Padding
+    @apply px-2 py-0.5 text-[0.7rem] font-bold uppercase tracking-wider 
+           rounded-full inline-flex items-center justify-center whitespace-nowrap;
 
     &.dynamic {
-        background: rgba($color-brand-blue, 0.2);
-        color: $color-brand-blue;
-        border: 1px solid rgba($color-brand-blue, 0.3);
+        // Tailwind /20 erzeugt automatisch die rgba-Farbe aus deinem Brand-Blau
+        @apply bg-brand-blue/20 text-brand-blue border border-brand-blue/30;
     }
 
     &.static {
-        background: rgba($text-gray, 0.1);
-        color: $text-gray;
-        border: 1px solid rgba($text-gray, 0.2);
+        @apply bg-muted/10 text-muted border border-muted/20;
     }
-}
-
-// --- ANIMATIONEN ---
-
-@keyframes pulse-red {
-    0% { box-shadow: 0 0 0 0 rgba($color-danger, 0.7); }
-    70% { box-shadow: 0 0 0 10px rgba($color-danger, 0); }
-    100% { box-shadow: 0 0 0 0 rgba($color-danger, 0); }
 }

@@ -3,7 +3,6 @@ module Update.Hardware exposing (update)
 import Types exposing (..)
 import Types.Domain exposing (..)
 import Ports
-import Json.Decode as Decode
 import Json.Encode as Encode
 
 {-| 
@@ -25,7 +24,7 @@ update msg model =
         HandleSystemLog result ->
             case result of
                 Ok logEntry ->
-                    -- Behält die Logik: Maximal 30 Einträge speichern
+                    -- Maximal 30 Einträge speichern
                     ( { model | logs = List.take 30 (logEntry :: model.logs), waitingForNfc = False }
                     , Cmd.none 
                     )
@@ -45,7 +44,7 @@ update msg model =
                 Err _ -> 
                     ( model, Cmd.none )
 
-        -- --- NEU: RANGER SPEZIFISCH ---
+        -- --- RANGER SPEZIFISCH ---
         HandleRangerBattery voltage ->
             ( { model | rangerBattery = Just voltage }, Cmd.none )
 

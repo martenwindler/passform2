@@ -1,129 +1,98 @@
 @use '../base/variables' as *;
 
 // --- NAVBAR ORGANISM ---
-// Die globale Kopfzeile mit integrierten Status-Molekülen
 
 .navbar.blue-look {
-    height: $nav-height;
-    background-color: $color-nav-bg;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 $space-lg;
-    box-shadow: $shadow-md;
-    z-index: 1000; 
-    position: relative;
+    // Grundgerüst
+    @apply h-nav bg-nav-bg text-white flex items-center justify-between 
+           px-lg shadow-md z-[1000] relative;
 
     // 1. Linke Sektion (Logo & Titel)
     .navbar-section {
-        display: flex;
-        align-items: center;
-        gap: $space-md;
-        z-index: 10;
+        @apply flex items-center gap-md z-10;
 
         .navbar-logo {
-            height: 35px;
-            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.2));
+            // Verstärkter Glow für das Logo
+            @apply h-[35px] drop-shadow-[0_0_8px_rgba(255,255,255,0.4)];
         }
 
         .navbar-title {
-            font-weight: 600;
-            font-size: 1.1rem;
-            letter-spacing: 0.5px;
-            color: $text-main;
+            // Weißer Text mit leichtem Glow-Effekt
+            @apply font-semibold text-[1.1rem] tracking-[0.5px] text-white;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
         }
     }
 
-    // 2. Mittlere Sektion (Zentrierte Status-Pille)
+    // 2. Mittlere Sektion (Status-Pille)
     .navbar-center {
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        pointer-events: auto;
+        @apply absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2;
+        // Klicks gehen durch den Container durch, außer auf die Pille selbst
+        pointer-events: none; 
 
-        // --- STATUS PILL MOLECULE ---
         .status-pill.combined-status {
-            display: inline-flex;
-            align-items: center;
-            background: rgba(0, 0, 0, 0.2);
-            padding: 6px 18px;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            gap: $space-md;
-            box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.2);
+            @apply inline-flex items-center bg-black/40 py-1.5 px-5 
+                   rounded-full border border-white/10 gap-4 shadow-inner;
+            pointer-events: auto;
 
             .indicator-group {
-                display: flex;
-                align-items: center;
-                gap: 8px;
+                @apply flex items-center gap-2.5;
 
                 .indicator-label {
-                    font-size: 0.75rem;
-                    font-weight: 700;
-                    color: $text-main;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
+                    // Hochwertiges, fettes Label
+                    @apply text-[0.7rem] font-extrabold text-white/90 uppercase tracking-wider;
                 }
             }
 
             .status-dot-small {
-                width: 8px;
-                height: 8px;
-                border-radius: 50%;
+                @apply w-2.5 h-2.5 rounded-full block shrink-0;
                 
-                // Semantische Zustände (Gesteuert durch Elm-Klassen)
+                // Wir nutzen hier die spezifischen Tailwind-Klassen
                 &.online {
-                    background-color: $color-success;
-                    box-shadow: 0 0 8px rgba($color-success, 0.4);
+                    background-color: #48bb78; // Fallback für SASS
+                    @apply bg-success;
+                    box-shadow: 0 0 12px rgba(72, 187, 120, 0.9);
                 }
+
                 &.offline {
-                    background-color: $color-danger;
-                    box-shadow: 0 0 8px rgba($color-danger, 0.4);
+                    background-color: #f56565; // Fallback
+                    @apply bg-danger;
+                    box-shadow: 0 0 12px rgba(245, 101, 101, 0.9);
                 }
+
                 &.warning {
-                    background-color: $color-warning;
-                    box-shadow: 0 0 8px rgba($color-warning, 0.4);
+                    background-color: #ecc94b; // Fallback
+                    @apply bg-warning;
+                    box-shadow: 0 0 12px rgba(236, 201, 75, 0.9);
                 }
             }
 
-            // Der saubere CSS Trennstrich
+            .indicator-group {
+                // Wir erzwingen Flexbox, damit der Punkt und der Text nebeneinander Platz haben
+                @apply flex items-center gap-2;
+            }
+
+            // Sichtbarer Trenner
             .status-divider {
-                width: 1px;
-                height: 12px;
-                background-color: rgba(255, 255, 255, 0.15);
+                @apply w-[1px] h-3 bg-white/20 block;
             }
         }
     }
 
     // 3. Rechte Sektion (Actions)
     .navbar-actions {
-        display: flex;
-        align-items: center;
-        gap: $space-md;
-        z-index: 10;
+        @apply flex items-center gap-md z-10;
 
         .btn-mode-switch, .btn-view-toggle {
-            background: rgba(255, 255, 255, 0.05);
-            color: $text-main;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            transition: all $transition-speed;
-            cursor: pointer;
+            @apply bg-white/5 text-white/80 border border-white/10 
+                   py-1.5 px-4 rounded-full text-[0.75rem] font-bold uppercase
+                   transition-all duration-200 cursor-pointer tracking-wide;
 
             &:hover {
-                background: rgba(255, 255, 255, 0.12);
-                border-color: $color-info;
-                color: white;
-                transform: translateY(-1px);
+                @apply bg-white/10 border-info/50 text-white -translate-y-px shadow-sm;
             }
 
             &:active {
-                transform: translateY(0);
+                @apply translate-y-0 opacity-70;
             }
         }
     }

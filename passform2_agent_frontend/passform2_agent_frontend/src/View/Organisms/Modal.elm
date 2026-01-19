@@ -1,102 +1,87 @@
-module View.Organisms.Modal exposing (viewActiveMenu)
+module View.Organisms.Modal exposing (view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
-import Json.Decode as Decode
 import Types exposing (..)
 import Types.Domain exposing (..)
-import View.Molecules.HardwareStatus exposing (viewStatusBadge, viewSignalStrength)
-import View.Organisms.Sidebar as Sidebar
+import View.Atoms.Button as Button
+import View.Molecules.FormGroup as FormGroup
+import View.Molecules.HardwareStatus as StatusDisplay
 
-
-{-| Organismus: Das aktive Modal / Menü.
-Gibt Html Msg zurück und mappt alle internen Nachrichten explizit.
--}
-viewActiveMenu : Model -> Maybe MenuType -> Html Msg
-viewActiveMenu model maybeMenu =
-    case maybeMenu of
-        Just (SelectionMenu cell) ->
-            -- Wir mappen das onClick-Event direkt auf die globale Msg
-            div [ class "modal-overlay", onClick (AgentsMsg CloseMenu) ]
-                [ div [ class "modal-content", stopPropagationOnClick ]
-                    [ h3 [] [ text "Modul hinzufügen" ]
-                    , button [ onClick (AgentsMsg (StartAgent FTF cell)), class "btn-ftf" ] [ text "FTF (Transport)" ]
-                    , button [ onClick (AgentsMsg (StartAgent Conveyeur cell)) ] [ text "Conveyeur Modul" ]
-                    , button [ onClick (AgentsMsg (StartAgent RollenModul cell)) ] [ text "Rollen Modul" ]
-                    , button [ onClick (AgentsMsg (StartAgent Greifer cell)) ] [ text "Greifer Modul" ]
-                    , button [ onClick (AgentsMsg (StartAgent Station cell)) ] [ text "Tisch Modul" ]
-                    , button [ onClick (AgentsMsg (StartAgent Mensch cell)) ] [ text "Mensch (Bediener)" ]
-                    , hr [] []
-                    , button [ onClick (AgentsMsg CloseMenu), class "btn-close" ] [ text "Abbrechen" ]
-                    ]
-                ]
-
-        Just (SettingsMenu cell agent) ->
-            let
-                aid = Maybe.withDefault "---" agent.agent_id
-                
-                ( nfcStat, nfcText ) = case model.nfcStatus of
-                    Online -> ( "online", "Bereit" )
-                    Error -> ( "error", "Fehler" )
-                    _ -> ( "unknown", "Warten..." )
-
-                ( piStat, piText ) = ( "online", "Verbunden" )
-                
-                agentIsActive = agent.signal_strength > 0
-                mappedSignalStrength = agent.signal_strength
-            in
-            -- Auch hier: Das Overlay-Event wird auf die globale Msg gemappt
-            div [ class "modal-overlay", onClick (AgentsMsg CloseMenu) ]
-                [ div [ class "modal-content settings-modal", stopPropagationOnClick ]
-                    [ h3 [] [ text (Sidebar.formatType agent.module_type) ]
-                    , div [ class "agent-id-badge" ] [ text ("ID: " ++ aid) ]
-
-                    , -- Hardware Sektion (Mappt auf HardwareMsg)
-                      Html.map HardwareMsg <|
-                        div []
-                            [ div [ class "hardware-status-row" ]
-                                [ viewStatusBadge "NFC Sensor" nfcStat nfcText
-                                , viewStatusBadge "Node" piStat piText
-                                ]
-                            , viewSignalStrength agentIsActive mappedSignalStrength
-                            , hr [] []
-                            , button
-                                [ onClick (RequestNfcWrite aid)
-                                , class "btn-nfc-write"
-                                , disabled model.waitingForNfc
-                                ]
-                                [ text (if model.waitingForNfc then "Schreibe..." else "ID auf Chip brennen") ]
-                            ]
-
-                    , hr [] []
-
-                    , -- Planungs Sektion (Mappt auf PlanningMsg)
-                      Html.map PlanningMsg <|
-                        div [ class "modal-action-row" ]
-                            [ button [ onClick (SetPathStart cell), class "btn-path-start" ] [ text "Start" ]
-                            , button [ onClick (SetPathGoal cell), class "btn-path-goal" ] [ text "Ziel" ]
-                            ]
-
-                    , hr [] []
-
-                    , -- Agenten Sektion (Mappt auf AgentsMsg)
-                      Html.map AgentsMsg <|
-                        div [ class "modal-action-row column" ]
-                            [ button [ onClick (RotateAgent cell), class "btn-rotate" ] [ text "Drehen" ]
-                            , button [ onClick (RemoveAgent cell), class "btn-delete" ] [ text "Löschen" ]
-                            , button [ onClick CloseMenu, class "btn-close" ] [ text "Schließen" ]
-                            ]
-                    ]
-                ]
-
+{-| Haupt-View des Modals - Alle Buttons nutzen jetzt 'btn-full' -}
+view : Model -> Html Msg
+view model =
+    case model.activeMenu of
         Nothing ->
             text ""
 
+        Just menuType ->
+            div [ class "modal-overlay" ]
+                [ div [ class "modal-content" ]
+                    [ viewHeader menuType
+                    , viewBody model menuType
+                    , viewFooter
+                    ]
+                ]
 
--- --- HELPER ---
+viewHeader : MenuType -> Html Msg
+viewHeader menuType =
+    h3 [] 
+        [ text <|
+            case menuType of
+                SelectionMenu _ -> "Modul-Typ wählen"
+                SettingsMenu _ _ -> "Agenten konfigurieren"
+        ]
 
-{-| Korrigierte Typ-Annotation: Muss Attribute Msg sein, da NoOp eine globale Msg ist. -}
-stopPropagationOnClick : Attribute Msg
-stopPropagationOnClick =
-    Html.Events.stopPropagationOn "click" (Decode.succeed ( NoOp, True ))
+viewBody : Model -> MenuType -> Html Msg
+viewBody model menuType =
+    case menuType of
+        SelectionMenu pos ->
+            -- Liste aller 7 Agententypen untereinander
+            div [ class "settings-form" ]
+                [ button [ class "btn-ftf btn-full", onClick (AgentsMsg (StartAgent FTF pos)) ] [ text "FTF Transport" ]
+                , button [ class "btn-path-goal btn-full", onClick (AgentsMsg (StartAgent Conveyeur pos)) ] [ text "Förderer" ]
+                , button [ class "btn-secondary btn-full", onClick (AgentsMsg (StartAgent RollenModul pos)) ] [ text "Rollenmodul" ]
+                , button [ class "btn-secondary btn-full", onClick (AgentsMsg (StartAgent Mensch pos)) ] [ text "Mensch (Interaktion)" ]
+                , button [ class "btn-secondary btn-full", onClick (AgentsMsg (StartAgent Greifer pos)) ] [ text "Greifer-Einheit" ]
+                , button [ class "btn-path-start btn-full", onClick (AgentsMsg (StartAgent Station pos)) ] [ text "Station" ]
+                , button [ class "btn-secondary btn-full", onClick (AgentsMsg (StartAgent (UnknownModule "Scanner") pos)) ] [ text "Scanner / Sonstige" ]
+                ]
+
+        SettingsMenu pos agent ->
+            div [ class "settings-form" ]
+                [ div [ class "agent-id-badge" ] [ text (Maybe.withDefault "Keine ID" agent.agent_id) ]
+                
+                , FormGroup.textField "ID ändern" (Maybe.withDefault "" agent.agent_id) "A-01" 
+                    (\val -> AgentsMsg (UpdateAgent pos { agent | agent_id = Just val }))
+
+                , div [ class "hardware-status-row" ]
+                    [ div [ class "hardware-pill" ] 
+                        [ div [ class "status-dot online" ] []
+                        , span [ class "status-text" ] [ text "Verbunden" ] 
+                        ]
+                    , div [ class "hardware-pill" ] 
+                        [ span [ class "signal-value" ] [ text (String.fromInt agent.signal_strength ++ "%") ]
+                        ]
+                    ]
+                
+                -- NFC Button (Full Width)
+                , button 
+                    [ class "btn-nfc-write btn-full"
+                    , disabled model.waitingForNfc
+                    , onClick (HardwareMsg (RequestNfcWrite (Maybe.withDefault "" agent.agent_id))) 
+                    ] 
+                    [ text (if model.waitingForNfc then "Schreibe..." else "NFC ID Schreiben") ]
+                
+                , if model.waitingForNfc then 
+                    div [ class "last-written-info" ] [ text "NFC Kontakt halten..." ]
+                  else text ""
+
+                -- Löschen Button (Full Width) nutzt das danger-Atom mit isFullWidth=True
+                , Button.danger "Agent Löschen" (AgentsMsg (RemoveAgent pos)) True True
+                ]
+
+viewFooter : Html Msg
+viewFooter =
+    button [ class "btn-close btn-full", onClick (AgentsMsg CloseMenu) ] [ text "Schließen" ]

@@ -2,7 +2,6 @@ module Types exposing (..)
 
 import Dict exposing (Dict)
 import Json.Decode as Decode
--- Wir importieren die Domänen-Entitäten aus dem Unterordner
 import Types.Domain exposing (..)
 
 
@@ -93,10 +92,14 @@ type AgentsMsg
     | ClearGrid
     | ExportConfig
     | ImportConfigTrigger
+    -- Konstruktoren für Agenten-Handling
     | StartAgent ModuleType GridCell
     | RemoveAgent GridCell
     | RotateAgent GridCell
-    | MoveAgent { oldX : Int, oldY : Int, newX : Int, newY : Int }
+    -- NEU: UpdateAgent für manuelle Änderungen (Singular, für das Modal)
+    | UpdateAgent GridCell AgentModule
+    -- UpdateAgents für JSON-Schnittstelle (Plural, für API-Updates)
     | UpdateAgents Decode.Value
+    | MoveAgent { oldX : Int, oldY : Int, newX : Int, newY : Int }
     | HandleGridClick GridCell
     | SetHoveredCell (Maybe GridCell)

@@ -1,0 +1,23 @@
+@use '../../../base/variables' as *;
+
+// --- AGENT LIST TAB ---
+
+.agent-list {
+    // Vertikaler Stack mit 10px Abstand (Tailwind 2.5 = 10px)
+    @apply flex flex-col gap-2.5 p-0 list-none;
+}
+
+.agent-item {
+    // Hintergrund aus Config, Border passend zum industriellen Look
+    @apply bg-drawer-bg border border-white/10 rounded-industrial-sm p-3 
+           flex justify-between items-center transition-all duration-200 
+           hover:bg-white/5 cursor-pointer active:scale-[0.98];
+
+    .agent-label { 
+        @apply font-bold text-white tracking-tight; 
+    }
+
+    .agent-coords { 
+        @apply text-muted text-[0.8rem] font-mono; 
+    }
+}

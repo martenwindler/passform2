@@ -1,0 +1,39 @@
+@use '../../../base/variables' as *;
+
+// --- SYSTEM LOGS TERMINAL ---
+
+.sidebar-section.fill {
+    @apply flex-1 flex flex-col min-h-0 overflow-hidden mb-0; // mb-0 entfernt unteren Abstand
+}
+
+.log-container {
+    // Layout: Maximale Höhe, interner Scroll
+    @apply flex-1 flex flex-col min-h-0 overflow-y-auto bg-black/40 p-2.5
+           border border-white/5 rounded-industrial-sm;
+
+    // Typografie
+    @apply font-mono text-[0.75rem] leading-relaxed text-white;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+
+    // Custom Scrollbar für den Terminal-Look
+    &::-webkit-scrollbar { @apply w-1; }
+    &::-webkit-scrollbar-track { @apply bg-transparent; }
+    &::-webkit-scrollbar-thumb { @apply bg-white/10 rounded-full; }
+
+    .log-entry {
+        @apply py-1 border-b border-white/[0.03] flex items-start gap-3 transition-colors;
+        
+        &:hover { @apply bg-white/[0.02]; }
+        &:last-child { @apply border-none; }
+
+        .log-dot {
+            @apply w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 bg-white/20;
+        }
+
+        // Semantische Farben (Direkte Zuweisung für maximale Stabilität)
+        &.error   { color: #f56565; .log-dot { background-color: #f56565; box-shadow: 0 0 5px #f56565; } }
+        &.warning { color: #ecc94b; .log-dot { background-color: #ecc94b; } }
+        &.success { color: #48bb78; .log-dot { background-color: #48bb78; } }
+        &.info    { color: #63b3ed; .log-dot { background-color: #63b3ed; } }
+    }
+}

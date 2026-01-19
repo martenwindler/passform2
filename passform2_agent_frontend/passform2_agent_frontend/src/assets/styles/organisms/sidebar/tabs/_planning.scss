@@ -1,0 +1,110 @@
+@use '../../../base/variables' as *;
+
+// --- PLANNING TAB CONTENT ---
+
+.sidebar-tab-content {
+    // Erzwingt Weiß und korrektes Padding für den gesamten Tab-Inhalt
+    @apply flex flex-col gap-6 px-lg text-white;
+
+    h3 {
+        // Hauptüberschrift (z.B. Missions-Planung)
+        @apply text-info text-[1.1rem] mt-2 mb-1 font-semibold tracking-wide;
+    }
+
+    // Die Gruppierungen (Gewichtungen, Navigation)
+    .planning-section {
+        @apply flex flex-col gap-3 mt-2;
+
+        h4 {
+            // Sub-Header mit industrieller Trennlinie
+            @apply text-white/90 text-[0.85rem] uppercase tracking-widest 
+                   border-b border-white/10 pb-1 mb-2 font-bold;
+        }
+    }
+
+    // Container für Label + Input (wie in deinem HTML)
+    .sidebar-section {
+        @apply flex flex-col gap-1.5 mb-2;
+
+        label {
+            @apply text-white/70 text-[0.7rem] font-bold uppercase tracking-tight;
+        }
+
+        // Das Eingabefeld innerhalb der Sidebar-Sektion
+        input[type="number"], 
+        input[type="text"] {
+            @apply w-full bg-bg-dark/80 border border-white/10 rounded-industrial-sm 
+                   text-white py-2 px-3 text-sm transition-all duration-200;
+
+            &:focus {
+                @apply border-success outline-none ring-1 ring-success/30 bg-black/40;
+            }
+
+            &:hover:not(:focus) {
+                @apply border-white/20;
+            }
+        }
+    }
+}
+
+// --- SPEZIELLE ELEMENTE ---
+
+// Koordinaten-Anzeige (Startpunkt/Zielpunkt)
+.coord-display {
+    @apply flex justify-between items-center py-2 border-b border-white/5;
+    
+    label {
+        @apply text-white/50 text-[0.75rem] font-medium m-0;
+    }
+
+    span {
+        @apply text-sm font-mono text-info font-semibold;
+    }
+}
+
+// Das Grid für X, Y, Winkel (falls du die 4er-Reihe nutzt)
+.parameter-grid-row {
+    @apply grid grid-cols-4 gap-2 mb-3;
+}
+
+// Der einzelne Input-Block für das 4er Grid
+.parameter-item {
+    @apply flex flex-col items-center text-center;
+
+    label {
+        @apply text-muted text-[0.7rem] font-bold lowercase mb-1 tracking-wider;
+        font-variant: small-caps;
+    }
+
+    input {
+        @apply w-full bg-bg-dark/80 border border-white/10 rounded-industrial-sm 
+               text-text-main py-1.5 px-0.5 text-center transition-all duration-200;
+
+        &:focus {
+            @apply border-success outline-none ring-1 ring-success/30;
+        }
+    }
+}
+
+// --- AKTIONEN ---
+
+.btn-apply, .btn-primary {
+    &.btn-full { @apply w-full; }
+
+    @apply bg-gradient-to-r from-success to-[#38a169] text-white font-bold 
+           p-3 rounded-industrial-sm uppercase cursor-pointer border-none
+           transition-all duration-200 shadow-sm mt-4;
+    
+    &:hover:not(:disabled) {
+        @apply -translate-y-0.5 shadow-md brightness-110;
+    }
+
+    &:active:not(:disabled) {
+        @apply translate-y-0 shadow-sm;
+    }
+
+    &:disabled {
+        @apply bg-none bg-white/10 text-white/20 cursor-not-allowed border border-white/5 shadow-none;
+        // Erzwingt das Verschwinden des Gradients im deaktivierten Zustand
+    }
+}
