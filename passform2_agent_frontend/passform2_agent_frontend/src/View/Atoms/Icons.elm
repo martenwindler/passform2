@@ -102,3 +102,31 @@ iconGoal =
         [ Svg.path [ Attr.d "M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" ] []
         , Svg.line [ Attr.x1 "4", Attr.y1 "22", Attr.x2 "4", Attr.y2 "15" ] []
         ]
+
+{-| Icon: Ranger (Space Car / Rover Style) -}
+iconRanger : Html msg
+iconRanger = 
+    iconBase [] 
+        [ -- Räder
+          Svg.circle [ Attr.cx "7.5", Attr.cy "18.5", Attr.r "2.5" ] []
+        , Svg.circle [ Attr.cx "16.5", Attr.cy "18.5", Attr.r "2.5" ] []
+        , -- Chassis / Hauptkörper
+          Svg.path [ Attr.d "M2 11h20v4H2z" ] []
+        , -- Aufbau / Mast
+          Svg.path [ Attr.d "M7 11V7l3-3h5" ] []
+        , -- Sensor-Kopf
+          Svg.rect [ Attr.x "15", Attr.y "2", Attr.width "4", Attr.height "3" ] []
+        , -- Struktur-Details
+          Svg.line [ Attr.x1 "12", Attr.y1 "11", Attr.x2 "12", Attr.y2 "15" ] []
+        ]
+
+{-| Icon: Grid (Gitter-Netz / Infrastruktur) -}
+iconGrid : Html msg
+iconGrid = 
+    iconBase [] 
+        [ Svg.rect [ Attr.x "3", Attr.y "3", Attr.width "18", Attr.height "18", Attr.rx "2" ] []
+        , Svg.line [ Attr.x1 "3", Attr.y1 "9", Attr.x2 "21", Attr.y2 "9" ] []
+        , Svg.line [ Attr.x1 "3", Attr.y1 "15", Attr.x2 "21", Attr.y2 "15" ] []
+        , Svg.line [ Attr.x1 "9", Attr.y1 "3", Attr.x2 "9", Attr.y2 "21" ] []
+        , Svg.line [ Attr.x1 "15", Attr.y1 "3", Attr.x2 "15", Attr.y2 "21" ] []
+        ]

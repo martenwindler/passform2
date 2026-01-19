@@ -31,10 +31,12 @@ type Mode
     | Hardware
 
 type SidebarTab
-    = TabPlanning    
-    | TabAgents      
-    | TabHardware    
-    | TabLogs        
+    = TabPlanning
+    | TabAgents
+    | TabHardware
+    | TabRanger
+    | TabGrid    -- Neu: Das Gitter bekommt seinen eigenen Slot
+    | TabLogs 
 
 -- --- ENTITIES ---
 
