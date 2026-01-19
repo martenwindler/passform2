@@ -9,16 +9,29 @@ import Json.Encode as Encode
 
 {-| 
     Logik-Domäne: Planung & Gitter-Konfiguration.
-    Zuständig für Pfadsuche, Gitterdimensionen und Contract-Net Gewichte.
+    Sichert jetzt die Gitter-Dimensionen hart zwischen 0 und 100 ab.
 -}
 update : PlanningMsg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         SetGridWidth val ->
-            ( { model | gridWidth = String.toInt val |> Maybe.withDefault model.gridWidth }, Cmd.none )
+            let
+                -- String zu Int wandeln, bei Fehler alten Wert nutzen, dann auf 0-100 begrenzen
+                newWidth = 
+                    String.toInt val 
+                        |> Maybe.withDefault model.gridWidth 
+                        |> clamp 0 100
+            in
+            ( { model | gridWidth = newWidth }, Cmd.none )
 
         SetGridHeight val ->
-            ( { model | gridHeight = String.toInt val |> Maybe.withDefault model.gridHeight }, Cmd.none )
+            let
+                newHeight = 
+                    String.toInt val 
+                        |> Maybe.withDefault model.gridHeight 
+                        |> clamp 0 100
+            in
+            ( { model | gridHeight = newHeight }, Cmd.none )
 
         SetPathStart cell ->
             ( { model | pathStart = Just cell, activeMenu = Nothing }, Cmd.none )
@@ -49,9 +62,7 @@ update msg model =
         StartPlanning isRanger ->
             if canPlan model then
                 ( { model | loading = True }
-                , -- FIX: Nutzt triggerPlanning (wie in Ports.elm definiert) 
-                  -- und encodiert die Daten zu JSON (Decode.Value)
-                  Ports.triggerPlanning 
+                , Ports.triggerPlanning 
                     (Decoders.encodePlanningData 
                         { start = model.pathStart
                         , goal = model.pathGoal
@@ -64,7 +75,6 @@ update msg model =
                 ( model, Cmd.none )
 
         PlanningResultRaw rawJson ->
-            -- FIX: Decode ist jetzt durch den Import verfügbar
             case Decode.decodeValue Decoders.pathDecoder rawJson of
                 Ok path ->
                     ( { model | currentPath = Just path, loading = False }, Cmd.none )
