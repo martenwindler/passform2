@@ -11,7 +11,7 @@ logger = logging.getLogger("planner")
 class PathPlanner:
     """
     Zentraler A*-Planer, der das Contract Net Protocol simuliert.
-    Prüft Pfade über die physische Kette von Modulen im Grid.
+    Berechnet Pfade basierend auf dynamischen Geboten (Weights) der Agenten.
     """
 
     def get_planning_weights(self) -> Dict[str, float]:
@@ -20,12 +20,13 @@ class PathPlanner:
             "execution_time_default": 1.0,
             "complex_module_time": 3.5,
             "human_extra_weight": 1.0,
-            "proximity_penalty": 0.5
+            "proximity_penalty": 0.5,
+            "hardware_safety_factor": 1.2
         })
 
     def get_allowed_dirs(self, module_type: str) -> List[Tuple[int, int]]:
         """Definiert die Durchlassrichtung basierend auf dem Modultyp."""
-        m_type = module_type.lower()
+        m_type = str(module_type).lower()
         
         # Omnidirektionale Module
         if m_type in ("greifer", "mensch", "tisch", "conveyeur", "ftf"):
@@ -40,38 +41,52 @@ class PathPlanner:
         return [(0, 1), (1, 0), (0, -1), (-1, 0)] # Fallback
 
     def calculate_move_cost(self, current_pos: Tuple[int, int], neighbor_pos: Tuple[int, int], 
-                            grid: dict) -> float:
+                            grid: dict, weights: Dict[str, float]) -> float:
         """
-        Kostenberechnung basierend auf Modultypen (simuliert Gebote im CNP).
+        Kostenberechnung (Gebots-Logik). Hier fließen die Frontend-Parameter ein.
         """
-        weights = self.get_planning_weights()
         from_agent = grid.get(current_pos, {})
         to_agent = grid.get(neighbor_pos, {})
         
-        m_type_from = from_agent.get("module_type", "unknown").lower()
-        m_type_to = to_agent.get("module_type", "unknown").lower()
+        m_type_from = str(from_agent.get("module_type", "unknown")).lower()
+        m_type_to = str(to_agent.get("module_type", "unknown")).lower()
 
-        # 1. Basis-Zeit (T_exec)
-        if m_type_from in ["greifer", "mensch"]:
+        # 1. Basis-Zeit (T_exec) bestimmen
+        if m_type_from == "mensch":
+            # Mensch nutzt komplexe Zeit + spezifisches Extra-Gewicht
+            base_cost = weights.get("complex_module_time", 3.5)
+            cost = base_cost + weights.get("human_extra_weight", 1.0)
+        
+        elif m_type_from == "greifer":
+            # Greifer nutzt nur komplexe Zeit
             cost = weights.get("complex_module_time", 3.5)
+            
+        elif m_type_from in ["conveyeur", "rollen_ns", "rollen_ow", "tisch"]:
+            # Standard-Module nutzen die Basis-Transportzeit
+            cost = weights.get("execution_time_default", 1.0)
+            
         else:
             cost = weights.get("execution_time_default", 1.0)
 
-        # 2. Zuschläge
-        if m_type_from == "mensch":
-            cost += weights.get("human_extra_weight", 1.0)
-
+        # 2. Nähe-Strafe (W_proximity) - Interaktion Mensch/Maschine
         if m_type_from == "greifer" and m_type_to == "mensch":
             cost += weights.get("proximity_penalty", 0.5)
+        
+        # 3. Hardware Sicherheitsfaktor (Globaler Multiplikator)
+        cost *= weights.get("hardware_safety_factor", 1.0)
         
         return cost
 
     def a_star(self, start_pos: Tuple[int, int], goal_pos: Tuple[int, int], 
-               grid: Dict[Tuple[int, int], dict], travel_mode: str = "chain"):
+               grid: Dict[Tuple[int, int], dict], travel_mode: str = "chain", 
+               weights: Optional[Dict[str, float]] = None):
         """
-        Berechnet den Pfad. Im Modus 'chain' müssen alle Zellen Agenten sein.
+        Kern-Algorithmus für die Pfadsuche.
         """
-        # --- VALIDIERUNG ---
+        if weights is None:
+            weights = self.get_planning_weights()
+
+        # Validierung
         if start_pos not in grid:
             return None, 0.0, f"Start {start_pos} ist kein Agent!"
         if goal_pos not in grid:
@@ -80,10 +95,10 @@ class PathPlanner:
         if start_pos == goal_pos:
             return [grid.get(start_pos)], 0.0, "Identisch."
 
-        logger.info(f"A* Planung gestartet: {start_pos} -> {goal_pos}")
+        logger.info(f"A* Suche: {start_pos} -> {goal_pos} | Mode: {travel_mode}")
 
         open_q = []
-        # (priority, current_cost, current_pos)
+        # (f_score, g_score, position)
         heapq.heappush(open_q, (0.0, 0.0, start_pos))
         
         g_score = {start_pos: 0.0}
@@ -94,7 +109,7 @@ class PathPlanner:
 
             if current == goal_pos:
                 path = self._reconstruct_path(came_from, current, grid)
-                return path, g_score[current], "Pfad gefunden."
+                return path, g_score[current], "Erfolg"
 
             current_agent = grid.get(current, {})
             directions = self.get_allowed_dirs(current_agent.get("module_type", "unknown"))
@@ -102,11 +117,12 @@ class PathPlanner:
             for dx, dy in directions:
                 neighbor = (current[0] + dx, current[1] + dy)
                 
-                # CNP Regel: Nur Agenten können am Pfad teilnehmen (außer FTF Modus)
+                # Im Chain-Modus nur über Agenten wandern
                 if travel_mode == "chain" and neighbor not in grid:
                     continue
 
-                tentative_g = current_g + self.calculate_move_cost(current, neighbor, grid)
+                step_cost = self.calculate_move_cost(current, neighbor, grid, weights)
+                tentative_g = current_g + step_cost
                 
                 if tentative_g < g_score.get(neighbor, math.inf):
                     came_from[neighbor] = current
@@ -114,7 +130,7 @@ class PathPlanner:
                     f_score = tentative_g + self._heuristic(neighbor, goal_pos)
                     heapq.heappush(open_q, (f_score, tentative_g, neighbor))
 
-        return None, 0.0, "Keine geschlossene Modulkette gefunden."
+        return None, 0.0, "Keine Pfadverbindung über Agenten gefunden."
 
     def _heuristic(self, a: Tuple[int, int], b: Tuple[int, int]) -> float:
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
@@ -122,14 +138,15 @@ class PathPlanner:
     def _reconstruct_path(self, came_from: dict, current: Tuple[int, int], grid: dict) -> List[dict]:
         path = []
         while current in came_from:
-            # Falls das Grid an der Stelle kein volles Objekt hat, baue ein Minimal-Objekt
             agent = grid.get(current, {"agent_id": f"node_{current[0]}_{current[1]}", "x": current[0], "y": current[1]})
             path.append(agent)
             current = came_from[current]
         
-        path.append(grid.get(current, {"agent_id": "start", "x": current[0], "y": current[1]}))
+        # Start-Knoten hinzufügen
+        start_agent = grid.get(current, {"agent_id": "start", "x": current[0], "y": current[1]})
+        path.append(start_agent)
         path.reverse()
         return path
 
-# Singleton Instanz
+# Singleton
 planner = PathPlanner()

@@ -29,8 +29,33 @@ update msg model =
 
         SetWeight field value ->
             let
-                newVal = String.toFloat value |> Maybe.withDefault 0.0
+                -- Wir wandeln den String in einen Float um, Default 0.0 bei Fehlern
+                rawVal = String.toFloat value |> Maybe.withDefault 0.0
+                
+                -- HIER: Die harten Grenzen nach Harlan's Modell
+                newVal =
+                    case field of
+                        "execution_time_default" ->
+                            clamp 0.1 5.0 rawVal
+
+                        "complex_module_time" ->
+                            clamp 1.0 10.0 rawVal
+
+                        "human_extra_weight" ->
+                            clamp 0.0 20.0 rawVal
+
+                        "proximity_penalty" ->
+                            clamp 0.0 10.0 rawVal
+
+                        "hardware_safety_factor" ->
+                            clamp 1.0 2.0 rawVal
+
+                        _ ->
+                            rawVal
+
                 oldWeights = model.planningWeights
+                
+                -- Update des entsprechenden Feldes im Weights-Record
                 newWeights =
                     case field of
                         "execution_time_default" -> { oldWeights | execution_time_default = newVal }
@@ -40,6 +65,7 @@ update msg model =
                         "hardware_safety_factor" -> { oldWeights | hardware_safety_factor = newVal }
                         _ -> oldWeights
             in
+            -- Wir setzen den Pfad auf Nothing, da sich die Kostenbasis geändert hat
             ( { model | planningWeights = newWeights, currentPath = Nothing }, Cmd.none )
 
         SaveWeights ->

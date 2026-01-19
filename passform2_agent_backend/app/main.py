@@ -162,32 +162,60 @@ async def handle_rfid_scanned(sid, data):
 # --- PFADPLANUNG LOGIK-HANDLER ---
 
 async def handle_plan_path_socket_io(sid, data):
+    """
+    Interne Pfadplanung (A*) mit dynamischen Gewichten aus dem Frontend.
+    Begrenzt die Parameter nach Harlan's CNP-Modell und loggt die Validierung.
+    """
     try:
+        # 1. Daten aus dem verschachtelten Elm-Payload extrahieren
         inner_payload = data.get("payload", {})
         start = inner_payload.get("start")
         goal = inner_payload.get("goal")
         
-        # 1. Versuche Agenten aus dem Frontend-Payload zu lesen
-        elm_agents = inner_payload.get("agents", {})
+        # 2. Gewichte extrahieren und validieren (Harlan's Constraints)
+        frontend_weights = inner_payload.get("weights", {})
         
+        # Wir begrenzen die Werte (Clamping) für die Stabilität des CNP
+        validated_weights = {
+            "execution_time_default": max(0.1, float(frontend_weights.get("execution_time_default", 1.0))),
+            "complex_module_time": max(0.1, float(frontend_weights.get("complex_module_time", 3.5))),
+            "human_extra_weight": max(0.0, min(float(frontend_weights.get("human_extra_weight", 1.0)), 20.0)),
+            "proximity_penalty": max(0.0, min(float(frontend_weights.get("proximity_penalty", 0.5)), 10.0)),
+            "hardware_safety_factor": max(1.0, min(float(frontend_weights.get("hardware_safety_factor", 1.2)), 2.0))
+        }
+        
+        # 3. Agenten/Grid aufbereiten
+        elm_agents = inner_payload.get("agents", {})
         if elm_agents:
-            # Falls Elm ein Dictionary oder eine Liste schickt
             raw_agents = elm_agents.values() if isinstance(elm_agents, dict) else elm_agents
             grid = { (int(a.get("x")), int(a.get("y"))): a for a in raw_agents if a }
         else:
-            # 2. Fallback: Nutze die SSoT vom Backend (AgentManager)
+            # Fallback auf Backend SSoT falls Frontend keine Agenten schickt
             from app.managers.agent_manager import agent_manager
             grid = { (a.x, a.y): a.to_dict() for a in agent_manager.agents.values() }
 
         if not start or not goal:
+            logger.warning(f"⚠️ Planung abgebrochen: Start/Ziel unvollständig (Start: {start}, Goal: {goal})")
             return
 
         start_t = (int(start["x"]), int(start["y"]))
         goal_t = (int(goal["x"]), int(goal["y"]))
 
-        logger.info(f"🔮 Planung: {start_t} -> {goal_t} | Module im Grid: {len(grid)}")
+        # --- TRANSPARENZ LOGS ---
+        logger.info(f"🔮 CNP Ausschreibung: {start_t} -> {goal_t} | Module: {len(grid)}")
+        logger.info(f"⚖️ Validierte Gewichte: T_exec={validated_weights['execution_time_default']}, " +
+                    f"T_complex={validated_weights['complex_module_time']}, " +
+                    f"W_human={validated_weights['human_extra_weight']}, " +
+                    f"Safety={validated_weights['hardware_safety_factor']}")
 
-        path, cost, msg = planner.a_star(start_t, goal_t, grid, travel_mode="chain")
+        # 4. A* mit Gewichten aufrufen
+        path, cost, msg = planner.a_star(
+            start_t, 
+            goal_t, 
+            grid, 
+            travel_mode="chain", 
+            weights=validated_weights  # Die validierten Gewichte gehen hier in den Kern
+        )
 
         if path:
             formatted_path = []
@@ -202,17 +230,20 @@ async def handle_plan_path_socket_io(sid, data):
                     "signal_strength": 100
                 })
 
+            # Erfolg zurückmelden
             await socket_manager.emit_event('path_complete', {
-                "status": 200, "cost": float(cost), "path": formatted_path
+                "status": 200, 
+                "cost": float(cost), 
+                "path": formatted_path
             }, target_sid=sid)
-            logger.info(f"✅ Pfad mit {len(formatted_path)} Modulen gesendet.")
+            logger.info(f"✅ Zuschlag erteilt! Gesamtkosten: {cost}s für {len(formatted_path)} Agenten.")
         else:
-            # Spinner im Frontend stoppen
+            # Fehler/Kein Pfad zurückmelden (stoppt Spinner im UI)
             await socket_manager.emit_event('path_complete', {"status": 404, "cost": 0.0, "path": []}, target_sid=sid)
-            logger.warning(f"⚠️ {msg}")
+            logger.warning(f"⚠️ Ausschreibung ohne Ergebnis: {msg}")
 
     except Exception as e:
-        logger.error(f"❌ Fehler: {e}", exc_info=True)
+        logger.error(f"❌ Kritischer Fehler in handle_plan_path: {e}", exc_info=True)
 
 async def handle_plan_path_ros(sid, payload):
     """ROS-basierte Pfadplanung (CNP) - Vorbereitet für später."""
