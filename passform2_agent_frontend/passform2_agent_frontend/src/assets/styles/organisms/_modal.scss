@@ -89,8 +89,14 @@
 
     // --- TYPOGRAPHY & BADGES ---
     .agent-id-badge {
-        @apply bg-white/5 text-info font-mono text-[0.85rem] 
-               py-2 px-3 rounded-industrial-sm text-center border border-info/20;
+        // font-black entspricht font-weight: 900
+        // uppercase macht es noch technischer
+        @apply bg-white/5 text-info font-mono font-black uppercase text-[0.9rem] 
+            py-2 px-3 rounded-industrial-sm text-center border border-info/30;
+        
+        // Sicherstellen, dass es wirklich knallt:
+        letter-spacing: 1px;
+        text-shadow: 0 0 10px rgba(99, 179, 237, 0.3); // Leichter blauer Glow passend zur ID
     }
 
     .status-text, .signal-value { 
@@ -130,3 +136,4 @@
     from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
 }
+
