@@ -1,0 +1,7 @@
+use_sim_time: False
+mesh_path: 'package://module_description/meshes/passform_module.stl'
+model_pkg: 'module_description'
+model_path: 'urdf/module_base.urdf.xacro'
+source_list:
+  - 'test'
+  - 'test132'

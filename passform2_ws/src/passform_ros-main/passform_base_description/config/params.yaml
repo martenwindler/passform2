@@ -1,0 +1,5 @@
+use_sim_time: False
+mesh_path: 'package://passform_base_description/meshes/passform_base.stl'
+model_pkg: 'passform_base_description'
+model_path: 'urdf/base.urdf.xacro'
+coordinate_path: 'config/bay.yaml'

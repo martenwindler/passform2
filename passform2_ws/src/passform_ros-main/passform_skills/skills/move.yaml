@@ -1,0 +1,73 @@
+type: Move
+description:
+  en-us: Move along conveying direction.
+  de: Bewegung entlang der Förderrichtung.
+driver_topic: test_topic1
+properties:
+  - type: Range
+    id_short: distance
+    value_type: Double
+    data:
+      min: 0.0
+      max: 0.3
+      description:
+        en-us: Motion distance of the conveyor from origin in m.
+        de: Bewegungsdistanz der Fördertechnik vom Ursprung in m.
+  - type: Range
+    id_short: velocity
+    value_type: Double
+    data:
+      min: 0.0
+      max: 1.0
+      description:
+        en-us: Velocity of the conveyor in m/s.
+        de: Geschwindigkeit der Fördertechnik in m/s.
+  - type: Range
+    id_short: acceleration
+    value_type: Double
+    data:
+      min: 0.0
+      max: 1.0
+      description:
+        en-us: Acceleration of the conveyor in m/s^2.
+        de: Beschleunigung der Fördertechnik in m/s^2.
+  - type: Range
+    id_short: weight
+    value_type: Double
+    data:
+      min: 0.0
+      max: 25.0
+      description:
+        en-us: Weight the system can move in kg.
+        de: Gewicht, welches das System bewegen kann in kg.
+input:
+  required:
+    by_position:
+    - type: string
+      id_short: reference_frame
+      data:
+        description:
+          en-us: Reference frame to which the positions are calculated.
+          de: Reference Systeme zu welchem die Positionen bestimmt werden.
+    - type: geometry_msgs/Point
+    by_id:
+    - type: string
+      id_short: uuid
+      data:
+        description:
+          en-us: UUID of the part to be moved.
+          de: UUID des zu bewegenden Teils.
+  optional:
+    - type: double
+      id_short: velocity
+      data:
+        value: 1.0
+    - type: double
+      id_short: acceleration
+      data:
+        value: 1.0
+    - type: geometry_msgs/Quaternion
+      id_short: orientation
+output:
+  - type: boolean
+    id_short: success

@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:include filename="$(find passform_util)/urdf/passform_macros.xacro"/>
+
+  <xacro:macro name="create_base_module" params="prefix">
+
+    <!-- <xacro:property name="magic_offset" value= "0.0253" /> -->
+
+    <!-- CREATE MODULE BASE -->
+    <xacro:link_from_cad
+      name = "${prefix}/base_link"
+      filename = "package://module_description/meshes/passform_module.stl"
+      scale = "0.001 0.001 0.001"
+      material = "steel"
+    />
+    <joint name="${prefix}/to_top" type="fixed">
+      <origin
+        xyz="-0.012352 -0.22 0.10075"
+        rpy="0 0 0"
+        />
+      <parent link="${prefix}/base_link"/>
+      <child link="${prefix}/base_top"/>
+    </joint>
+    <link name="${prefix}/base_top"/>
+
+  </xacro:macro>
+
+
+  <!-- CREATE WORKPLATE -->
+  <xacro:macro name="create_workplate" params="prefix">
+
+    <!-- Create plate -->
+    <joint name="${prefix}/to_plate" type="fixed">
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0"
+        />
+      <parent link="${prefix}/base_top"/>
+      <child link="${prefix}/plate"/>
+    </joint>
+
+    <xacro:link_from_cad
+      name = "${prefix}/plate"
+      filename = "package://module_description/meshes/plate.stl"
+      scale = "0.001 0.001 0.001"
+      material = "wood"
+    />
+
+    <joint name="${prefix}/to_plate-top" type="fixed">
+      <origin
+        xyz="0 0 0.04"
+        rpy="0 0 0"
+        />
+      <parent link="${prefix}/plate"/>
+      <child link="${prefix}/plate_top"/>
+    </joint>
+    <link name="${prefix}/plate_top"/>
+
+  </xacro:macro>
+
+</robot>

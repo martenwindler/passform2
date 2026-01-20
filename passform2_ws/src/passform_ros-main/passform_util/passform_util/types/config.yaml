@@ -1,0 +1,83 @@
+TechnicalData:
+  # Thumbnail: /home/jasper/git/passform_ros/passform_util/passform_util/basyx/lena.png
+  Supply:
+    24vdc: True
+    230vac: False
+    vacuum: False
+  PhysicalProperties:
+    - type: Property
+      id_short: mass
+      value_type: Double
+      data:
+        value: 12.5
+        description:
+          en-us: Total mass of the system in kg.
+          de: Gesamtmasse des Systems in kg.
+    - type: Property
+      id_short: width
+      value_type: Double
+      data:
+        value: 0.6
+        description:
+          en-us: Width of the system in m.
+          de: Systembreite in m.
+    - type: Property
+      id_short: depth
+      value_type: Double
+      data:
+        value: 0.6
+        description:
+          en-us: Depth of the system in m.
+          de: Systemtiefe in m.
+    - type: Property
+      id_short: height
+      value_type: Double
+      data:
+        value: 0.6
+        description:
+          en-us: Height of the system in m.
+          de: Systemhöhe in m.
+    - type: Range
+      id_short: test_range
+      value_type: Double
+      data:
+        min: 0.6
+        max: 1.0
+        description:
+          en-us: Height of the system in m.
+          de: Systemhöhe in m.
+Inventory:
+  - type: Property
+    id_short: test1
+    value_type: Integer
+    data:
+      value: 1
+      description:
+        en-us: Testitem
+        de: Testgegenstand
+  - type: Property
+    id_short: test2
+    value_type: Integer
+    data:
+      value: 12
+      description:
+        en-us: Testitem
+        de: Testgegenstand
+
+Inventory2:
+  - type: Property
+    id_short: c1
+    value_type: Integer
+    data:
+      value: 1
+      description:
+        en-us: COPOL
+        de: COPOL
+  - type: Property
+    id_short: c2
+    value_type: Integer
+    data:
+      value: 12
+      description:
+        en-us: COPOL
+        de: COPOL

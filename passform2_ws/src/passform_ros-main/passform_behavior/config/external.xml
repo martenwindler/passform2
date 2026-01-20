@@ -1,0 +1,36 @@
+<root >
+   <BehaviorTree>
+      <Sequence>
+          <Action ID="PrintString" message="start"/>
+         <Fallback>
+            <Action ID="Passform" action_type="2"/>
+            <Action ID="Passform" action_type="1" uuid='test-uuid'/>
+          </Fallback>
+
+          <PrintString message="Passform 1or2 completed"/>
+          <Fallback>
+              <Action ID="Move"/>
+              <Action ID="PrintString" message="Move failed"/>
+          </Fallback>
+          <Fallback>
+              <Timeout msec="500">
+                 <Action ID="Passform" action_type="2"/>
+              </Timeout>
+              <Action ID="PrintString" message="Passform aborted"/>
+          </Fallback>
+          <Fallback>
+              <Timeout msec="500">
+                 <Action ID="Passform" action_type="2"/>
+              </Timeout>
+              <Action ID="PrintString" message="Passform aborted"/>
+          </Fallback>
+          <Fallback>
+              <Timeout msec="500">
+                 <Action ID="Passform" action_type="2"/>
+              </Timeout>
+              <Action ID="PrintString" message="Passform aborted"/>
+          </Fallback>
+          <Action ID="PrintString" message="PROCESS COMPLETE"/>
+      </Sequence>
+   </BehaviorTree>
+</root>

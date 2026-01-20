@@ -15,8 +15,9 @@ passform2/
 │   └── data/                 # Zentrale SSoT
 ├── passform2_ws/             # Zentraler ROS 2 Workspace 
 │   └── src/
-│       ├── passform_agent_msgs/      # Custom Interfaces/Messages
-│       └── passform_agent_planning/  # ROS-Nodes (monitor_node, agent_node)
+│       ├── passform_agent_msgs/      # Passform 2 Custom Interfaces/Messages
+│       ├── passform_agent_planning/  # Passform 2 ROS-Nodes (monitor_node, agent_node)
+│       └── passform_ros/             # Passform 1 integration
 ├── deployment/               # Deployment-Vorlagen für Hardware-Module
 │   └── agent_docker/         # Docker-Files RPi 5
 ├── frontend/                 # Web-3D-UI 

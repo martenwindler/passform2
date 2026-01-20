@@ -1,0 +1,10 @@
+# Request
+passform_msgs/Task task
+---
+# Result
+passform_msgs/Location location
+rcl_interfaces/Parameter[] parameter
+---
+# Feedback
+passform_msgs/Location location
+rcl_interfaces/Parameter[] parameter

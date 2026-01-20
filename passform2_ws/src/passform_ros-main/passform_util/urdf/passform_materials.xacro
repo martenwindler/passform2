@@ -1,0 +1,33 @@
+<?xml version="1.0" ?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <material name="steel">
+    <color rgba="${135/255} ${135/255} ${129/255} 1.0"/>
+  </material>
+
+  <material name="aluminium">
+    <color rgba="${180/255} ${180/255} ${175/255} 1.0"/>
+  </material>
+  <material name="aluminium_transparent">
+    <color rgba="${180/255} ${180/255} ${175/255} 0.3"/>
+  </material>
+  <material name="wood">
+    <color rgba="${121/255} ${68/255} ${59/255} 1.0"/>
+  </material>
+
+  <material name="marker">
+    <color rgba="${222/255} ${111/255} ${111/255} 1.0"/>
+  </material>
+
+  <material name="biba_red">
+    <color rgba="${226/255} ${0/255} ${26/255} 1.0"/>
+  </material>
+  <material name="biba_red_trans">
+    <color rgba="${226/255} ${0/255} ${26/255} 0.3"/>
+  </material>
+  <material name="biba_gray">
+    <color rgba="${76/255} ${76/255} ${76/255} 1.0"/>
+  </material>
+  <material name="biba_lightgray">
+    <color rgba="${178/255} ${178/255} ${178/255} 1.0"/>
+  </material>
+</robot>

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="module_base">
+  <xacro:arg name="prefix" default=""/>
+  <xacro:arg name="mesh_path" default="package://module_description/meshes/passform_module.stl"/>
+
+  <!-- load macros -->
+  <xacro:include filename="$(find module_description)/urdf/macro_module_base.urdf.xacro"/>
+
+  <!-- create base -->
+  <xacro:create_base_module
+    prefix="$(arg prefix)"
+  />
+
+</robot>

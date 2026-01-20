@@ -1,0 +1,10 @@
+# Request
+float32 timeout # time in s before action is cancelled (0 = no timeout)
+float32 wait_time # time in s before action is finished (success)
+string wait_process # uuid of process to wait for
+---
+# Result
+rcl_interfaces/Parameter[] post_conditions
+---
+# Feedback
+rcl_interfaces/Parameter[] conditions

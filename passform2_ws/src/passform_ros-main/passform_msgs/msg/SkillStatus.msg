@@ -1,0 +1,2 @@
+passform_msgs/Skill skill
+diagnostic_msgs/DiagnosticStatus status

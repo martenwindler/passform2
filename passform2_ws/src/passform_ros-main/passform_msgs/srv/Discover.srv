@@ -1,0 +1,4 @@
+diagnostic_msgs/DiagnosticStatus[] client_description
+---
+diagnostic_msgs/DiagnosticStatus[] server_description
+uint8 bay_id

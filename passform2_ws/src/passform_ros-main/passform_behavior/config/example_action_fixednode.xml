@@ -1,0 +1,113 @@
+<?xml version="1.0"?>
+<root main_tree_to_execute="BehaviorTree">
+    <!-- ////////// -->
+    <BehaviorTree ID="BehaviorTree">
+        <Sequence>
+            <Fallback>
+                <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="" item_id="" task_id="" v_max=""/>
+                <Control ID="FixedModule">
+                    <Action F_max="" ID="Grasp" a_max="" item_id="" task_id="" v_max=""/>
+                    <Action ID="Move" a_max="" end_pos="" item_id="" task_id="" v_max=""/>
+                    <Action ID="Release" task_id=""/>
+                </Control>
+            </Fallback>
+        </Sequence>
+    </BehaviorTree>
+    <!-- ////////// -->
+    <TreeNodesModel>
+        <Action ID="AssemblyMount">
+            <input_port name="F_max" type="float"/>
+            <input_port name="M_max" type="float"/>
+            <input_port name="a_max" type="float"/>
+            <input_port name="end_pos" type="std::string"/>
+            <input_port name="item_id" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Action ID="AssemblyPickplace">
+            <input_port name="F_max" type="float"/>
+            <input_port name="M_max" type="float"/>
+            <input_port name="a_max" type="float"/>
+            <input_port name="end_pos" type="std::string"/>
+            <input_port name="item_id" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Action ID="AssemblyPlug">
+            <input_port name="F_max" type="float"/>
+            <input_port name="M_max" type="float"/>
+            <input_port name="a_max" type="float"/>
+            <input_port name="end_pos" type="std::string"/>
+            <input_port name="item_id" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Action ID="AssemblyScrew">
+            <input_port name="F_max" type="float"/>
+            <input_port name="M_max" type="float"/>
+            <input_port name="a_max" type="float"/>
+            <input_port name="item_id" type="std::string"/>
+            <input_port name="screw_id" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Control ID="FixedModule"/>
+        <Action ID="Grasp">
+            <input_port name="F_max" type="float"/>
+            <input_port name="a_max" type="float"/>
+            <input_port name="item_id" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Action ID="Move">
+            <input_port name="a_max" type="float"/>
+            <input_port name="end_pos" type="std::string"/>
+            <input_port name="item_id" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Action ID="Passform">
+            <input_port name="action_type" type="unsigned int"/>
+        </Action>
+        <Action ID="Position">
+            <input_port name="F_max" type="float"/>
+            <input_port name="M_max" type="float"/>
+            <input_port name="a_max" type="float"/>
+            <input_port name="end_pos" type="std::string"/>
+            <input_port name="item_id" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Action ID="Pressure">
+            <input_port name="F_max" type="float"/>
+            <input_port name="M_max" type="float"/>
+            <input_port name="item_id" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+        </Action>
+        <Action ID="PrintString">
+            <input_port name="message" type="std::string"/>
+        </Action>
+        <Action ID="Release">
+            <input_port name="task_id" type="int"/>
+        </Action>
+        <Control ID="SpecificModule">
+            <input_port name="module_uuid"/>
+        </Control>
+        <Action ID="ToolGet">
+            <input_port name="item_id" type="std::string"/>
+            <input_port name="task_id" type="std::string"/>
+            <input_port name="tool_id" type="std::string"/>
+        </Action>
+        <Action ID="ToolPut">
+            <input_port name="end_pos" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="tool_id" type="std::string"/>
+        </Action>
+        <Action ID="ToolUse">
+            <input_port name="item_id" type="std::string"/>
+            <input_port name="task_id" type="std::string"/>
+            <input_port name="tool_id" type="std::string"/>
+        </Action>
+    </TreeNodesModel>
+    <!-- ////////// -->
+</root>

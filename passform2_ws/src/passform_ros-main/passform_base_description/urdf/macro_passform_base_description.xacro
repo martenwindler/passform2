@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="passform_base">
+
+<xacro:include filename="$(find passform_util)/urdf/passform_macros.xacro"/>
+
+<xacro:property name="mesh_scale" value="0.01 0.01 0.01"/>
+
+<!-- Base -->
+<xacro:macro name="create_base" params="mesh parent:=world name:=passform/base_link">
+  <joint name="world_to_passform" type="fixed">
+    <origin
+      xyz="0 0 0"
+      rpy="0 0 0"
+      />
+    <parent link="${parent}"/>
+    <child link="${name}"/>
+  </joint>
+  <xacro:link_from_cad
+    name = "${name}"
+    filename = "${mesh}"
+    scale = "${mesh_scale}"
+    material = "aluminium"
+  />
+</xacro:macro>
+
+<!-- Dock Connector -->
+<xacro:macro name="create_bay" params="id bay_data parent:=passform/base_link">
+  <joint name="bay_${id}_connect" type="fixed">
+    <origin
+      xyz="${' '.join([str(v) for v in bay_data[id]['xyz']])}"
+      rpy="${' '.join([str(v) for v in bay_data[id]['rpy']])}"
+      />
+    <parent link="${parent}"/>
+    <child link="bay_${id}_dock"/>
+  </joint>
+  <link name="bay_${id}_dock"/>
+</xacro:macro>
+
+<!-- POI -->
+<xacro:macro name="create_poi" params="id poi_data parent:=passform/base_link">
+  <joint name="poi_${id}_connect" type="fixed">
+    <origin
+      xyz="${' '.join([str(v) for v in poi_data[id]['xyz']])}"
+      rpy="${' '.join([str(v) for v in poi_data[id]['rpy']])}"
+      />
+    <parent link="${parent}"/>
+    <child link="poi_${id}"/>
+  </joint>
+  <link name="poi_${id}"/>
+</xacro:macro>
+</robot>

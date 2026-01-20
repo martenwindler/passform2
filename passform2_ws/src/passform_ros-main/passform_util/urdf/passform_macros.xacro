@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+<xacro:include filename="$(find passform_util)/urdf/passform_materials.xacro"/>
+
+<!-- inertia -->
+<xacro:macro name="default_inertial" params="mass">
+  <inertial>
+    <mass value="${mass}" />
+    <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0" />
+  </inertial>
+</xacro:macro>
+
+<!-- Create a Link from CAD data -->
+<xacro:macro name="link_from_cad" params="name filename scale material:=False collision:=False mass:=0">
+  <!-- standard CAD -->
+  <link name="${name}">
+    <!-- visual of geometry is always there -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="${filename}" scale="${scale}"/>
+      </geometry>
+      <xacro:unless value="${material == 'False'}">
+        <material name="${material}"/>
+      </xacro:unless>
+    </visual>
+
+    <!-- Inertia, if mass is specified -->
+    <xacro:unless value="${mass == 0}">
+      <xacro:default_inertial mass="${mass}"/>
+    </xacro:unless>
+
+    <!-- Collision if wanted -->
+    <xacro:if value="${collision == 'True'}">
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="${filename}" scale="${scale}"/>
+      </geometry>
+    </collision>
+    </xacro:if>
+  </link>
+</xacro:macro>
+
+
+</robot><!-- <xacro:if value="${suffix == 'left'}"> code for create A </xacro:if> -->
+<!-- <xacro:unless value="${suffix == 'left'}"> code for create B </xacro:unless> -->

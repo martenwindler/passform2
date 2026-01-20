@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="passform_base">
+  <xacro:arg name="prefix" default=""/>
+  <xacro:arg name="bay_file" default="$(find passform_base_description)/config/bay.yaml"/>
+  <xacro:arg name="mesh_file" default="package://passform_base_description/meshes/passform_base.stl"/>
+  <xacro:arg name="poi_file" default="$(find passform_base_description)/config/poi.yaml"/>
+
+  <!-- load macros -->
+  <xacro:include filename="$(find passform_base_description)/urdf/macro_passform_base_description.xacro"/>
+
+  <!-- bay data -->
+  <xacro:property name="bay_yaml" value="$(arg bay_file)" />
+  <xacro:property name="bay_data" value="${xacro.load_yaml(bay_yaml)}"/>
+
+  <!-- create base -->
+  <link name="world" />
+  <xacro:create_base mesh="$(arg mesh_file)"/>
+
+ <!-- create bay links -->
+  <xacro:create_bay id="1" bay_data="${bay_data}"/>
+  <xacro:create_bay id="2" bay_data="${bay_data}"/>
+  <xacro:create_bay id="3" bay_data="${bay_data}"/>
+  <xacro:create_bay id="4" bay_data="${bay_data}"/>
+  <xacro:create_bay id="5" bay_data="${bay_data}"/>
+  <xacro:create_bay id="6" bay_data="${bay_data}"/>
+  <xacro:create_bay id="7" bay_data="${bay_data}"/>
+  <xacro:create_bay id="8" bay_data="${bay_data}"/>
+
+  <!-- poi data -->
+  <xacro:property name="poi_yaml" value="$(arg poi_file)" />
+  <xacro:property name="poi_data" value="${xacro.load_yaml(poi_yaml)}"/>
+  <xacro:create_poi id="c1" poi_data="${poi_data}"/>
+  <xacro:create_poi id="c2" poi_data="${poi_data}"/>
+  <xacro:create_poi id="c3" poi_data="${poi_data}"/>
+  <xacro:create_poi id="c4" poi_data="${poi_data}"/>
+
+</robot>

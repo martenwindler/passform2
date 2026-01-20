@@ -1,0 +1,11 @@
+product_1:
+  name: productname_1
+  source_frame: poi_c2
+
+product_2:
+  name: productname_2
+  source_frame: poi_c2
+  translation:
+    x: 0.25
+    y: 0
+    z: 0

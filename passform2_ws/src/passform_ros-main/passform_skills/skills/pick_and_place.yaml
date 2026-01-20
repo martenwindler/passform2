@@ -1,0 +1,10 @@
+type: CUSTOM
+id_short: Pick-and-place
+driver_topic: pick_and_place
+description:
+  en-us: Pick an object and place it at another position.
+  de: Aufnehmen eines Objektes und Ablegen an einer anderen Position.
+primitives:
+  - type: Pick
+  - type: Move
+  - type: Release

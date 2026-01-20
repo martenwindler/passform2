@@ -2,7 +2,7 @@ module View.Organisms.Sidebar.Sections.WeightsSection exposing (view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, onInput)
+import Html.Events exposing (onInput)
 import Types exposing (..)
 
 view : Model -> Html Msg
@@ -22,20 +22,20 @@ view model =
             
             -- Nähe-Strafe: 0.0s bis 10.0s
             , viewWeightItem "Nähe" "0.1" "0.0" "10.0" model.planningWeights.proximity_penalty "proximity_penalty"
+
+            -- Sicherheit (Safety Factor): 1.0 bis 2.0
+            , viewWeightItem "Sicherheit" "0.1" "1.0" "2.0" model.planningWeights.hardware_safety_factor "hardware_safety_factor"
             ]
-            
-        , button 
-            [ class "btn-apply-weights"
-            , onClick (PlanningMsg SaveWeights) 
-            ] 
-            [ text "Parameter anwenden" ]
+        
+        , p [ class "weights-hint" ] 
+            [ text "Änderungen wirken sich direkt auf die nächste Planung aus." ]
         ]
 
 {-| Hilfsfunktion mit min/max Begrenzung -}
 viewWeightItem : String -> String -> String -> String -> Float -> String -> Html Msg
 viewWeightItem labelTitle stepVal minVal maxVal val key =
     div [ class "parameter-item" ]
-        [ label [] [ text (labelTitle ++ " (s)") ] -- Einheit (s) zur Klarheit hinzugefügt
+        [ label [] [ text (labelTitle ++ " (s)") ]
         , input 
             [ type_ "number"
             , step stepVal

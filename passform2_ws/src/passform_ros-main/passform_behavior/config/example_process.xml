@@ -1,0 +1,160 @@
+<?xml version="1.0"?>
+<root main_tree_to_execute="BehaviorTree">
+    <!-- ////////// -->
+    <BehaviorTree ID="BehaviorTree">
+        <Sequence>
+            <Fallback name="1">
+                <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="MA" uuid="KK1" task_id="1" v_max=""/>
+                <Sequence>
+                    <Action F_max="" ID="Grasp" a_max="" uuid="KK1" task_id="2" v_max=""/>
+                    <Action ID="Move" a_max="" end_pos="MA" uuid="KK1" task_id="3" v_max=""/>
+                    <Action ID="Release" uuid="KK1" task_id="4"/>
+                </Sequence>
+            </Fallback>
+            <Fallback name="2">
+                <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="MH" uuid="Hat" task_id="5" v_max=""/>
+                <Sequence>
+                    <Action F_max="" ID="Grasp" a_max="" uuid="Hat" task_id="6" v_max=""/>
+                    <Action ID="Move" a_max="" end_pos="MH" uuid="Hat" task_id="7" v_max=""/>
+                    <Action ID="Release" uuid="Hat" task_id="8"/>
+                </Sequence>
+            </Fallback>
+            <Fallback name="3">
+                <Action F_max="" ID="AssemblyMount" M_max="" a_max="" end_pos="Hat" uuid="GPIO Header" task_id="9" v_max=""/>
+                <Sequence>
+                    <Action F_max="" ID="Grasp" a_max="" uuid="GPIO Header" task_id="10" v_max=""/>
+                    <Action ID="Move" a_max="" end_pos="Hat" uuid="GPIO Header" task_id="11" v_max=""/>
+                    <Action ID="Release" uuid="GPIO Header" task_id="12"/>
+                </Sequence>
+            </Fallback>
+            <Fallback name="4">
+                <Action F_max="" ID="AssemblyPlug" M_max="10" a_max="" end_pos="Hat" uuid="Hat_Case" task_id="13" v_max=""/>
+                <Sequence>
+                    <Action F_max="" ID="Grasp" a_max="" uuid="Hat_Case" task_id="14" v_max=""/>
+                    <Action ID="Move" a_max="" end_pos="Hat" uuid="Hat_Case" task_id="15" v_max=""/>
+                    <Action ID="Release" uuid="Hat_Case" task_id="16"/>
+                </Sequence>
+            </Fallback>
+            <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="KK1_3" uuid="Hat_Case" name="5" task_id="17" v_max=""/>
+            <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="KL" uuid="KK1" name="6" task_id="18" v_max=""/>
+            <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="MA" uuid="KK2" name="7" task_id="19" v_max=""/>
+            <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="MH" uuid="PI_Case" name="8" task_id="20" v_max=""/>
+            <Action F_max="" ID="AssemblyMount" M_max="" a_max="" end_pos="PI_Case" uuid="PI_Zero" name="9" task_id="21" v_max=""/>
+            <Action F_max="" ID="AssemblyPlug" M_max="5" a_max="" end_pos="PI_Case" uuid="dist" name="10" task_id="22" v_max=""/>
+            <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="KK2_1" uuid="PI_Case" name="11" task_id="23" v_max=""/>
+            <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="KL" uuid="KK2" name="12" task_id="24" v_max=""/>
+            <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="MA" uuid="KK2" name="13" task_id="25" v_max=""/>
+            <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="MH" uuid="PI_Case" name="14" task_id="26" v_max=""/>
+            <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="MA" uuid="KK1" name="15" task_id="27" v_max=""/>
+            <Action F_max="" ID="AssemblyPlug" M_max="5" a_max="" end_pos="PI_Case" uuid="Hat_Case" name="16" task_id="28" v_max=""/>
+            <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="Hat" uuid="Lid" name="17" task_id="29" v_max=""/>
+            <Action F_max="" ID="AssemblyScrew" M_max="" a_max="" uuid="Lid" name="18" screw_id="Screw" task_id="30" v_max=""/>
+            <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="KK1_4" uuid="Pi_Case" name="19" task_id="31" v_max=""/>
+            <Action F_max="" ID="AssemblyPickplace" M_max="" a_max="" end_pos="conv1" uuid="KK1" name="20" task_id="32" v_max=""/>
+        </Sequence>
+    </BehaviorTree>
+    <!-- ////////// -->
+    <TreeNodesModel>
+        <Action ID="AssemblyMount">
+            <input_port name="F_max" type="float"/>
+            <input_port name="M_max" type="float"/>
+            <input_port name="a_max" type="float"/>
+            <input_port name="end_pos" type="std::string"/>
+            <input_port name="uuid" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Action ID="AssemblyPickplace">
+            <input_port name="F_max" type="float"/>
+            <input_port name="M_max" type="float"/>
+            <input_port name="a_max" type="float"/>
+            <input_port name="end_pos" type="std::string"/>
+            <input_port name="uuid" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Action ID="AssemblyPlug">
+            <input_port name="F_max" type="float"/>
+            <input_port name="M_max" type="float"/>
+            <input_port name="a_max" type="float"/>
+            <input_port name="end_pos" type="std::string"/>
+            <input_port name="uuid" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Action ID="AssemblyScrew">
+            <input_port name="F_max" type="float"/>
+            <input_port name="M_max" type="float"/>
+            <input_port name="a_max" type="float"/>
+            <input_port name="uuid" type="std::string"/>
+            <input_port name="screw_id" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Control ID="FixedModule"/>
+        <Action ID="Grasp">
+            <input_port name="F_max" type="float"/>
+            <input_port name="a_max" type="float"/>
+            <input_port name="uuid" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Action ID="Move">
+            <input_port name="a_max" type="float"/>
+            <input_port name="end_pos" type="std::string"/>
+            <input_port name="uuid" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Action ID="Passform">
+            <input_port name="action_type" type="unsigned int"/>
+        </Action>
+        <Action ID="Position">
+            <input_port name="F_max" type="float"/>
+            <input_port name="M_max" type="float"/>
+            <input_port name="a_max" type="float"/>
+            <input_port name="end_pos" type="std::string"/>
+            <input_port name="uuid" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="v_max" type="float"/>
+        </Action>
+        <Action ID="Pressure">
+            <input_port name="F_max" type="float"/>
+            <input_port name="M_max" type="float"/>
+            <input_port name="uuid" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+        </Action>
+        <Action ID="PrintString">
+            <input_port name="message" type="std::string"/>
+        </Action>
+        <Decorator ID="RangeLoop">
+            <output_port default="current_iteration" name="current" type="int"/>
+            <input_port name="start" type="int">First value of the iteration</input_port>
+            <input_port default="1" name="step" type="int">The increment at each iteration</input_port>
+            <input_port name="stop" type="int">Iteration returns before last value</input_port>
+        </Decorator>
+        <Action ID="Release">
+            <input_port name="uuid"/>
+            <input_port name="task_id"/>
+        </Action>
+        <Control ID="SpecificModule">
+            <input_port name="module_uuid" type="std::string"/>
+        </Control>
+        <Action ID="ToolGet">
+            <input_port name="uuid" type="std::string"/>
+            <input_port name="task_id" type="std::string"/>
+            <input_port name="tool_id" type="std::string"/>
+        </Action>
+        <Action ID="ToolPut">
+            <input_port name="end_pos" type="std::string"/>
+            <input_port name="task_id" type="int"/>
+            <input_port name="tool_id" type="std::string"/>
+        </Action>
+        <Action ID="ToolUse">
+            <input_port name="uuid" type="std::string"/>
+            <input_port name="task_id" type="std::string"/>
+            <input_port name="tool_id" type="std::string"/>
+        </Action>
+    </TreeNodesModel>
+    <!-- ////////// -->
+</root>
