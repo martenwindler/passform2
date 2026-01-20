@@ -34,7 +34,7 @@ view model =
                 ]
             ]
 
-        , -- 3. Rechts: Actions (hier greift das gap-xl aus dem SCSS)
+        , -- 3. Rechts: Actions
           div [ class "navbar-actions" ]
             [ button 
                 [ class "btn-mode-switch"
@@ -48,6 +48,15 @@ view model =
                 , onClick (AgentsMsg ToggleViewMode) 
                 ] 
                 [ text (if model.is3D then "2D" else "3D") ]
+            
+            , -- Projekt-Link als weitere Pille ganz rechts
+              a 
+                [ class "btn-view-toggle link-pill"
+                , href "https://passform.biba.uni-bremen.de/"
+                , target "_blank" -- Öffnet in neuem Tab
+                , rel "noopener noreferrer"
+                ] 
+                [ text "Projekt" ]
             ]
         ]
 

@@ -68,25 +68,31 @@
     .navbar-actions {
         @apply flex items-center z-10;
         
-        // FIX: Wir nutzen natives CSS Gap (ca. 32px), um Tailwind-Probleme zu umgehen
-        gap: 2rem; 
-
-        .btn-mode-switch, .btn-view-toggle {
+        // KRITISCH: Wir erzwingen den Abstand hier massiv
+        display: flex !important;
+        gap: 0.75rem !important; // 24px Abstand zwischen allen Pillen
+        
+        .btn-mode-switch, 
+        .btn-view-toggle {
             @apply bg-white/5 text-white/80 border border-white/10 
                    py-1.5 px-4 rounded-full text-[0.75rem] font-bold uppercase
                    transition-all duration-200 cursor-pointer tracking-wide;
+            
+            // Verhindert das "Zusammenkleben"
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none !important;
+            white-space: nowrap; // Verhindert Zeilenumbruch in der Pille
 
             &:hover {
                 @apply bg-white/10 border-info/50 text-white -translate-y-px shadow-sm;
-            }
-
-            &:active {
-                @apply translate-y-0 opacity-70;
+                text-decoration: none !important;
             }
         }
 
-        // ZWEITER FIX: Falls das Grid/Gap aus irgendeinem Grund ignoriert wird
-        .btn-view-toggle {
+        // Falls das Gap-Property vom Browser ignoriert wird (Fallback)
+        & > * + * {
             margin-left: 0.5rem; 
         }
     }
