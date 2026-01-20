@@ -3,9 +3,17 @@ module.exports = {
   content: [
     "./index.html",
     "./src/**/*.elm", // Scannt deinen Elm-Code nach Klassen
+    "./src/**/*.ts",  // Falls du Klassen im TypeScript (Three.js) nutzt
   ],
   theme: {
     extend: {
+      // --- 0. TYPOGRAFIE ---
+      fontFamily: {
+        // Wir setzen 'Open Sans' als primäre Sans-Schrift. 
+        // Die Fallbacks sorgen für Stabilität, falls mal was nicht lädt.
+        sans: ['"Open Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
+
       // --- 1. FARBPALETTE ---
       colors: {
         'bg-dark': '#1a202c',
@@ -27,23 +35,21 @@ module.exports = {
       },
 
       // --- 2. ABSTÄNDE & 3. LAYOUT ---
-      // Tailwind nutzt eine 4px-Basis. 1 unit = 4px.
-      // Deine $space-Werte entsprechen also exakt den Tailwind-Defaults (1, 2, 4, 6, 8).
       spacing: {
-        'xs': '4px',    // entspricht p-1
-        'sm': '8px',    // entspricht p-2
-        'md': '16px',   // entspricht p-4
-        'lg': '24px',   // entspricht p-6
-        'xl': '32px',   // entspricht p-8
-        'nav': '60px',  // $nav-height
-        'rail': '60px', // $rail-width
-        'drawer': '320px', // $drawer-width
+        'xs': '4px',
+        'sm': '8px',
+        'md': '16px',
+        'lg': '24px',
+        'xl': '32px',
+        'nav': '60px',  // Perfekt auf die BIBA-Seite abgestimmt
+        'rail': '60px', 
+        'drawer': '320px', 
       },
 
       // --- BORDER RADIUS ---
       borderRadius: {
-        'industrial': '8px',    // $border-radius
-        'industrial-sm': '4px', // $border-radius-sm
+        'industrial': '8px',
+        'industrial-sm': '4px',
       },
 
       // --- 4. SCHATTEN ---
@@ -56,10 +62,10 @@ module.exports = {
 
       // --- 5. ANIMATIONEN & TRANSITIONS ---
       transitionTimingFunction: {
-        'industrial': 'cubic-bezier(0.4, 0, 0.2, 1)', // $transition-curve
+        'industrial': 'cubic-bezier(0.4, 0, 0.2, 1)',
       },
       transitionDuration: {
-        '200': '200ms', // $transition-speed
+        '200': '200ms',
       },
       keyframes: {
         'pulse-red': {

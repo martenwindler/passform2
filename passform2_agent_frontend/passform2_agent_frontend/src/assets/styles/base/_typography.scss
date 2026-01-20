@@ -1,0 +1,93 @@
+/* src/styles/base/_typography.scss */
+
+@use 'variables' as *;
+
+// --- BASIS ---
+body {
+    @apply font-sans antialiased text-text-main;
+    font-size: 0.875rem; // ~14px (Der Sweetspot zwischen Photopea und Lesbarkeit)
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+// --- ÜBERSCHRIFTEN ---
+h1, .text-h1 {
+    @apply font-extrabold tracking-tight text-white;
+    font-size: 1.5rem; // 24px
+}
+
+h2, .text-h2 {
+    @apply font-bold tracking-tight text-white;
+    font-size: 1.25rem; // 20px
+}
+
+h3, .text-h3 {
+    @apply font-semibold text-text-main;
+    font-size: 1rem; // 16px
+}
+
+// --- SPEZIALKLASSEN FÜR DASHBOARDS ---
+
+// Für die kleinen Labels über Inputs oder in der Sidebar
+.text-label {
+    @apply font-bold uppercase tracking-wider text-text-muted;
+    font-size: 0.7rem; // 11.2px - Sehr kompakt
+}
+
+// Für numerische Daten (Zahlen müssen gut lesbar sein)
+.text-data {
+    @apply font-medium font-sans;
+    font-variant-numeric: tabular-nums; // Verhindert Springen bei wechselnden Zahlen
+    letter-spacing: 0.02em;
+}
+
+// Für Statusmeldungen oder kleine Infos
+.text-caption {
+    @apply text-text-muted;
+    font-size: 0.75rem; // 12px
+}
+
+// Für deine Buttons in der Navbar
+.text-button {
+    @apply font-bold uppercase tracking-wide;
+    font-size: 0.75rem;
+}
+
+// --- LINKS ---
+a {
+    @apply transition-colors duration-200;
+    text-decoration: none;
+    
+    &:hover {
+        @apply text-info;
+    }
+}
+
+/* Ergänzung für _typography.scss */
+
+.text-glow-info {
+    color: theme('colors.info');
+    text-shadow: 0 0 8px rgba(99, 179, 237, 0.5);
+}
+
+.text-glow-success {
+    color: theme('colors.success');
+    text-shadow: 0 0 8px rgba(72, 187, 120, 0.5);
+}
+
+.text-glow-danger {
+    color: theme('colors.danger');
+    text-shadow: 0 0 12px rgba(245, 101, 101, 0.6);
+    @apply animate-pulse-error; // Dein Puls-Effekt aus der Config!
+}
+
+.text-industrial-dark {
+    color: #000000 !important;
+    text-shadow: none !important; // Glow entfernen, damit es lesbar bleibt
+}
+
+.text-force-black {
+    color: #000000 !important;
+    text-shadow: none !important;
+    @apply opacity-100; // Sicherstellen, dass nichts halbtransparent ist
+}

@@ -1,5 +1,7 @@
 // 1. ZUERST: Alle SASS-Dateien laden (Absolut oben!)
 @use 'base/variables' as *;
+@use 'base/fonts';
+@use 'base/typography';
 @use 'base/reset';
 
 // Atome
@@ -90,4 +92,48 @@
     // Da sie im selben Flex-Container wie .grid-viewport sitzt,
     // "drückt" sie das Gitter automatisch nach links.
     @apply h-full shrink-0;
+}
+
+// Globales Schrift-Setup
+body {
+    // Standard-Font über Tailwind-Variable (Open Sans aus deiner Config)
+    @apply font-sans antialiased; 
+    
+    // Glättung für helle Schrift auf dunklem Grund
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    
+    // Die Basisgröße (0.875rem = 14px bei 16px Basis)
+    // Das ist etwas lesbarer als 13px, aber immer noch kompakt
+    font-size: 0.875rem; 
+    line-height: 1.5;
+    color: theme('colors.text-main');
+}
+
+// Form-Elemente erben die Schriftfamilie automatisch
+input, button, textarea, select {
+    font-family: inherit;
+    font-size: inherit;
+}
+
+// Spezialfall: Tabellen oder kleine Labels (wie in der Sidebar)
+.text-micro {
+    font-size: 0.75rem; // 12px
+    @apply font-medium tracking-wide uppercase;
+}
+
+.loading-overlay {
+    @apply absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-200;
+    z-index: 10;
+    
+    &.is-loading { opacity: 1; }
+    
+    svg {
+        @apply w-12 h-12 animate-spin text-info;
+    }
+}
+
+.sidebar-container, .modal-content {
+    backdrop-filter: blur(12px); // Erhöhter Wert für den "Frosted Glass" Look
+    background-color: rgba(26, 32, 44, 0.8); // Dein bg-dark mit 80% Deckkraft
 }

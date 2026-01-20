@@ -28,3 +28,10 @@
         @apply bg-danger/20 border-danger/40;
     }
 }
+
+.btn-industrial {
+    @apply transition-transform duration-200 ease-out;
+    &:hover:not(:disabled) {
+        transform: scale(1.05);
+    }
+}

@@ -5,17 +5,19 @@
 .navbar.blue-look {
     @apply h-nav bg-nav-bg text-white flex items-center justify-between 
            px-lg shadow-md z-[1000] relative;
+    
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 
     .navbar-section {
-        @apply flex items-center gap-md z-10;
-
+        @apply flex items-center z-10;
         .navbar-logo {
-            @apply h-[35px] drop-shadow-[0_0_8px_rgba(255,255,255,0.4)];
+            @apply h-[35px];
+            filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.25)) !important;
         }
-
         .navbar-title {
-            @apply font-semibold text-[1.1rem] tracking-[0.5px] text-white;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+            @apply m-0 text-white;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
         }
     }
 
@@ -24,76 +26,61 @@
         pointer-events: none; 
 
         .status-pill.combined-status {
-            @apply inline-flex items-center bg-black/40 py-1.5 px-5 
-                   rounded-full border border-white/10 gap-4 shadow-inner;
+            @apply inline-flex items-center bg-black/40 py-1.5 px-4 
+                   rounded-full border border-white/10 gap-3 shadow-inner;
             pointer-events: auto;
 
             .indicator-group {
-                @apply flex items-center gap-2.5;
-
-                .indicator-label {
-                    @apply text-[0.7rem] font-extrabold text-white/90 uppercase tracking-wider;
-                }
+                @apply flex items-center gap-2;
+                .indicator-label { @apply text-label text-white/90; }
             }
 
             .status-dot-small {
-                @apply w-2.5 h-2.5 rounded-full block shrink-0;
+                @apply w-2 h-2 rounded-full block shrink-0;
                 
+                // HIER DER KRÄFTIGE GLOW ZURÜCK
                 &.online {
-                    background-color: #48bb78;
-                    @apply bg-success;
-                    box-shadow: 0 0 12px rgba(72, 187, 120, 0.9);
+                    background-color: #48bb78 !important;
+                    box-shadow: 0 0 12px #48bb78, 0 0 5px rgba(72, 187, 120, 0.6) !important;
                 }
-
                 &.offline {
-                    background-color: #f56565;
-                    @apply bg-danger;
-                    box-shadow: 0 0 12px rgba(245, 101, 101, 0.9);
+                    background-color: #f56565 !important;
+                    box-shadow: 0 0 12px #f56565, 0 0 5px rgba(245, 101, 101, 0.6) !important;
                 }
-
                 &.warning {
-                    background-color: #ecc94b;
-                    @apply bg-warning;
-                    box-shadow: 0 0 12px rgba(236, 201, 75, 0.9);
+                    background-color: #ecc94b !important;
+                    box-shadow: 0 0 12px #ecc94b, 0 0 5px rgba(236, 201, 75, 0.6) !important;
                 }
             }
 
             .status-divider {
-                @apply w-[1px] h-3 bg-white/20 block;
+                @apply w-[1px] h-3 bg-white/10 block;
+                margin: 0 2px;
             }
         }
     }
 
-    // 3. Rechte Sektion (Actions)
     .navbar-actions {
-        @apply flex items-center z-10;
-        
-        // KRITISCH: Wir erzwingen den Abstand hier massiv
+        // HIER DER ABSTANDS-FIX FÜR DIE BUTTONS
         display: flex !important;
-        gap: 0.75rem !important; // 24px Abstand zwischen allen Pillen
+        align-items: center !important;
+        gap: 0.75rem !important; // Stabile 12px Lücke zwischen den Pillen
+        z-index: 10;
         
         .btn-mode-switch, 
         .btn-view-toggle {
             @apply bg-white/5 text-white/80 border border-white/10 
-                   py-1.5 px-4 rounded-full text-[0.75rem] font-bold uppercase
-                   transition-all duration-200 cursor-pointer tracking-wide;
+                   py-1.5 px-4 rounded-full transition-all duration-200 
+                   cursor-pointer inline-flex items-center 
+                   justify-center whitespace-nowrap;
             
-            // Verhindert das "Zusammenkleben"
-            display: inline-flex !important;
-            align-items: center;
-            justify-content: center;
+            margin: 0 !important; // Margin killen, damit nur GAP zählt
             text-decoration: none !important;
-            white-space: nowrap; // Verhindert Zeilenumbruch in der Pille
 
             &:hover {
                 @apply bg-white/10 border-info/50 text-white -translate-y-px shadow-sm;
-                text-decoration: none !important;
+                transform: scale(1.03);
             }
-        }
-
-        // Falls das Gap-Property vom Browser ignoriert wird (Fallback)
-        & > * + * {
-            margin-left: 0.5rem; 
         }
     }
 }
