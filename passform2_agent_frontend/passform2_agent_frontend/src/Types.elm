@@ -5,10 +5,30 @@ import Json.Decode as Decode
 import Types.Domain exposing (..)
 
 
+-- --- FLAGS ---
+
+{-|
+Daten, die beim Start der App von JavaScript (index.html)
+an Elm übergeben werden.
+-}
+type alias Flags =
+    { backendIP : String
+    , savedConfig : Maybe String
+    }
+
+
+-- --- LAYOUT MODES ---
+
+type LayoutMode
+    = LandingMode
+    | AppMode
+
+
 -- --- MODEL ---
 
 type alias Model =
-    { mode : Mode
+    { activeLayout : LayoutMode 
+    , mode : Mode
     , backendIP : String
     , connected : Bool
     , rosConnected : Bool
@@ -50,10 +70,20 @@ type Msg
     = PlanningMsg PlanningMsg
     | HardwareMsg HardwareMsg
     | AgentsMsg AgentsMsg
+    | SystemMsg SystemMsg 
     | NoOp
 
 
 -- --- DOMÄNEN-SPEZIFISCHE MESSAGES ---
+
+type SystemMsg
+    = NewProject                
+    | OpenFileBrowser           
+    | DragOver                  
+    | FileDropped Decode.Value  
+    | FileSelected Decode.Value 
+    | ResetToLanding            
+
 
 type PlanningMsg
     = SetGridWidth String

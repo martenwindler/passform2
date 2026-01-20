@@ -1,0 +1,16 @@
+@use '../base/variables' as *;
+
+.app-shell {
+    @apply h-screen w-screen flex flex-col overflow-hidden bg-bg-main;
+
+    .content-area {
+        @apply flex-1 flex overflow-hidden relative;
+        // Das Gitter nimmt den Restplatz ein, die Sidebar wird rechts angeflanscht
+    }
+
+    // Falls du das Gitter zentrieren willst
+    .grid-viewport {
+        @apply flex-1 h-full overflow-auto bg-grid-bg relative;
+        // Hier kommt dein Three.js oder SVG Gitter rein
+    }
+}

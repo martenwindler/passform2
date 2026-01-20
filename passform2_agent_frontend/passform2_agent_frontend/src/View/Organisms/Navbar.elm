@@ -9,14 +9,13 @@ import Types.Domain exposing (..)
 view : Model -> Html Msg
 view model =
     nav [ class "navbar blue-look" ]
-        [ -- 1. Links: Logo und Titel
+        [ -- 1. Links: Logo und Titel (Bleiben immer da)
           div [ class "navbar-section" ]
             [ img [ src "src/assets/images/logo.png", class "navbar-logo", alt "Logo" ] []
-            -- NEU: text-h3 statt manueller Font-Größe
-            , span [ class "navbar-title text-h3 hidden sm:inline ml-3" ] [ text "Passform 2.0" ]
+            , span [ class "navbar-title text-h3 hidden sm:inline ml-3 text-white" ] [ text "Passform 2.0" ]
             ]
         
-        , -- 2. Mitte: Status-Pille (zentriert)
+        , -- 2. Mitte: Status-Pille (Zentraler Anker, bleibt immer da)
           div [ class "navbar-center hidden md:flex" ]
             [ div [ class "status-pill combined-status" ]
                 [ viewIndicator "REST" (if model.connected then Online else Error)
@@ -35,30 +34,46 @@ view model =
                 ]
             ]
 
-        , -- 3. Rechts: Actions
-          div [ class "navbar-actions" ]
-            [ button 
-                [ class "btn-mode-switch text-button"
-                , onClick (AgentsMsg ToggleMode) 
-                ] 
-                [ span [ class "hidden lg:inline" ] 
-                    [ text (if model.mode == Simulation then "Hardware-Modus" else "Simulations-Modus") ]
-                ]
-            , button 
-                [ class "btn-view-toggle text-button"
-                , onClick (AgentsMsg ToggleViewMode) 
-                ] 
-                [ text (if model.is3D then "2D" else "3D") ]
-            
-            , a 
-                [ class "btn-view-toggle link-pill text-button"
-                , href "https://passform.biba.uni-bremen.de/"
-                , target "_blank"
-                , rel "noopener noreferrer"
-                ] 
-                [ text "Projekt" ]
-            ]
+        , -- 3. Rechts: Actions (Werden im LandingMode ausgeblendet)
+          viewActions model
         ]
+
+{-| 
+Hilfsfunktion für die rechte Seite der Navbar.
+Gibt im LandingMode ein leeres div zurück, damit die Mitte zentriert bleibt.
+-}
+viewActions : Model -> Html Msg
+viewActions model =
+    case model.activeLayout of
+        LandingMode ->
+            -- Leer im Landing Layout
+            div [ class "navbar-actions" ] []
+
+        AppMode ->
+            -- Volle Funktionalität in der App
+            div [ class "navbar-actions" ]
+                [ button 
+                    [ class "btn-mode-switch text-button"
+                    , onClick (AgentsMsg ToggleMode) 
+                    ] 
+                    [ span [ class "hidden lg:inline text-white" ] 
+                        [ text (if model.mode == Simulation then "Hardware-Modus" else "Simulations-Modus") ]
+                    ]
+                , button 
+                    [ class "btn-view-toggle text-button text-white"
+                    , onClick (AgentsMsg ToggleViewMode) 
+                    ] 
+                    [ text (if model.is3D then "2D" else "3D") ]
+                
+                , a 
+                    [ class "btn-view-toggle link-pill text-button text-white"
+                    , href "https://passform.biba.uni-bremen.de/"
+                    , target "_blank"
+                    , rel "noopener noreferrer"
+                    ] 
+                    [ text "Projekt" ]
+                ]
+
 
 -- --- HELPER ---
 
@@ -66,8 +81,7 @@ viewIndicator : String -> HardwareStatus -> Html Msg
 viewIndicator label status =
     div [ class "indicator-group" ]
         [ div [ class ("status-dot-small " ++ statusToClass status) ] []
-        -- NEU: text-label für die Status-Beschriftung
-        , span [ class "indicator-label text-label" ] [ text label ]
+        , span [ class "indicator-label text-label text-white" ] [ text label ]
         ]
 
 statusToClass : HardwareStatus -> String

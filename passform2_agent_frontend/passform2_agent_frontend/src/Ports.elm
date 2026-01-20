@@ -25,6 +25,9 @@ port exportConfig : String -> Cmd msg
 
 port importConfigTrigger : () -> Cmd msg
 
+-- NEU: Schickt das File-Objekt (JSON) an JS zum Auslesen
+port requestFileRead : Decode.Value -> Cmd msg
+
 port writeNfcTrigger : String -> Cmd msg
 
 port savePlanningWeights : Decode.Value -> Cmd msg
@@ -50,6 +53,9 @@ port pathCompleteReceiver : (Decode.Value -> msg) -> Sub msg
 port systemLogReceiver : (Decode.Value -> msg) -> Sub msg
 
 port rfidReceiver : (Decode.Value -> msg) -> Sub msg
+
+-- NEU: Empfängt den String-Inhalt der eingelesenen Datei
+port fileContentRead : (String -> msg) -> Sub msg
 
 port configReceived : (String -> msg) -> Sub msg
 

@@ -15,10 +15,13 @@ import Types.Domain exposing (..)
 import Update.Planning as Planning
 import Update.Hardware as Hardware
 import Update.Agents as Agents
+import Update.System as System
 
 -- VIEW-IMPORTE (Das neue Layout-System)
-import View.Layouts.MainLayout as MainLayout
-
+import View.Organisms.Navbar as Navbar
+import View.Organisms.Sidebar as Sidebar
+import View.Layouts.LandingLayout as LandingLayout
+import View.Layouts.LandingLayout as LandingLayout
 
 -- --- PROGRAM ---
 
@@ -34,18 +37,14 @@ main =
 
 -- --- INIT ---
 
-init : { backendIP : String, savedConfig : Maybe String } -> ( Model, Cmd Msg )
+init : Flags -> ( Model, Cmd Msg )
 init flags =
     let
         initialAgents =
-            case flags.savedConfig of
-                Just json ->
-                    case Decode.decodeString Decoders.agentMapDecoder json of
-                        Ok agents -> agents
-                        Err _ -> Dict.empty
-                Nothing -> Dict.empty
+            Dict.empty -- Oder dein Standard-Gitter, falls vorhanden
     in
-    ( { mode = Simulation
+    ( { activeLayout = LandingMode -- HIER WAR DER FEHLER: Das Feld hat gefehlt
+      , mode = Simulation
       , backendIP = flags.backendIP
       , connected = True
       , rosConnected = False
@@ -98,9 +97,11 @@ update msg model =
         AgentsMsg aMsg ->
             Agents.update aMsg model
 
+        SystemMsg sMsg ->
+            System.update sMsg model
+
         NoOp ->
             ( model, Cmd.none )
-
 
 -- --- SUBSCRIPTIONS ---
 
@@ -138,8 +139,18 @@ handlePathComplete rawValue =
 
 view : Model -> Html Msg
 view model =
-    MainLayout.view model (view3D model)
+    div [ class "app-shell" ]
+        [ Navbar.view model
+        , case model.activeLayout of
+            LandingMode -> 
+                LandingLayout.view model
 
+            AppMode -> 
+                div [ class "content-area" ] 
+                    [ view3D model -- HIER: Direkt die lokale Funktion nutzen
+                    , Sidebar.view model 
+                    ]
+        ]
 
 -- --- HELPER VIEW (3D Scene Interop) ---
 

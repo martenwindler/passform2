@@ -6,7 +6,8 @@ import Dict
 
 emptyModel : Model
 emptyModel =
-    { mode = Simulation
+    { activeLayout = LandingMode -- HIER DER FIX: Standardwert für Tests
+    , mode = Simulation
     , backendIP = "127.0.0.1"
     , connected = False
     , rosConnected = False
@@ -29,7 +30,13 @@ emptyModel =
     , gridHeight = 4
     , waitingForNfc = False
     , nfcStatus = UnknownStatus
-    , planningWeights = { execution_time_default = 1.0, complex_module_time = 3.5, human_extra_weight = 1.0, proximity_penalty = 0.5, hardware_safety_factor = 1.2 }
+    , planningWeights = 
+        { execution_time_default = 1.0
+        , complex_module_time = 3.5
+        , human_extra_weight = 1.0
+        , proximity_penalty = 0.5
+        , hardware_safety_factor = 1.2 
+        }
     , currentHz = 1.0
     , alert = Nothing
     , connectedHardware = []

@@ -5,6 +5,7 @@ import Types.Domain exposing (..)
 import Update.Planning as Planning
 import Update.Hardware as Hardware
 import Update.Agents as Agents
+import Update.System as System
 
 {-| 
   Zentraler Dispatcher: 
@@ -28,3 +29,6 @@ update msg model =
 
         OpenMenu x y ->
             ( { model | activeMenu = Just (SelectionMenu ( x, y )) }, Cmd.none )
+
+        SystemMsg sMsg ->
+            System.update sMsg model

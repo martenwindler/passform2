@@ -91,3 +91,58 @@ a {
     text-shadow: none !important;
     @apply opacity-100; // Sicherstellen, dass nichts halbtransparent ist
 }
+
+
+// --- BASIS TYPOGRAFIE ---
+
+body {
+    font-family: 'Open Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: #ffffff; // Zentraler Fix: Alle Texte standardmäßig weiß
+}
+
+// --- ÜBERSCHRIFTEN ---
+
+.text-h1 {
+    @apply font-bold tracking-tight;
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    line-height: 1.1;
+    color: #ffffff;
+}
+
+.text-h2 {
+    @apply font-bold;
+    font-size: 2rem;
+    color: #ffffff;
+}
+
+.text-h3 {
+    @apply font-semibold;
+    font-size: 1.25rem;
+    color: #ffffff;
+}
+
+// --- SPEZIALKLASSEN (Für Landing & Sidebar) ---
+
+.text-label {
+    @apply uppercase tracking-widest font-medium;
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.9); // Minimal transparent für Tiefe
+}
+
+.text-button {
+    @apply font-bold tracking-wide;
+    font-size: 1rem;
+}
+
+.text-caption {
+    @apply font-normal;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6); // Dezent für Hintergrundinfos
+}
+
+.text-data {
+    font-family: 'JetBrains Mono', monospace; // Falls für Koordinaten genutzt
+    color: var(--color-info, #3482f6); // Datenwerte dürfen farbig hervorstechen
+}

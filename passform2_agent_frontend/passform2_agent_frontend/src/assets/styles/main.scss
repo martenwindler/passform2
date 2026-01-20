@@ -30,6 +30,10 @@
 @use "organisms/sidebar/sections/planning-weights";
 @use "organisms/sidebar/sections/planning-result";
 
+// L to the ayouts
+@use 'layouts/landinglayout';
+@use 'layouts/mainlayout';
+
 // 2. DANACH: Tailwind Schichten injizieren
 @tailwind base;
 @tailwind components;
