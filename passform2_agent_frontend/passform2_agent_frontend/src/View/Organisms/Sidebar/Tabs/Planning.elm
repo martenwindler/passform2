@@ -9,14 +9,9 @@ import View.Organisms.Sidebar.Sections.PathResultSection as PathResultSection
 
 view : Model -> Html Msg
 view model =
-    div [ class "sidebar-tab-content scrollbar-hide flex flex-col gap-6" ]
-        [ -- REBRANDING: Haupttitel angepasst
-          h3 [] [ text "Contract Net Protocol" ]
-
-        , -- Navigation, Status & Start-Button
-          MissionSection.view model
-        , -- NEU: Das Ergebnis der Pfadsuche (erscheint nur bei Erfolg)
-          PathResultSection.view model
-        , -- CNP Gewichte (Kostenfunktion)
-          WeightsSection.view model
+    div [ class "sidebar-tab-content tab-planning flex flex-col gap-6" ] -- Neu: tab-planning
+        [ h3 [] [ text "Contract Net Protocol" ]
+        , MissionSection.view model
+        , PathResultSection.view model
+        , WeightsSection.view model
         ]

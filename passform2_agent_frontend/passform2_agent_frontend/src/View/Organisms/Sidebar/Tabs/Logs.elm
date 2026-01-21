@@ -11,10 +11,7 @@ Orchestriert die LogSection innerhalb des Sidebar-Layouts.
 -}
 view : Model -> Html Msg
 view model =
-    -- h-full und flex-col sind entscheidend für das Terminal-Scrolling
-    div [ class "sidebar-tab-content h-full flex flex-col" ]
+    div [ class "sidebar-tab-content tab-logs h-full flex flex-col" ] -- Neu: tab-logs
         [ h3 [ class "shrink-0 mb-4" ] [ text "System-Historie" ]
-        
-        , -- Aufruf der isolierten Sektion
-          LogSection.view model
+        , LogSection.view model
         ]

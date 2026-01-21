@@ -31,11 +31,24 @@ viewDrawer : Model -> Html Msg
 viewDrawer model =
     div [ class "sidebar-content" ]
         [ div [ class "sidebar-tab-header" ] 
-            -- NEU: text-h3 sorgt für die gleiche Optik wie in der Navbar & Modal
             [ h2 [ class "text-h3" ] [ text (getTabTitle model.activeSidebarTab) ] ]
-        , div [ class "tab-body" ] 
+        , div 
+            [ class "tab-body"
+            , id ("tab-container-" ++ tabToIdString model.activeSidebarTab) -- Zwingt zum Re-Render
+            ] 
             [ viewTabContent model ]
         ]
+
+-- Hilfsfunktion am Ende der Datei
+tabToIdString : SidebarTab -> String
+tabToIdString tab =
+    case tab of
+        TabPlanning -> "planning"
+        TabGrid -> "grid"
+        TabAgents -> "agents"
+        TabHardware -> "hardware"
+        TabRanger -> "ranger"
+        TabLogs -> "logs"
 
 viewRail : Model -> Html Msg
 viewRail model =

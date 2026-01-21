@@ -12,12 +12,9 @@ Der Agents-Tab fungiert als Orchestrator.
 -}
 view : Model -> Html Msg
 view model =
-    div [ class "sidebar-tab-content h-full flex flex-col" ]
-        [ -- 1. Die Modul-Liste
-          ActiveModuleSection.view model
-
-        , -- 2. Globaler Action-Bereich
-          div [ class "mt-auto pt-4 border-t border-white/5" ]
+    div [ class "sidebar-tab-content tab-agents h-full flex flex-col" ] -- Neu: tab-agents
+        [ ActiveModuleSection.view model
+        , div [ class "mt-auto pt-4 border-t border-white/5" ]
             [ Button.danger "Gesamtes Gitter leeren" (AgentsMsg ClearGrid) True True ]
         ]
 
