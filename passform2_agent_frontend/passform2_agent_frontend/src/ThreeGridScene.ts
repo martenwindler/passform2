@@ -72,7 +72,10 @@ export class ThreeGridScene extends HTMLElement {
                 case 'path': this.drawPath(JSON.parse(newVal)); break;
                 case 'start-pos':
                 case 'goal-pos': this.updateMarkers(); break;
-                case 'allow-interaction': this.style.cursor = 'default'; break;
+                case 'allow-interaction': 
+                    // Hier war der Fehler: Nur Cursor ändern reicht nicht immer
+                    this.style.cursor = newVal === 'true' ? 'crosshair' : 'default'; 
+                    break;
             }
         } catch (e) { console.error(`Attribute update error (${name}):`, e); }
     }
@@ -86,14 +89,18 @@ export class ThreeGridScene extends HTMLElement {
         this.shadowRoot?.appendChild(style);
         this.shadowRoot?.appendChild(this.renderer.domElement);
 
-        // KORREKTUR: ResizeObserver statt Window-Event
-        // Er erkennt Größenänderungen durch die Sidebar-Animation in Echtzeit
+        // ERZWINGE Pointer-Events auf dem Host-Element
+        this.style.pointerEvents = 'auto';
+        this.renderer.domElement.style.pointerEvents = 'auto';
+
         this.resizeObserver = new ResizeObserver(() => this.resize());
         this.resizeObserver.observe(this);
 
+        // WICHTIG: Ändere die Listener auf das domElement statt Window, 
+        // um Konflikte mit der Sidebar zu vermeiden
         this.renderer.domElement.addEventListener('mousedown', (e) => this.onMouseDown(e));
-        window.addEventListener('mousemove', (e) => this.onMouseMove(e));
-        window.addEventListener('mouseup', (e) => this.onMouseUp(e));
+        this.renderer.domElement.addEventListener('mousemove', (e) => this.onMouseMove(e));
+        this.renderer.domElement.addEventListener('mouseup', (e) => this.onMouseUp(e));
         
         this.animate();
         this.updateGrid();

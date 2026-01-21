@@ -68,7 +68,15 @@
 // 3. Der Content-Bereich (Das Herzstück)
 .content-area {
     @apply flex flex-1 flex-row overflow-hidden relative;
-    // Wir nutzen Flexbox, weil flex: 1 am Gitter perfekt auf die Breite der Sidebar reagiert
+    z-index: 1; // Sicherstellen, dass die App-Ebene über dem (evtl. noch vorhandenen) Landing-Hintergrund liegt
+    
+    three-grid-scene {
+        display: block;
+        flex: 1; // Nimmt den Platz ein
+        height: 100%;
+        pointer-events: auto !important; // KRITISCH
+        z-index: 5; // Vor dem Hintergrund
+    }
 }
 
 .grid-viewport {
@@ -140,4 +148,10 @@ input, button, textarea, select {
 .sidebar-container, .modal-content {
     backdrop-filter: blur(12px); // Erhöhter Wert für den "Frosted Glass" Look
     background-color: rgba(26, 32, 44, 0.8); // Dein bg-dark mit 80% Deckkraft
+}
+
+// Falls die Sidebar im Weg ist, stelle sicher, dass sie nicht 
+// den ganzen Bildschirm mit einem unsichtbaren Overlay blockiert
+.sidebar-container {
+    pointer-events: auto;
 }

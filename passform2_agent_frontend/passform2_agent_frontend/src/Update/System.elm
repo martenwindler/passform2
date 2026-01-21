@@ -15,17 +15,14 @@ update : SystemMsg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         NewProject ->
-            -- Wir leeren das Gitter und springen direkt in die App
             ( { model 
                 | activeLayout = AppMode
-                , agents = Dict.empty
-                , pathStart = Nothing
-                , pathGoal = Nothing
-                , currentPath = Nothing 
-              }
+                , editing = True  -- Das muss hier stehen!
+                , agents = Dict.empty 
+            }
             , Cmd.none 
             )
-
+            
         OpenFileBrowser ->
             -- Dieser Call wird meist indirekt über das Label/Input im View gelöst,
             -- aber wir lassen ihn als Platzhalter für manuelle Trigger.

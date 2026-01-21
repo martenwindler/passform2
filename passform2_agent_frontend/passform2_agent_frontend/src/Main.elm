@@ -19,9 +19,11 @@ import Update.System as System
 
 -- VIEW-IMPORTE (Das neue Layout-System)
 import View.Organisms.Navbar as Navbar
+import View.Organisms.Modal as Modal
 import View.Organisms.Sidebar as Sidebar
 import View.Layouts.LandingLayout as LandingLayout
 import View.Layouts.LandingLayout as LandingLayout
+import View.Organisms.Modal
 
 -- --- PROGRAM ---
 
@@ -142,14 +144,18 @@ view model =
     div [ class "app-shell" ]
         [ Navbar.view model
         , case model.activeLayout of
-            LandingMode -> 
+            LandingMode ->
                 LandingLayout.view model
 
-            AppMode -> 
+            AppMode ->
                 div [ class "content-area" ] 
-                    [ view3D model -- HIER: Direkt die lokale Funktion nutzen
+                    [ view3D model
                     , Sidebar.view model 
                     ]
+        
+        -- WICHTIG: Das Modal muss HIER stehen, damit es über der Landingpage 
+        -- UND über dem Gitter angezeigt werden kann!
+        , View.Organisms.Modal.view model 
         ]
 
 -- --- HELPER VIEW (3D Scene Interop) ---
@@ -159,18 +165,47 @@ view3D model =
     let
         allowInteraction =
             case model.mode of
-                Simulation -> "true"
-                Hardware -> "false"
+                Simulation ->
+                    "true"
+
+                Hardware ->
+                    "false"
+                    
+        -- Wir geben dem Gitter explizit mit, in welchem Modus wir sind
+        layoutModeStr =
+            case model.activeLayout of
+                LandingMode -> "landing"
+                AppMode -> "app"
     in
     node "three-grid-scene"
-        [ attribute "agents" (model.agents |> Decoders.encodeAgentMap |> Encode.encode 0)
-        , attribute "path" (Decoders.encodePath model.currentPath |> Encode.encode 0)
-        , attribute "is-3d" (if model.is3D then "true" else "false")
-        , attribute "grid-width" (String.fromInt model.gridWidth)
+        [ -- Basis-Konfiguration
+          attribute "grid-width" (String.fromInt model.gridWidth)
         , attribute "grid-height" (String.fromInt model.gridHeight)
+        , attribute "is-3d" (if model.is3D then "true" else "false")
+        
+        -- Interaktions-Logik
         , attribute "allow-interaction" allowInteraction 
-        , attribute "start-pos" (model.pathStart |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
-        , attribute "goal-pos" (model.pathGoal |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) |> Maybe.withDefault Encode.null |> Encode.encode 0)
+        , attribute "active-layout" layoutModeStr
+        
+        -- Daten-Objekte (als JSON-Strings für das Custom Element)
+        , attribute "agents" (model.agents |> Decoders.encodeAgentMap |> Encode.encode 0)
+        , attribute "path" (Decoders.encodePath model.currentPath |> Encode.encode 0)
+        
+        -- Positionen
+        , attribute "start-pos" 
+            (model.pathStart 
+                |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) 
+                |> Maybe.withDefault Encode.null 
+                |> Encode.encode 0
+            )
+        , attribute "goal-pos" 
+            (model.pathGoal 
+                |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) 
+                |> Maybe.withDefault Encode.null 
+                |> Encode.encode 0
+            )
+            
+        -- EVENT-LISTENER (Die Brücke zurück zu Elm)
         , Ports.onAgentMoved (MoveAgent >> AgentsMsg)
         , Ports.onCellClicked (HandleGridClick >> AgentsMsg) 
         ]

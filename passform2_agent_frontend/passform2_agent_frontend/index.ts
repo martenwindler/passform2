@@ -7,18 +7,16 @@ import "./src/assets/styles/main.scss";
 
 const savedConfig = localStorage.getItem('p2_agent_config');
 const defaultBackend = 'http://127.0.0.1:8080';
-const rosBridgeUrl = 'http://127.0.0.1:5000';
 
 let backendIP = localStorage.getItem('p2_backend_ip') || defaultBackend;
 
+// Bereinigung der IP-Adressen
 if (backendIP.includes("localhost")) {
     backendIP = backendIP.replace("localhost", "127.0.0.1");
 }
-
 if (backendIP.includes(":8000")) {
     backendIP = backendIP.replace(":8000", ":8080");
 }
-
 if (backendIP.includes(":5000") || backendIP.includes("192.168")) {
     backendIP = defaultBackend;
 }
@@ -48,6 +46,48 @@ const sendSafe = (portName: string, data: any) => {
     if (port && port.send) port.send(data);
 };
 
+// --- FILE READER LOGIK (KORRIGIERT FÜR LANDING PAGE) ---
+
+/**
+ * Kernfunktion zum Einlesen von JSON-Dateien.
+ * Wandelt das File-Objekt in einen String um und schickt ihn an Elm.
+ */
+const handleFileReading = (file: File) => {
+    if (!file) return;
+    
+    // Validierung (Optional, aber empfohlen)
+    if (!file.name.endsWith('.json') && file.type !== "application/json") {
+        console.warn("⚠️ Nur .json Dateien sind erlaubt.");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const content = ev.target?.result;
+        if (typeof content === 'string') {
+            // Sende an beide möglichen Ports (Abwärtskompatibilität)
+            sendSafe('fileContentRead', content);
+            sendSafe('configReceived', content);
+            console.log("✅ Konfigurationsdatei erfolgreich eingelesen.");
+        }
+    };
+    reader.readAsText(file);
+};
+
+/**
+ * Port für automatisiertes Einlesen (wird von der Landing-Page Dropzone getriggert)
+ */
+subscribeSafe('requestFileRead', (data: any) => {
+    // Wenn data direkt ein File ist (aus dem Drop-Decoder)
+    if (data instanceof File || (data && data.name)) {
+        handleFileReading(data);
+    } 
+    // Falls ein Raw-Event oder ein Proxy-Objekt kommt
+    else if (data && data.target && data.target.files) {
+        handleFileReading(data.target.files[0]);
+    }
+});
+
 // --- ROS-BRIDGE VERBINDUNG (Port 5000) ---
 
 const connectToRosBridge = () => {
@@ -56,30 +96,15 @@ const connectToRosBridge = () => {
         rosSocket.disconnect();
     }
     
-    console.log("🤖 Versuche Verbindung zu ROS-Bridge...");
-    
-    // Versuche es ohne http:// falls http://127.0.0.1:5000 nicht klappt
     rosSocket = io('ws://127.0.0.1:5000', { 
         transports: ['websocket'],
         reconnection: true,
-        reconnectionDelay: 2000,
-        timeout: 5000
+        reconnectionDelay: 2000
     });
 
-    rosSocket.on('connect', () => {
-        console.log("✅ ROS-Bridge verbunden!");
-        sendSafe('rosStatusReceiver', true);
-    });
-
-    rosSocket.on('connect_error', (err) => {
-        console.error("❌ ROS-Bridge Verbindungsfehler:", err);
-        sendSafe('rosStatusReceiver', false);
-    });
-
-    rosSocket.on('disconnect', () => {
-        console.warn("⚠️ ROS-Bridge verloren.");
-        sendSafe('rosStatusReceiver', false);
-    });
+    rosSocket.on('connect', () => sendSafe('rosStatusReceiver', true));
+    rosSocket.on('connect_error', () => sendSafe('rosStatusReceiver', false));
+    rosSocket.on('disconnect', () => sendSafe('rosStatusReceiver', false));
 };
 
 connectToRosBridge();
@@ -89,73 +114,51 @@ connectToRosBridge();
 const setupMainSocket = (url: string) => {
     const socketUrl = url.replace("localhost", "127.0.0.1");
 
-    if (socketUrl === currentBackendUrl && (isConnecting || socket?.connected)) {
-        return;
-    }
+    if (socketUrl === currentBackendUrl && (isConnecting || socket?.connected)) return;
 
     if (socket) {
-        console.log("🔄 Trenne bestehenden Socket für Neuverbindung...");
         socket.removeAllListeners();
         socket.disconnect();
-        isConnecting = false;
     }
     
     currentBackendUrl = socketUrl;
     isConnecting = true;
-    console.log("🔗 Verbindungsaufbau Haupt-Backend:", socketUrl);
     
     socket = io(socketUrl, {
-        transports: ['polling', 'websocket'], // Zuerst Polling, dann Upgrade (stabiler)
+        transports: ['polling', 'websocket'],
         reconnection: true,
-        reconnectionDelay: 1000,
-        timeout: 20000,
         path: "/socket.io/",
         forceNew: true 
     });
 
     socket.on('connect', () => {
         isConnecting = false;
-        console.log("✅ Haupt-Backend (8080) Online via WebSocket");
         sendSafe('socketStatusReceiver', true);
     });
 
+    socket.on('active_agents', (data) => sendSafe('activeAgentsReceiver', data.agents || data));
+    socket.on('path_complete', (data: any) => sendSafe('pathCompleteReceiver', data));
+    socket.on('system_log', (data: any) => sendSafe('systemLogReceiver', data));
+    socket.on('nfc_status', (data: any) => sendSafe('nfcStatusReceiver', data.status || data));
     socket.on('hardware_update', (data: any) => sendSafe('hardwareUpdateReceiver', data));
 
     socket.on('rfid_scanned', (data: any) => {
         sendSafe('rfidReceiver', data.id || data);
-        sendSafe('systemLogReceiver', { 
-            message: `RFID Scan [${data.pi_id || 'Pi'}]: ${data.id}`, 
-            level: "info" 
-        });
     });
 
-    socket.on('active_agents', (data) => {
-        const agents = data.agents ? data.agents : data;
-        sendSafe('activeAgentsReceiver', agents);
-    });
-
-    socket.on('path_complete', (data: any) => sendSafe('pathCompleteReceiver', data));
-    socket.on('system_log', (data: any) => sendSafe('systemLogReceiver', data));
-    socket.on('nfc_status', (data: any) => sendSafe('nfcStatusReceiver', data.status || data));
-
-    socket.on('connect_error', (err) => {
+    socket.on('connect_error', () => {
         isConnecting = false;
-        console.error("❌ Haupt-Backend Fehler (8080):", err.message);
         sendSafe('socketStatusReceiver', false);
     });
 
-    // VERBESSERT: Disconnect Handler mit Reason-Logging
     socket.on('disconnect', (reason) => {
         isConnecting = false;
-        console.warn("❌ Haupt-Backend Verbindung verloren. Grund:", reason);
         sendSafe('socketStatusReceiver', false);
-        
-        // Automatischer Reconnect-Versuch bei serverseitigem Abbruch
-        if (reason === "io server disconnect") {
-            socket?.connect();
-        }
+        if (reason === "io server disconnect") socket?.connect();
     });
 };
+
+setupMainSocket(backendIP);
 
 // --- ELM PORTS ---
 
@@ -174,39 +177,16 @@ subscribeSafe('setMode', (mode: string) => {
     if (socket?.connected) socket.emit('set_mode', mode);
 });
 
-subscribeSafe('triggerPlanning', (payload: any) => {
-    console.log("🚀 Elm will Planung starten!", payload);
-    
-    if (!socket) {
-        console.error("❌ Socket-Objekt existiert gar nicht!");
-        return;
-    }
-
-    if (!socket.connected) {
-        console.warn("⚠️ Socket ist laut JS nicht verbunden, versuche trotzdem zu senden...");
-    }
-
-    socket.emit('plan_path', payload);
-    console.log("📤 Nachricht 'plan_path' wurde an den Äther übergeben.");
-});
-
-subscribeSafe('sendCnpRequest', (payload: any) => {
-    console.log("🚀 Port 'sendCnpRequest' gefeuert!", payload);
-    
-    if (socket && socket.connected) {
-        socket.emit('plan_path', payload);
-        console.log("📤 'plan_path' an Backend gesendet.");
-    } else {
-        console.error("❌ Socket nicht verbunden. Senden fehlgeschlagen.");
-    }
-});
-
-subscribeSafe('savePlanningWeights', (weights: any) => {
-    if (socket?.connected) socket.emit('update_planning_config', weights);
-});
-
-subscribeSafe('writeNfcTrigger', (text: string) => {
-    if (socket?.connected) socket.emit('write_nfc', text);
+// Manueller Import-Trigger (Button-Klick)
+subscribeSafe('importConfigTrigger', () => {
+    const input = document.createElement('input');
+    input.type = 'file'; 
+    input.accept = '.json';
+    input.onchange = (e: any) => {
+        const file = e.target.files?.[0];
+        handleFileReading(file);
+    };
+    input.click();
 });
 
 // --- STORAGE & EXPORT ---
@@ -217,22 +197,25 @@ subscribeSafe('exportConfig', (json: string) => {
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'passform_config.json'; a.click();
+    a.href = url; 
+    a.download = 'passform_config.json'; 
+    a.click();
     URL.revokeObjectURL(url);
 });
 
-subscribeSafe('importConfigTrigger', () => {
-    const input = document.createElement('input');
-    input.type = 'file'; input.accept = '.json';
-    input.onchange = (e: any) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const content = ev.target?.result;
-            if (typeof content === 'string') sendSafe('configReceived', content);
-        };
-        reader.readAsText(file);
-    };
-    input.click();
+// Restliche Steuerungs-Ports
+subscribeSafe('triggerPlanning', (payload: any) => {
+    if (socket?.connected) socket.emit('plan_path', payload);
+});
+
+subscribeSafe('sendCnpRequest', (payload: any) => {
+    if (socket?.connected) socket.emit('plan_path', payload);
+});
+
+subscribeSafe('savePlanningWeights', (weights: any) => {
+    if (socket?.connected) socket.emit('update_planning_config', weights);
+});
+
+subscribeSafe('writeNfcTrigger', (text: string) => {
+    if (socket?.connected) socket.emit('write_nfc', text);
 });
