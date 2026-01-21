@@ -29,6 +29,18 @@ const app = Elm.Main.init({
     }
 });
 
+// Suche diesen Block in index.ts und ersetze ihn komplett:
+app.ports.pushConfig.subscribe((configData: any) => {
+    console.log("🔌 JS PORT: pushConfig erhalten. Inhalt:", configData);
+    
+    if (socket && socket.connected) {
+        console.log("📡 SOCKET: Emittiére 'push_config' an das Backend...");
+        socket.emit('push_config', configData);
+    } else {
+        console.error("❌ SOCKET: Nicht verbunden! Senden abgebrochen.");
+    }
+});
+
 let socket: Socket | null = null;
 let rosSocket: Socket | null = null;
 let currentBackendUrl = ""; 

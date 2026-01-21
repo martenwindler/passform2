@@ -4,7 +4,8 @@ import Browser
 import Decoders
 import Dict exposing (Dict)
 import Html exposing (..)
-import Html.Attributes exposing (..)
+import Html.Attributes exposing (class, attribute) -- 'attribute' explizit importieren
+import Html.Events exposing (on) -- 'on' für Custom Events importieren
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ports
@@ -65,6 +66,7 @@ init flags =
       , gridWidth = 6
       , gridHeight = 4
       , editing = True
+      , isDragging = False
       , is3D = False
       , loading = False
       , activeMenu = Nothing
@@ -112,13 +114,31 @@ subscriptions model =
     Sub.batch
         [ Ports.socketStatusReceiver (SetConnected >> HardwareMsg)
         , Ports.rosStatusReceiver (SetRosConnected >> HardwareMsg)
+        
+        -- 1. Live-Updates (sind schon Decode.Value)
         , Ports.activeAgentsReceiver (UpdateAgents >> AgentsMsg)
+        
+        -- 2. Datei-Inhalte (sind Strings)
+        -- Wir wandeln den String in ein Decode.Value um, damit UpdateAgents damit arbeiten kann
+        , Ports.configReceived (\jsonString -> 
+            case Decode.decodeString Decode.value jsonString of
+                Ok val -> AgentsMsg (UpdateAgents val)
+                Err _ -> NoOp
+          )
+        , Ports.fileContentRead (\jsonString -> 
+            case Decode.decodeString Decode.value jsonString of
+                Ok val -> AgentsMsg (UpdateAgents val)
+                Err _ -> NoOp
+          )
+        
         , Ports.pathCompleteReceiver handlePathComplete
-        , Ports.configReceived (ConfigReceived >> PlanningMsg)
         , Ports.systemLogReceiver (\val -> HardwareMsg (HandleSystemLog (Decode.decodeValue Decoders.decodeSystemLog val)))
         , Ports.rfidReceiver (\val -> HardwareMsg (HandleRfid (Decode.decodeValue Decoders.decodeRfid val)))
         , Ports.nfcStatusReceiver (\val -> HardwareMsg (HandleNfcStatus (Decode.decodeValue Decode.string val)))
         , Ports.hardwareUpdateReceiver (\val -> HardwareMsg (HandleHardwareUpdate (Decode.decodeValue Decoders.hardwareListDecoder val)))
+        --, Ports.onAgentMoved (\d -> 
+        --    AgentsMsg (MoveAgent d.agentId { x = d.newX, y = d.newY })
+        --   )
         ]
 
 {-| 
@@ -165,13 +185,9 @@ view3D model =
     let
         allowInteraction =
             case model.mode of
-                Simulation ->
-                    "true"
+                Simulation -> "true"
+                Hardware -> "false"
 
-                Hardware ->
-                    "false"
-                    
-        -- Wir geben dem Gitter explizit mit, in welchem Modus wir sind
         layoutModeStr =
             case model.activeLayout of
                 LandingMode -> "landing"
@@ -187,7 +203,7 @@ view3D model =
         , attribute "allow-interaction" allowInteraction 
         , attribute "active-layout" layoutModeStr
         
-        -- Daten-Objekte (als JSON-Strings für das Custom Element)
+        -- Daten-Objekte
         , attribute "agents" (model.agents |> Decoders.encodeAgentMap |> Encode.encode 0)
         , attribute "path" (Decoders.encodePath model.currentPath |> Encode.encode 0)
         
@@ -204,9 +220,31 @@ view3D model =
                 |> Maybe.withDefault Encode.null 
                 |> Encode.encode 0
             )
-            
-        -- EVENT-LISTENER (Die Brücke zurück zu Elm)
-        , Ports.onAgentMoved (MoveAgent >> AgentsMsg)
-        , Ports.onCellClicked (HandleGridClick >> AgentsMsg) 
+
+        -- --- EVENT LISTENER ---
+        -- 1. Klick auf Zelle
+        , Ports.onCellClicked (HandleGridClick >> AgentsMsg)
+
+        -- 2. NEU: Drag & Drop Ende abfangen
+        -- Wir hören auf das CustomEvent von JS und wandeln es in AgentsMsg (MoveAgent ...) um 
+        , Html.Events.on "agent-moved" (Decode.at ["detail"] decodeMoveAgent)
         ]
         []
+
+-- Hilfsfunktion für die Positionen, um die View sauber zu halten
+encodePos : Maybe GridCell -> String
+encodePos maybeCell =
+    maybeCell 
+        |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) 
+        |> Maybe.withDefault Encode.null 
+        |> Encode.encode 0
+
+-- Der Decoder, der das JS-Event liest
+decodeMoveAgent : Decode.Decoder Msg
+decodeMoveAgent =
+    Decode.map2 (\id cell -> AgentsMsg (MoveAgent id cell))
+        (Decode.field "agentId" Decode.string)
+        (Decode.map2 GridCell 
+            (Decode.field "newX" Decode.int) 
+            (Decode.field "newY" Decode.int)
+        )

@@ -1,11 +1,10 @@
 module Decoders exposing (..)
 
+import Types exposing (..)
+import Types.Domain exposing (..)
 import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder, bool, field, float, int, list, maybe, string)
 import Json.Encode as Encode
-import Types exposing (..)
-import Types.Domain exposing (..)
-
 
 -- --- TYPE-SAFE MAPPERS (Internal) ---
 
@@ -103,7 +102,6 @@ moduleTypeToString mt =
         UnknownModule s ->
             s
 
-
 -- --- SYSTEM DECODERS ---
 
 
@@ -154,17 +152,92 @@ agentModuleDecoder =
         |> andMap (Decode.oneOf [ field "payload" (maybe string), Decode.succeed Nothing ])
         |> andMap (Decode.oneOf [ field "signal_strength" int, Decode.succeed 100 ])
 
+-- Ersetze deinen agentMapDecoder in Decoders.elm durch diesen:
 
-agentMapDecoder : Decoder (Dict (Int, Int) AgentModule)
+agentMapDecoder : Decode.Decoder (Dict (Int, Int) AgentModule)
 agentMapDecoder =
-    field "agents" (list agentModuleDecoder)
-        |> Decode.map
-            (\agents ->
-                agents
-                    |> List.map (\a -> ( ( a.position.x, a.position.y ), a ))
-                    |> Dict.fromList
-            )
+    -- Wir probieren drei Varianten, falls eine scheitert:
+    Decode.oneOf
+        [ -- 1. Das Ideal: Ein Objekt mit "agents": [...]
+          Decode.field "agents" decodeAgentListAsDict
+        , -- 2. Fallback: Eine direkte Liste von Agenten [...]
+          decodeAgentListAsDict
+        , -- 3. Fallback: Ein direktes Dictionary {"0,0": {...}}
+          decodeAgentDictDirectly
+        ]
 
+
+-- HILFSFUNKTIONEN FÜR DEN DECODER --
+
+decodeAgentListAsDict : Decode.Decoder (Dict (Int, Int) AgentModule)
+decodeAgentListAsDict =
+    Decode.list agentDecoder
+        |> Decode.map (\list -> 
+            list 
+                |> List.map (\a -> ( (a.position.x, a.position.y), a ))
+                |> Dict.fromList
+        )
+
+decodeAgentDictDirectly : Decode.Decoder (Dict (Int, Int) AgentModule)
+decodeAgentDictDirectly =
+    Decode.dict agentDecoder
+        |> Decode.map (\dict ->
+            dict
+                |> Dict.values
+                |> List.map (\a -> ( (a.position.x, a.position.y), a ))
+                |> Dict.fromList
+        )
+
+agentDecoder : Decode.Decoder AgentModule
+agentDecoder =
+    Decode.succeed AgentModule
+        |> andMap (Decode.maybe (Decode.field "agent_id" Decode.string))
+        |> andMap (Decode.field "module_type" decodeModuleType)
+        |> andMap decodeFlexiblePosition -- KORREKTUR: Sucht überall nach x und y
+        |> andMap (Decode.oneOf [ Decode.field "orientation" Decode.int, Decode.succeed 0 ])
+        |> andMap (Decode.oneOf [ Decode.field "is_dynamic" Decode.bool, Decode.succeed False ])
+        |> andMap (Decode.oneOf [ Decode.field "payload" (Decode.maybe Decode.string), Decode.succeed Nothing ])
+        |> andMap (Decode.oneOf [ Decode.field "signal_strength" Decode.int, Decode.succeed 100 ])
+
+-- Hilfsfunktion: Versucht x/y flach ODER in einem position-Objekt zu finden
+decodeFlexiblePosition : Decode.Decoder GridCell
+decodeFlexiblePosition =
+    Decode.oneOf
+        [ -- Variante A: { "position": { "x": 1, "y": 1 } }
+          Decode.field "position" (Decode.map2 GridCell (Decode.field "x" Decode.int) (Decode.field "y" Decode.int))
+        , -- Variante B: { "x": 1, "y": 1 }
+          Decode.map2 GridCell (Decode.field "x" Decode.int) (Decode.field "y" Decode.int)
+        ]
+
+-- Neue Hilfsfunktion, um x/y flach in ein GridCell zu verwandeln
+decodePositionFromFlat : Decode.Decoder GridCell
+decodePositionFromFlat =
+    Decode.map2 GridCell
+        (Decode.field "x" Decode.int)
+        (Decode.field "y" Decode.int)
+
+decodeGridCell : Decode.Decoder GridCell
+decodeGridCell =
+    Decode.map2 GridCell
+        (Decode.field "x" Decode.int)
+        (Decode.field "y" Decode.int)
+
+-- Hilfsfunktion um "0,0" zu (0,0) zu machen
+parseKey : String -> (Int, Int)
+parseKey str =
+    case String.split "," str of
+        [ xStr, yStr ] ->
+            ( String.toInt xStr |> Maybe.withDefault 0
+            , String.toInt yStr |> Maybe.withDefault 0
+            )
+        _ ->
+            ( 0, 0 )
+
+decodeCell : Decode.Decoder GridCell
+decodeCell =
+    Decode.map2 GridCell
+        (Decode.field "x" Decode.int)
+        (Decode.field "y" Decode.int)
 
 hardwareDeviceDecoder : Decode.Decoder HardwareDevice
 hardwareDeviceDecoder =
@@ -178,6 +251,22 @@ hardwareListDecoder : Decode.Decoder (List HardwareDevice)
 hardwareListDecoder =
     Decode.list hardwareDeviceDecoder
 
+
+decodeModuleType : Decoder ModuleType
+decodeModuleType =
+    Decode.string
+        |> Decode.andThen
+            (\str ->
+                case String.toLower str of
+                    "ftf" -> Decode.succeed FTF
+                    "conveyeur" -> Decode.succeed Conveyeur
+                    "rollenmodul" -> Decode.succeed RollenModul
+                    "rollen_ns" -> Decode.succeed RollenModul -- Mapping für dein Backend
+                    "mensch" -> Decode.succeed Mensch
+                    "greifer" -> Decode.succeed Greifer
+                    "station" -> Decode.succeed Station
+                    _ -> Decode.succeed (UnknownModule str)
+            )
 
 -- --- PLANNING & PATH DECODERS ---
 
@@ -229,11 +318,9 @@ encodeCnpAnnouncement model =
 
 encodeAgentMap : Dict (Int, Int) AgentModule -> Encode.Value
 encodeAgentMap agents =
-    -- Wir senden die Agenten als Liste, da das Backend dies in 'handle_plan_path' 
-    -- über raw_agents = elm_agents.values() verarbeiten kann.
-    agents
-        |> Dict.values
-        |> Encode.list encodeAgentModule
+    -- WICHTIG: Hier muss eine LISTE erzeugt werden, kein Objekt!
+    Encode.list encodeAgent (Dict.values agents)
+
 
 
 encodeAgentModule : AgentModule -> Encode.Value
@@ -287,4 +374,31 @@ encodePlanningData data =
         , ( "goal", data.goal |> Maybe.map encodeGridCell |> Maybe.withDefault Encode.null )
         , ( "weights", encodeWeights data.weights )
         , ( "isRanger", Encode.bool data.isRanger )
+        ]
+
+encodeFullConfig model =
+    Encode.object
+        [ ( "agents", encodeAgentMap model.agents )
+        , ( "config"
+          , Encode.object
+                [ ( "grid"
+                  , Encode.object
+                        [ ( "width", Encode.int model.gridWidth )
+                        , ( "height", Encode.int model.gridHeight )
+                        ]
+                  )
+                ]
+          )
+        ]
+
+encodeAgent : AgentModule -> Encode.Value
+encodeAgent agent =
+    Encode.object
+        [ ( "agent_id", Encode.string (Maybe.withDefault "unknown" agent.agent_id) )
+        , ( "module_type", Encode.string (moduleTypeToString agent.module_type) )
+        , ( "x", Encode.int agent.position.x )
+        , ( "y", Encode.int agent.position.y )
+        , ( "orientation", Encode.int agent.orientation )
+        , ( "is_dynamic", Encode.bool agent.is_dynamic )
+        , ( "signal_strength", Encode.int agent.signal_strength )
         ]

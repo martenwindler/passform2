@@ -2,6 +2,7 @@ module Update.Planning exposing (update, canPlan)
 
 import Decoders
 import Json.Decode as Decode
+import Json.Encode as Encode
 import Ports
 import Types exposing (..)
 import Types.Domain exposing (..)
@@ -9,6 +10,11 @@ import Types.Domain exposing (..)
 update : PlanningMsg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        ConfigReceived jsonString ->
+            ( { model | loading = True } 
+            , Ports.socketEmitPort ( "upload_config", Encode.string jsonString ) -- FIX: Tuple statt Record
+            )
+
         SetGridWidth val ->
             let
                 newWidth = String.toInt val |> Maybe.withDefault model.gridWidth |> clamp 0 100
@@ -88,11 +94,9 @@ update msg model =
             case Decode.decodeValue Decoders.pathDecoder rawJson of
                 Ok path ->
                     ( { model | currentPath = Just path, loading = False }, Cmd.none )
+
                 Err _ ->
                     ( { model | loading = False, currentPath = Nothing }, Cmd.none )
-
-        ConfigReceived _ ->
-            ( model, Cmd.none )
 
 canPlan : Model -> Bool
 canPlan model =

@@ -63,18 +63,17 @@ port nfcStatusReceiver : (Decode.Value -> msg) -> Sub msg
 
 port hardwareUpdateReceiver : (Decode.Value -> msg) -> Sub msg
 
+port pushConfig : Encode.Value -> Cmd msg
 
 -- --- EVENT-HELPER FÜR DIE 3D-VIEW (KORRIGIERT) ---
 
-onAgentMoved : ( { oldX : Int, oldY : Int, newX : Int, newY : Int } -> msg ) -> Attribute msg
-onAgentMoved toMsg =
-    on "agent-moved" (Decode.map toMsg decodeAgentMove)
+port onAgentMoved : ({ agentId : String, oldX : Int, oldY : Int, newX : Int, newY : Int } -> msg) -> Sub msg
 
 
 onCellClicked : (GridCell -> msg) -> Attribute msg
 onCellClicked toMsg =
+    -- Elm hört auf das JS-Event "cell-clicked"
     on "cell-clicked" (Decode.map toMsg decodeCellClick)
-
 
 -- --- INTERNE DECODER ---
 
@@ -89,6 +88,7 @@ decodeAgentMove =
 
 decodeCellClick : Decode.Decoder GridCell
 decodeCellClick =
+    -- Hier muss "detail" stehen, weil CustomEvents ihre Daten dort ablegen!
     Decode.at ["detail"] 
         (Decode.map2 GridCell
             (Decode.field "x" Decode.int)

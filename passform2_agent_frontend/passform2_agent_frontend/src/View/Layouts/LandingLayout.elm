@@ -9,36 +9,41 @@ import Types exposing (..)
 view : Model -> Html Msg
 view model =
     main_ [ class "landing-layout-content" ]
-        [ -- Der zentrale Wrapper (Flex-Container)
-          div [ class "landing-wrapper" ]
-            [ -- Zone 1: Hero (Überschrift)
-              div [ class "landing-hero" ]
+        [ div [ class "landing-wrapper" ]
+            [ div [ class "landing-hero" ]
                 [ h1 [ class "text-h1" ] [ text "Industrieller Gitter-Planer" ]
                 , p [ class "text-label" ] [ text "Starten Sie ein neues Projekt oder laden Sie eine Konfiguration." ]
                 ]
 
-            , -- Zone 2: Actions (Horizontaler Flex-Container innerhalb des vertikalen Wrappers)
-              div [ class "landing-actions" ]
-                [ button [ class "landing-action-card bhover", onClick (SystemMsg NewProject) ]
-                    [ div [ class "card-icon" ] [ text "⊕" ]
-                    , div [ class "card-text" ] [ span [ class "text-button block" ] [ text "Neues Projekt" ] ]
+            , div [ class "landing-actions" ]
+                [ -- 1. Neues Projekt
+                  button 
+                    [ class "landing-action-card bhover"
+                    , onClick (SystemMsg NewProject) 
                     ]
-                , label [ class "landing-action-card bhover cursor-pointer", for "json-upload" ]
-                    [ div [ class "card-icon" ] [ text "📂" ]
-                    , div [ class "card-text" ] [ span [ class "text-button block" ] [ text "Vom Computer öffnen" ] ]
-                    , input [ type_ "file", id "json-upload", class "sr-only", accept ".json", onFileChange (SystemMsg << FileSelected) ] []
+                    [ div [ class "card-icon" ] [ text "⊕" ]
+                    , div [ class "card-text" ] [ span [ class "text-button" ] [ text "Neues Projekt" ] ]
+                    ]
+
+                -- 2. Vorlagen
+                , button 
+                    [ class "landing-action-card bhover"
+                    , onClick NoOp 
+                    ]
+                    [ div [ class "card-icon" ] [ text "📋" ]
+                    , div [ class "card-text" ] [ span [ class "text-button" ] [ text "Vorlagen" ] ]
                     ]
                 ]
 
-            , -- Zone 3: Massive Drop-Area (Grid/Flex Wrapper für Zentrierung)
-              div 
-                [ class "landing-drop-area"
+            , div 
+                [ class "landing-drop-area cursor-pointer" 
                 , onDragOver DragOver
                 , onDrop FileDropped
+                , onClick (SystemMsg OpenFileBrowser) -- Triggert den JS-Dialog
                 ]
                 [ div [ class "drop-zone-inner" ]
                     [ div [ class "drop-icon" ] [ text "⤓" ]
-                    , span [ class "text-label" ] [ text "Fügen Sie Ihre .json-Konfiguration an einer beliebigen Stelle in diesem Feld ein." ]
+                    , span [ class "text-label" ] [ text "Drop your .json or click here to browse" ] 
                     ]
                 ]
             ]
@@ -46,12 +51,6 @@ view model =
 
 
 -- --- EVENT HELPER ---
-
-{-| Erkennt Dateiauswahl über den Button/Dialog -}
-onFileChange : (Decode.Value -> Msg) -> Attribute Msg
-onFileChange toMsg =
-    Html.Events.on "change" (Decode.map toMsg Decode.value)
-
 
 {-| Verhindert Browser-Default beim Dragover -}
 onDragOver : SystemMsg -> Attribute Msg

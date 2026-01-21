@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import json
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -44,69 +45,53 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Kritischer Fehler beim Starten der ROS-Nodes: {e}")
 
-    # 2. ROS-Client
+    # 2. ROS-Client & Health Task
     try:
         get_ros_client()
-    except Exception as e:
-        logger.warning(f"⚠️ ROS-Client konnte nicht sofort initialisiert werden: {e}")
-
-    # 3. Lokaler NFC-Reader
-    if nfc_manager.get_status() == "online":
-        nfc_manager.start_reading()
-        logger.info("📡 Lokaler NFC-Hintergrund-Thread gestartet.")
-
-    # 4. Health-Monitoring Task
+    except Exception:
+        pass
     health_task = asyncio.create_task(agent_manager.start_health_broadcast_loop())
-    
-    # --- SYNC LOGIK FÜR NEUE CLIENTS ---
+
+    # --- DEFINITION SYNC CALLBACK ---
     async def sync_state_for_client(sid):
-        """Versorgt neue Browser-Verbindungen sofort mit allen SSoT-Daten."""
         try:
             current_mode = config.get_current_mode().value
+            
+            # 1. Status senden
             await socket_manager.emit_event('mode', current_mode, target_sid=sid)
             await socket_manager.emit_event('hardware_update', list(hardware_registry.values()), target_sid=sid)
-            await socket_manager.emit_event('nfc_status', {"status": nfc_manager.get_status()}, target_sid=sid)
             
-            agents = [a.to_dict() for a in agent_manager.agents.values()]
-            await socket_manager.emit_event('active_agents', agents, target_sid=sid)
+            # 2. Agenten-Sync: WICHTIG - Wir laden die Datei JETZT frisch
+            # Damit verhindern wir, dass ein leerer RAM-Stand die Elm-Daten killt.
+            config_manager.load_from_ssot() # Datei neu einlesen
+            agents_list = config_manager.current_data.get("agents", [])
+            
+            # Falls es ein Dict ist, in Liste wandeln
+            if isinstance(agents_list, dict):
+                agents_list = list(agents_list.values())
 
-            await socket_manager.emit_event('system_log', {
-                "message": f"Synchronisation abgeschlossen (Modus: {current_mode})", 
-                "level": "success"
-            }, target_sid=sid)
-        except Exception as e:
-            logger.error(f"❌ Fehler beim Client-Sync für SID {sid}: {e}")
-
-    socket_manager.set_on_new_client_callback(sync_state_for_client)
+            await socket_manager.emit_event('active_agents', {"agents": agents_list}, target_sid=sid)
+            
+            logger.info(f"✅ Sync an Client {sid}: {len(agents_list)} Agenten aus config.json")
     
     # --- APP LÄUFT ---
     yield 
     
-    # --- SHUTDOWN (Wird bei STRG+C ausgelöst) ---
+    # --- SHUTDOWN (STRG+C) ---
     logger.info("🛑 Shutdown eingeleitet: Räume Ressourcen auf...")
-    
-    # 1. Health-Task abbrechen
     health_task.cancel()
     try:
         await asyncio.wait_for(health_task, timeout=2.0)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
-        logger.info("✅ Health-Monitoring Task beendet.")
+    except:
+        pass
 
-    # 2. NFC-Manager stoppen
     nfc_manager.running = False
-    
-    # 3. ROS-Nodes terminieren
-    logger.info("📡 Beende alle ROS-Nodes...")
     node_manager.kill_all_nodes()
     
-    # 4. Clients informieren
     await socket_manager.emit_event('system_log', {
-        "message": "Backend wurde manuell beendet (SIGINT).",
+        "message": "Backend beendet.",
         "level": "warning"
     })
-    
-    # Kurze Pause für den finalen Netzwerk-Flush
-    await asyncio.sleep(0.2)
     logger.info("✅ PassForm Backend sauber beendet.")
 
 # --- APP SETUP ---
@@ -154,141 +139,72 @@ async def handle_pi_hardware(sid, data):
     logger.info(f"🖥️ Pi Hardware Update: {data.get('pi_id')}")
     await socket_manager.emit_event('hardware_update', list(hardware_registry.values()))
 
-@socket_manager.sio.on('rfid_scanned')
-async def handle_rfid_scanned(sid, data):
-    logger.info(f"🎴 RFID Scan: {data.get('id')}")
-    await socket_manager.emit_event('rfid_scanned', data)
-
-# --- PFADPLANUNG LOGIK-HANDLER ---
-
-async def handle_plan_path_socket_io(sid, data):
-    """
-    Interne Pfadplanung (A*) mit dynamischen Gewichten aus dem Frontend.
-    Begrenzt die Parameter nach Harlan's CNP-Modell und loggt die Validierung.
-    """
-    try:
-        # 1. Daten aus dem verschachtelten Elm-Payload extrahieren
-        inner_payload = data.get("payload", {})
-        start = inner_payload.get("start")
-        goal = inner_payload.get("goal")
+@socket_manager.sio.on('push_config')
+async def handle_push_config(sid, data):
+    print(f"\n🔥 BACKEND: Event 'push_config' von {sid} empfangen!")
+    
+    if "agents" in data:
+        count = len(data["agents"])
+        print(f"📦 BACKEND: Erhaltene Agenten-Anzahl: {count}")
         
-        # 2. Gewichte extrahieren und validieren (Harlan's Constraints)
-        frontend_weights = inner_payload.get("weights", {})
+        config_manager.current_data["agents"] = data["agents"]
+        success = config_manager.save_to_ssot()
         
-        # Wir begrenzen die Werte (Clamping) für die Stabilität des CNP
-        validated_weights = {
-            "execution_time_default": max(0.1, float(frontend_weights.get("execution_time_default", 1.0))),
-            "complex_module_time": max(0.1, float(frontend_weights.get("complex_module_time", 3.5))),
-            "human_extra_weight": max(0.0, min(float(frontend_weights.get("human_extra_weight", 1.0)), 20.0)),
-            "proximity_penalty": max(0.0, min(float(frontend_weights.get("proximity_penalty", 0.5)), 10.0)),
-            "hardware_safety_factor": max(1.0, min(float(frontend_weights.get("hardware_safety_factor", 1.2)), 2.0))
-        }
-        
-        # 3. Agenten/Grid aufbereiten
-        elm_agents = inner_payload.get("agents", {})
-        if elm_agents:
-            raw_agents = elm_agents.values() if isinstance(elm_agents, dict) else elm_agents
-            grid = { (int(a.get("x")), int(a.get("y"))): a for a in raw_agents if a }
+        if success:
+            print(f"💾 BACKEND: SSoT (config.json) erfolgreich geschrieben.")
+            # Broadcast zurück
+            await socket_manager.emit_event('active_agents', {"agents": data["agents"]})
         else:
-            # Fallback auf Backend SSoT falls Frontend keine Agenten schickt
-            from app.managers.agent_manager import agent_manager
-            grid = { (a.x, a.y): a.to_dict() for a in agent_manager.agents.values() }
-
-        if not start or not goal:
-            logger.warning(f"⚠️ Planung abgebrochen: Start/Ziel unvollständig (Start: {start}, Goal: {goal})")
-            return
-
-        start_t = (int(start["x"]), int(start["y"]))
-        goal_t = (int(goal["x"]), int(goal["y"]))
-
-        # --- TRANSPARENZ LOGS ---
-        logger.info(f"🔮 CNP Ausschreibung: {start_t} -> {goal_t} | Module: {len(grid)}")
-        logger.info(f"⚖️ Validierte Gewichte: T_exec={validated_weights['execution_time_default']}, " +
-                    f"T_complex={validated_weights['complex_module_time']}, " +
-                    f"W_human={validated_weights['human_extra_weight']}, " +
-                    f"Safety={validated_weights['hardware_safety_factor']}")
-
-        # 4. A* mit Gewichten aufrufen
-        path, cost, msg = planner.a_star(
-            start_t, 
-            goal_t, 
-            grid, 
-            travel_mode="chain", 
-            weights=validated_weights  # Die validierten Gewichte gehen hier in den Kern
-        )
-
-        if path:
-            formatted_path = []
-            for step in path:
-                formatted_path.append({
-                    "agent_id": str(step.get("agent_id", "unknown")),
-                    "module_type": str(step.get("module_type", "unknown")),
-                    "position": {"x": int(step.get("x", 0)), "y": int(step.get("y", 0))},
-                    "orientation": int(step.get("orientation", 0)),
-                    "is_dynamic": bool(step.get("is_dynamic", False)),
-                    "payload": None,
-                    "signal_strength": 100
-                })
-
-            # Erfolg zurückmelden
-            await socket_manager.emit_event('path_complete', {
-                "status": 200, 
-                "cost": float(cost), 
-                "path": formatted_path
-            }, target_sid=sid)
-            logger.info(f"✅ Zuschlag erteilt! Gesamtkosten: {cost}s für {len(formatted_path)} Agenten.")
-        else:
-            # Fehler/Kein Pfad zurückmelden (stoppt Spinner im UI)
-            await socket_manager.emit_event('path_complete', {"status": 404, "cost": 0.0, "path": []}, target_sid=sid)
-            logger.warning(f"⚠️ Ausschreibung ohne Ergebnis: {msg}")
-
-    except Exception as e:
-        logger.error(f"❌ Kritischer Fehler in handle_plan_path: {e}", exc_info=True)
-
-async def handle_plan_path_ros(sid, payload):
-    """ROS-basierte Pfadplanung (CNP) - Vorbereitet für später."""
-    try:
-        from .managers.path_manager import path_manager, PlanPathRequest, Position
-        import time
-        start_data = payload.get("start")
-        goal_data = payload.get("goal")
-        request_id = f"ros_cnp_{int(time.time())}"
-        req = PlanPathRequest(
-            request_id=request_id,
-            start=Position(x=start_data["x"], y=start_data["y"]),
-            goal=Position(x=goal_data["x"], y=goal_data["y"])
-        )
-        path_manager.request_path(req)
-        logger.info(f"📡 ROS-Ausschreibung (CNP) initiiert: {request_id}")
-    except Exception as e:
-        logger.error(f"❌ Fehler in handle_plan_path_ros: {e}")
-
-# --- SOCKET.IO EVENT ROUTING ---
+            print(f"❌ BACKEND: Fehler beim Schreiben der config.json!")
 
 @socket_manager.sio.on('plan_path')
 async def handle_plan_path_routing(sid, payload):
-    # Das hier MUSS im Terminal erscheinen, wenn der Button gedrückt wird
-    print("\n" + "="*50)
-    print(f"🔥 PLAN_PATH EVENT GEFEUERT!")
-    print(f"FROM SID: {sid}")
-    print(f"PAYLOAD: {payload}")
-    print("="*50 + "\n")
-    
     await handle_plan_path_socket_io(sid, payload)
+
+async def handle_plan_path_socket_io(sid, data):
+    try:
+        inner_payload = data.get("payload", {})
+        start = inner_payload.get("start")
+        goal = inner_payload.get("goal")
+        if not start or not goal: return
+
+        f_weights = inner_payload.get("weights", {})
+        val_weights = {
+            "execution_time_default": max(0.1, float(f_weights.get("execution_time_default", 1.0))),
+            "complex_module_time": max(0.1, float(f_weights.get("complex_module_time", 3.5))),
+            "human_extra_weight": max(0.0, float(f_weights.get("human_extra_weight", 1.0))),
+            "proximity_penalty": max(0.0, float(f_weights.get("proximity_penalty", 0.5))),
+            "hardware_safety_factor": max(1.0, float(f_weights.get("hardware_safety_factor", 1.2)))
+        }
+
+        elm_agents = inner_payload.get("agents", {})
+        raw_agents = elm_agents.values() if isinstance(elm_agents, dict) else elm_agents
+        grid = { (int(a["x"]), int(a["y"])): a for a in raw_agents if a }
+
+        path, cost, msg = planner.a_star(
+            (int(start["x"]), int(start["y"])), 
+            (int(goal["x"]), int(goal["y"])), 
+            grid, travel_mode="chain", weights=val_weights
+        )
+
+        if path:
+            formatted = [{"agent_id": str(s.get("agent_id", "unknown")), "position": {"x": int(s.get("x", 0)), "y": int(s.get("y", 0))}} for s in path]
+            await socket_manager.emit_event('path_complete', {"status": 200, "cost": float(cost), "path": formatted}, target_sid=sid)
+        else:
+            await socket_manager.emit_event('path_complete', {"status": 404, "path": []}, target_sid=sid)
+    except Exception as e:
+        logger.error(f"❌ Planungsfehler: {e}")
 
 @socket_manager.sio.on('set_mode')
 async def handle_set_mode(sid, data):
     mode_str = data if isinstance(data, str) else data.get("mode")
     try:
-        new_mode = SystemMode(mode_str)
-        if config.set_mode(new_mode):
+        if config.set_mode(SystemMode(mode_str)):
             agent_manager.clear_all_agents()
             await socket_manager.emit_event('mode', mode_str)
-            logger.info(f"🔄 Modus auf {mode_str} gewechselt.")
     except Exception as e:
         logger.error(f"❌ Modus-Wechsel Fehler: {e}")
 
-# --- SOCKET.IO INTEGRATION ---
 socket_manager.attach_fastapi(fastapi_app)
 app = socket_manager.app_sio
 

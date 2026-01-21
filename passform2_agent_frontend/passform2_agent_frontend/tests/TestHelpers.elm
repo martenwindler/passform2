@@ -21,6 +21,7 @@ emptyModel =
     , currentPath = Nothing
     , hoveredCell = Nothing
     , editing = True
+    , isDragging = False
     , is3D = False
     , loading = False
     , activeMenu = Nothing

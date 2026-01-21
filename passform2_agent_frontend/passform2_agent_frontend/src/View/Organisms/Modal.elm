@@ -62,6 +62,7 @@ viewBody model menuType =
         SettingsMenu cell agent ->
             let
                 aid = agent.agent_id |> Maybe.withDefault "unnamed"
+                posText = "Position: " ++ String.fromInt cell.x ++ " / " ++ String.fromInt cell.y
                 maybePi = model.connectedHardware |> List.filter (\hw -> hw.pi_id == "PassForM2-Pi5-Client") |> List.head
 
                 ( piStat, piText, piGlow ) =
@@ -82,7 +83,11 @@ viewBody model menuType =
                 mappedSignal = if isHardwareReady then 100 else 0
             in
             div [ class "settings-form" ]
-                [ div [ class "agent-id-badge text-data mb-4" ] [ text ("ID: " ++ aid) ]
+                [ div [ class "flex justify-between items-center mb-4" ]
+                    [ div [ class "agent-id-badge text-data" ] [ text ("ID: " ++ aid) ]
+                    , div [ class "text-caption font-bold opacity-60" ] [ text posText ] -- Die Koordinaten!
+                    ]
+                
                 , div [ class "hardware-status-row" ]
                     [ viewOldStatusPill "RC522 Sensor" nfcStat nfcText nfcGlow
                     , viewOldStatusPill "RPI 5 Node" piStat piText piGlow

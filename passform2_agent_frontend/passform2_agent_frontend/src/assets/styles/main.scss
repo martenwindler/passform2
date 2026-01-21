@@ -155,3 +155,26 @@ input, button, textarea, select {
 .sidebar-container {
     pointer-events: auto;
 }
+
+/* In dein Stylesheet werfen */
+.modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background-color: rgba(0, 0, 0, 0.7) !important; /* Dunkler Hintergrund */
+    z-index: 9999 !important; /* ABSOLUT IM VORDERGRUND */
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    color: black;
+    padding: 20px;
+    border-radius: 8px;
+    min-width: 300px;
+    z-index: 10000 !important;
+}

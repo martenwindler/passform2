@@ -38,19 +38,18 @@ view model =
           viewActions model
         ]
 
-{-| 
-Hilfsfunktion für die rechte Seite der Navbar.
-Gibt im LandingMode ein leeres div zurück, damit die Mitte zentriert bleibt.
--}
+-- src/View/Organisms/Navbar.elm
+
 viewActions : Model -> Html Msg
 viewActions model =
     case model.activeLayout of
         LandingMode ->
-            -- Leer im Landing Layout
-            div [ class "navbar-actions" ] []
+            -- Auf der Startseite: Nur der BIBA Projekt-Link
+            div [ class "navbar-actions" ]
+                [ viewProjectLink ]
 
         AppMode ->
-            -- Volle Funktionalität in der App
+            -- In der App: Volle Action-Bar
             div [ class "navbar-actions" ]
                 [ button 
                     [ class "btn-mode-switch text-button"
@@ -65,15 +64,8 @@ viewActions model =
                     ] 
                     [ text (if model.is3D then "2D" else "3D") ]
                 
-                , a 
-                    [ class "btn-view-toggle link-pill text-button text-white"
-                    , href "https://passform.biba.uni-bremen.de/"
-                    , target "_blank"
-                    , rel "noopener noreferrer"
-                    ] 
-                    [ text "Projekt" ]
+                , viewProjectLink
                 ]
-
 
 -- --- HELPER ---
 
@@ -91,3 +83,14 @@ statusToClass status =
         Standby -> "warning"
         Error -> "offline"
         _ -> "offline"
+
+{-| Extrahiert, damit wir den Link nicht doppelt schreiben müssen -}
+viewProjectLink : Html Msg
+viewProjectLink =
+    a 
+        [ class "btn-view-toggle link-pill text-button text-white"
+        , href "https://passform.biba.uni-bremen.de/"
+        , target "_blank"
+        , rel "noopener noreferrer"
+        ] 
+        [ text "Projekt" ]

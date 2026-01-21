@@ -42,6 +42,7 @@ type alias Model =
     , currentPath : Maybe Path
     , hoveredCell : Maybe GridCell
     , editing : Bool
+    , isDragging : Bool
     , is3D : Bool
     , loading : Bool
     , activeMenu : Maybe MenuType
@@ -129,6 +130,6 @@ type AgentsMsg
     | RotateAgent GridCell
     | UpdateAgent GridCell AgentModule
     | UpdateAgents Decode.Value
-    | MoveAgent { oldX : Int, oldY : Int, newX : Int, newY : Int }
+    | MoveAgent String GridCell
     | HandleGridClick GridCell
     | SetHoveredCell (Maybe GridCell)

@@ -3,49 +3,49 @@
 .landing-layout-content {
     @apply flex w-full overflow-y-auto;
     background-color: var(--bg-dark, #1a202c);
-
     height: calc(100vh - 60px);
     color: #ffffff;
 
     .landing-wrapper {
         display: flex;
         flex-direction: column;
-        // stretch sorgt dafür, dass Kinder die volle Breite (1024px) einnehmen
+        // Sorgt dafür, dass alle direkten Kinder (Hero, Actions, Drop-Area) 
+        // die volle Breite einnehmen
         align-items: stretch; 
         justify-content: center;
         text-align: center;
 
         width: 100%;
-        max-width: 40rem; // 64rem; // 1024px
+        max-width: 40rem; // Deine kompakte Breite
         margin: 0 auto;
         padding: 2rem;
-        gap: 4rem; // Großzügiger Abstand zwischen den Sektionen
+        gap: 3rem; 
     }
 
     // Zone 1: Hero
     .landing-hero {
-        @apply text-center; // Text in der Mitte
+        @apply text-center;
         h1 { @apply text-h1 mb-4; }
         p { @apply opacity-70 text-xl; }
     }
 
-    // Zone 2: Actions
+    // Zone 2: Actions (Jetzt wieder als vertikaler Stack)
     .landing-actions {
         display: flex;
-        flex-direction: column; // Untereinander statt nebeneinander
-        gap: 1.5rem;
+        flex-direction: column; // Untereinander für 100% Breite
+        gap: 1rem;
         width: 100%;
 
         .landing-action-card {
-            @apply flex items-center justify-center p-8 bg-white/5 
+            // Kein flex: 1 mehr nötig, da wir untereinander stapeln
+            @apply flex items-center justify-center p-6 bg-white/5 
                    border border-white/10 rounded-2xl transition-all duration-300 
-                   cursor-pointer text-white w-full; // Volle Breite
+                   cursor-pointer text-white w-full; 
             
-            // Text innerhalb der Karte zentrieren
             text-align: center;
             
             .card-icon { @apply text-3xl mr-4; }
-            .text-button { @apply text-2xl font-bold; }
+            .text-button { @apply text-xl font-bold; }
 
             &:hover {
                 @apply bg-white/10 border-info/50;
@@ -56,15 +56,11 @@
 
     // Zone 3: Massive Drop Area
     .landing-drop-area {
-        // --- DEINE NEUEN STYLES ---
-        min-width: max-content;
-        min-height: 200px;
+        min-height: 250px;
+        border: 2px solid #ffffff; 
+        border-radius: 2rem;
         
-        // Rahmen-Styling
-        border: 2px solid #ffffff; // Border Width & Color White
-        border-radius: 2rem;       // Ordentlicher Border Radius
-        
-        @apply w-full border-dashed transition-all duration-300;
+        @apply w-full border-dashed transition-all duration-300 cursor-pointer;
         background: rgba(255, 255, 255, 0.02);
         
         display: flex;
@@ -74,27 +70,45 @@
 
         &:hover {
             @apply bg-white/10;
-            border-color: var(--color-info, #3482f6); // Optionaler Glow bei Hover
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            border-color: var(--color-info, #3482f6);
+            box-shadow: 0 0 30px rgba(52, 130, 246, 0.15);
+            transform: translateY(-2px);
         }
 
         .drop-zone-inner {
-            @apply flex flex-col items-center gap-6 text-white;
+            @apply flex flex-col items-center gap-4 text-white;
             width: 100%;
+            pointer-events: none; // Klick geht durch auf Parent
 
             .drop-icon {
                 text-align: center;
                 font-size: xxx-large;
                 line-height: 1;
                 @apply mb-2;
-                padding: 0 0 2rem 0;
+                // Padding nach deinen Wünschen
+                padding: 0 0 1rem 0; 
             }
 
             .text-label { 
                 text-align: center;
-                @apply text-2xl tracking-[0.2em] uppercase font-light block;
+                @apply text-xl tracking-[0.2em] uppercase font-light block;
                 width: 100%;
+                opacity: 0.6;
             }
+        }
+        
+        cursor: pointer;
+        transition: all 0.3s ease;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+        }
+        
+        // Verhindert, dass Kinder-Elemente den Klick "verschlucken"
+        .drop-zone-inner {
+            pointer-events: none;
         }
     }
 }
