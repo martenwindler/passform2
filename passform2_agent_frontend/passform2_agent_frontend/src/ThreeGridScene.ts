@@ -305,7 +305,7 @@ export class ThreeGridScene extends HTMLElement {
         if (this.pathLine) { this.scene.remove(this.pathLine); }
         if (!nodes || nodes.length < 2) return;
         const pts = nodes.map(n => new THREE.Vector3((n.x ?? n.position.x) + 0.5, 0.1, (n.y ?? n.position.y) + 0.5));
-        this.pathLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x00f2ff }));
+        this.pathLine = new THREE.Line(new THREE.BufferGeometry().setFromPointsn(pts), new THREE.LineBasicMaterial({ color: 0x00f2ff }));
         this.scene.add(this.pathLine);
     }
 

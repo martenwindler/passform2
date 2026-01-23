@@ -1,0 +1,1 @@
+module Domain.Representations.Skill exposing (..)
