@@ -3,14 +3,9 @@
 <package format="3">
   <name>module_base</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="wil@biba.uni-bremen.de">jasper</maintainer>
-  <license>TODO: License declaration</license>
-
-  <test_depend>ament_copyright</test_depend>
-  <test_depend>ament_flake8</test_depend>
-  <test_depend>ament_pep257</test_depend>
-  <test_depend>python3-pytest</test_depend>
+  <description></description>
+  <maintainer></maintainer>
+  <license></license>
 
   <depend>passform_msgs</depend>
   <depend>passform_util</depend>

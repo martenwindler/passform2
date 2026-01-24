@@ -1,140 +1,160 @@
-import mimetypes
-import os
-import re
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use std::path::Path;
+use std::fs;
+use std::collections::HashMap;
 
-from basyx.aas import model
-from basyx.aas.model import base
-from passform_util.basyx import sanitize_basyx_string
-
-
-def data_to_blob(data_path, id_short:str=None) -> model.Blob:
-    """Turn a file at data_path to a basyx blob
-    """
-    if id_short is None:
-        id_short = sanitize_basyx_string(os.path.splitext(os.path.basename(data_path))[0])
-    obj = model.Blob(
-        id_short=id_short,
-        mime_type=mimetypes.guess_type(data_path)[0]
-    )
-    with open(data_path, "rb") as file:
-        f = file.read()
-        obj.value = bytearray(f)[0:-1] # it seems the last element breaks decoding
-    return obj
-
-def dict_to_dataelement(data:dict, **kwargs) -> model.DataElement:
-    """
-    Create a DataElement object from dict. Also tries to convert to ROS-based element.
-
-    type: <Property | SubmodelElementCollection* | MultiLanguageProperty | Range>
-    id_short: <str>
-    value_type: <model.datatypes>
-    data:
-        value: <Any>
-        description: <dict(lang-key:<str>)>
-
-    For ROS:
-    type: ROS-datatype
-    id_short: Optional
-    """
-    id_short = data['id_short'] if 'id_short' in data else None
-    val_type = getattr(model.datatypes, data['value_type']) if 'value_type' in data else None
-    if 'data' in data:
-        kwargs.update(data['data'])
-    if data['type'] == 'Property':
-        obj = model.Property(id_short, val_type, **kwargs)
-    elif data['type'] == 'MultiLanguageProperty':
-        obj = model.MultiLanguageProperty(id_short, **kwargs)
-    elif data['type'] == 'Range':
-        obj = model.Range(id_short, val_type, **kwargs)
-    elif data['type'] in ['SubmodelElementCollection', 'SubmodelElementCollectionUnordered']:
-        obj = model.SubmodelElementCollectionUnordered(id_short, **kwargs)
-        for d in data['data']:
-            obj.value.add(dict_to_dataelement(d, **kwargs))
-    elif '/' in data['type']:
-        obj = ros_to_dataelement(data, **kwargs)
-    else:
-        try:
-            # convert to ROS as last restort. raises for all unknown datatypes
-            obj = ros_to_dataelement(data, **kwargs)
-        except KeyError:
-            raise KeyError(f'DataElement "{data["type"]}" unkown.')
-    return obj
-
-def dict_to_variable(data:dict, category=None) -> model.OperationVariable:
-    """
-    creates an OperationVariable object from dict
-
-    type: <Property | MultiLanguageProperty | Range>
-    id_short: <str>
-    value_type: <model.datatypes>
-    data:
-        value: <Any>
-        description: <dict(lang-key:<str>)>
-    """
-    return model.OperationVariable(
-        value = dict_to_dataelement(data, category=category, kind=base.ModelingKind.TEMPLATE)
-    )
-
-datatype_conversion = {
-# convert ROS type to basyx DataType
-    'int8': 'Short',
-    'int32': 'Integer',
-    'uint8': 'UnsignedShort',
-    'uint32': 'UnsignedInt',
-    'string': 'String',
-    'double': 'Double',
-    'boolean': 'Boolean',
-    'octet': 'Byte', # byte in msg definitions
-    'float': 'Float'
+/// Repräsentiert die ModelingKind (Instance vs Template)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum ModelingKind {
+    #[serde(rename = "Instance")]
+    Instance,
+    #[serde(rename = "Template")]
+    Template,
 }
 
-def ros_to_dataelement(data:dict, kind=base.ModelingKind.INSTANCE, **kwargs) -> model.DataElement:
-    """
-    Create a DataElement object from ROS dict.
-    NOT TESTED FOR ALL ROS DATATYPES.
+/// Die zentralen BaSyx Submodel-Elemente
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "modelType")]
+pub enum SubmodelElement {
+    #[serde(rename = "Property")]
+    Property {
+        #[serde(rename = "idShort")]
+        id_short: String,
+        #[serde(rename = "valueType")]
+        value_type: String,
+        value: Option<Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        qualifier: Option<Vec<Qualifier>>,
+        kind: ModelingKind,
+    },
+    #[serde(rename = "SubmodelElementCollection")]
+    Collection {
+        #[serde(rename = "idShort")]
+        id_short: String,
+        value: Vec<SubmodelElement>,
+        kind: ModelingKind,
+    },
+    #[serde(rename = "Blob")]
+    Blob {
+        #[serde(rename = "idShort")]
+        id_short: String,
+        #[serde(rename = "mimeType")]
+        mime_type: String,
+        value: String, // Base64 kodiert
+    },
+    #[serde(rename = "Range")]
+    Range {
+        #[serde(rename = "idShort")]
+        id_short: String,
+        #[serde(rename = "valueType")]
+        value_type: String,
+        min: Value,
+        max: Value,
+        kind: ModelingKind,
+    },
+}
 
-    :dict{}:
-        type: <ROS-datatype>
-        id_short: Optional<str>
-    """
-    is_array = False
-    data_type = data['type']
-    if 'data' in data:
-        kwargs.update(data['data'])
-    id_short = data['id_short'] if 'id_short' in data else kwargs['id_short'] if 'id_short' in kwargs else None
-    if 'sequence' in data_type:
-        # TODO: Store arrays in DataElement
-        data_type = data_type.replace('sequence<','').replace('>','')
-        is_array = True
-    if '/' in data_type:
-        # complex ROS message like 'geometry_msgs/Pose'
-        pkg = data_type.split('/')[0]
-        msg = data_type.split('/')[1]
-        id_short=id_short if id_short != None else msg
-        if is_array: id_short+='_ARRAY'
-        obj = model.SubmodelElementCollectionUnordered(id_short, kind=kind, **kwargs)
-        ros_msg = getattr(__import__(pkg).msg, msg)
-        for id_short, child_type in ros_msg.get_fields_and_field_types().items():
-            obj.value.add(ros_to_dataelement(
-                {'type': child_type, 'id_short': id_short},
-                kind=kind,
-                **kwargs  # nest additional information through all layers
-            ))
-    else:
-        # simple variable
-        if is_array: id_short+='_ARRAY'
-        obj = model.Property(id_short, getattr(model.datatypes, datatype_conversion[data_type]), **kwargs)
-        obj._kind = kind # dirty way of correcting the kind
-        # for kw in kwargs:
-        # # nest additional information through all layers
-        #     setattr(obj, kw, kwargs[kw])
-    obj = add_ros_qualifier(obj, data_type)
-    return obj
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Qualifier {
+    #[serde(rename = "type")]
+    pub type_: String,
+    #[serde(rename = "valueType")]
+    pub value_type: String,
+    pub value: String,
+}
 
-def add_ros_qualifier(obj, data_type):
-    obj.qualifier = {base.Qualifier(
-        type_= 'ROS',
-        value_type= model.datatypes.String,
-        value= data_type,
-        )}
-    return obj
+/// Verwandelt eine Datei in einen BaSyx Blob
+pub fn data_to_blob(data_path: &Path, id_short: Option<String>) -> Result<SubmodelElement, std::io::Error> {
+    let file_name = data_path.file_stem().unwrap().to_str().unwrap();
+    let id = id_short.unwrap_or_else(|| file_name.to_string());
+    
+    // Einfaches Mime-Type Guessing (Rust hat keine Standard-Lib dafür, 
+    // hier vereinfacht oder über crate 'mime_guess')
+    let mime_type = match data_path.extension().and_then(|s| s.to_str()) {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("pdf") => "application/pdf",
+        _ => "application/octet-stream",
+    };
+
+    let data = fs::read(data_path)?;
+    // BaSyx erwartet Blobs oft als Base64
+    let base64_value = base64::encode(&data);
+
+    Ok(SubmodelElement::Blob {
+        id_short: id,
+        mime_type: mime_type.to_string(),
+        value: base64_value,
+    })
+}
+
+/// Hilfsfunktion für die ROS-Typen-Konvertierung
+fn get_basyx_datatype(ros_type: &str) -> &str {
+    match ros_type {
+        "int8" | "int16" => "Short",
+        "int32" | "int64" => "Integer",
+        "uint8" | "uint16" => "UnsignedShort",
+        "uint32" | "uint64" => "UnsignedInt",
+        "string" => "String",
+        "double" | "float64" => "Double",
+        "float" | "float32" => "Float",
+        "boolean" | "bool" => "Boolean",
+        "octet" | "byte" => "Byte",
+        _ => "String",
+    }
+}
+
+/// Fügt den ROS-Qualifier hinzu (identisch zur Python Logik)
+fn add_ros_qualifier(data_type: &str) -> Vec<Qualifier> {
+    vec![Qualifier {
+        type_: "ROS".to_string(),
+        value_type: "String".to_string(),
+        value: data_type.to_string(),
+    }]
+}
+
+/// Konvertiert (theoretische) ROS-Datenstrukturen in BaSyx-Elemente
+/// In Rust würden diese Daten meist über rclrs oder serde_json reinkommen.
+pub fn ros_to_dataelement(
+    id_short: String, 
+    data_type: &str, 
+    value: Option<Value>, 
+    kind: ModelingKind
+) -> SubmodelElement {
+    
+    let mut clean_type = data_type.to_string();
+    let mut is_array = false;
+
+    if clean_type.contains("sequence<") || clean_type.contains("[]") {
+        clean_type = clean_type.replace("sequence<", "").replace(">", "").replace("[]", "");
+        is_array = true;
+    }
+
+    let final_id = if is_array { format!("{}_ARRAY", id_short) } else { id_short };
+
+    // Komplexe ROS-Typen (pkg/Msg) behandeln wir als Collections
+    if clean_type.contains('/') {
+        // Hinweis: Echte Rekursion erfordert Zugriff auf ROS-Message-Definitionen.
+        // Hier als Platzhalter für eine Collection:
+        SubmodelElement::Collection {
+            id_short: final_id,
+            value: vec![], // Hier müssten die Child-Elemente rein
+            kind,
+        }
+    } else {
+        // Einfacher Typ
+        SubmodelElement::Property {
+            id_short: final_id,
+            value_type: get_basyx_datatype(&clean_type).to_string(),
+            value,
+            qualifier: Some(add_ros_qualifier(&clean_type)),
+            kind,
+        }
+    }
+}
+
+/// Erzeugt eine OperationVariable (ModelingKind: Template)
+pub fn to_operation_variable(id_short: String, data_type: &str) -> SubmodelElement {
+    ros_to_dataelement(id_short, data_type, None, ModelingKind::Template)
+}

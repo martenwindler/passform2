@@ -12,16 +12,19 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name), glob('launch/*.launch.py')),
-        (os.path.join('share', package_name, 'config'), glob('config/*')),
-        (os.path.join('share', package_name, 'skills'), glob('skills/*'))
+        # Hier werden die Skills aus dem Unterordner installiert
+        (os.path.join('share', package_name, 'skills'), 
+            glob('passform_agent_resources/skills/*.yaml')),
+        # Falls du dort auch Configs hast:
+        (os.path.join('share', package_name, 'config'), 
+            glob('config/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='jasper',
-    maintainer_email='wil@biba.uni-bremen.de',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    maintainer='x',
+    maintainer_email='x',
+    description='x',
+    license='x',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
