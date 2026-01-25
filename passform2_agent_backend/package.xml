@@ -4,18 +4,20 @@
   <name>passform_agent_backend</name>
   <version>0.1.0</version>
   <description>Backend agent for processing ROS2 data and providing an API interface</description>
-  <maintainer email="user@todo.todo">User</maintainer>
-  <license>Apache-2.0</license>
+  <maintainer email="marten@passform.local">Marten</maintainer>
+  <license>TODO: License declaration</license>
 
-  <depend>rclpy</depend>
+  <buildtool_depend>ament_cargo</buildtool_depend>
+  <buildtool_depend>cargo</buildtool_depend>
+
+  <depend>rclrs</depend>
   <depend>std_msgs</depend>
+  <depend>rclpy</depend>
 
-  <test_depend>ament_copyright</test_depend>
-  <test_depend>ament_flake8</test_depend>
-  <test_depend>ament_pep257</test_depend>
-  <test_depend>python3-pytest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
 
   <export>
-    <build_type>ament_python</build_type>
+    <build_type>ament_cargo</build_type>
   </export>
 </package>

@@ -1,0 +1,2 @@
+bool active
+passform_agent_resources/AgentInfo agent_info

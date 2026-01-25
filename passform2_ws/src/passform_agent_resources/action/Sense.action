@@ -1,0 +1,11 @@
+# Request
+string target_id # uuid of part to be moved (robot, part, effector, ..)
+passform_agent_resources/Location target_location
+geometry_msgs/Wrench wrench
+rcl_interfaces/Parameter[] conditions
+---
+# Result
+rcl_interfaces/Parameter[] post_conditions
+---
+# Feedback
+rcl_interfaces/Parameter[] conditions

@@ -1,2 +1,0 @@
-bool active
-passform_agent_msgs/AgentInfo agent_info

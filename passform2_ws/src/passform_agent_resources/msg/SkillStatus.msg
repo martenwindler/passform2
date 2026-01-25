@@ -1,0 +1,2 @@
+passform_agent_resources/Skill skill
+diagnostic_msgs/DiagnosticStatus status

@@ -1,5 +1,0 @@
-**/**/node_modules/
-/elm-stuff/
-.vite
-package-lock.json
-**/**/*.woff2

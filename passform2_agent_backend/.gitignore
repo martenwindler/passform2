@@ -5,6 +5,8 @@ __pycache__/
 install/
 build/
 log/
-*.rs
 cargo.toml
 tests/**/**
+CMakeLists.txt
+target/
+Cargo.lock
