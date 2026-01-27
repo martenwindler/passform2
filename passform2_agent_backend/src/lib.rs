@@ -1,15 +1,25 @@
 pub mod core;
-pub mod managers;
-pub mod ros;
+pub mod com;
+// pub mod ros;      // Temporär deaktiviert
+// pub mod managers; // Temporär deaktiviert
 
-// Re-exports
-pub use crate::core::config::ConfigManager;
-pub use crate::managers::AgentManager;
-pub use crate::managers::SystemApi;
-pub use crate::managers::path_manager::PathManager;
+use tokio::sync::RwLock;
+use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
+use reqwest::Client;
+
+// Wir definieren die Kern-Strukturen hier in der Lib, 
+// damit main.rs und proxy.rs sie beide sehen.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Agent {
+    pub agent_id: String,
+    pub x: i32,
+    pub y: i32,
+}
 
 pub struct AppState {
-    pub ros_client: std::sync::Arc<crate::ros::ros_client::RosClient>,
-    pub agent_manager: std::sync::Arc<crate::managers::AgentManager>,
-    pub path_manager: std::sync::Arc<crate::managers::path_manager::PathManager>, 
+    pub hardware_registry: RwLock<HashMap<String, serde_json::Value>>,
+    pub agents: RwLock<Vec<Agent>>,
+    pub system_mode: RwLock<String>,
+    pub http_client: Client,
 }

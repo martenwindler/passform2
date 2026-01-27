@@ -51,3 +51,6 @@ qtcreator-*
 CATKIN_IGNORE
 
 .cargo
+src/ros2/
+src/ros2_rust/
+src/ros2-rust/
