@@ -73,5 +73,16 @@ htmlcov/
 *.bak
 *.bak.*
 
-
 secret.key
+
+passform2_ws/src/ros2/*
+!passform2_ws/src/ros2/.gitkeep
+
+passform2_ws/src/ros2_rust/*
+!passform2_ws/src/ros2_rust/.gitkeep
+
+passform2_ws/src/ros2-rust/*
+!passform2_ws/src/ros2-rust/.gitkeep
+
+passform2_agent_backend/repos/basyx-aas-web-ui/*
+!passform2_agent_backend/repos/basyx-aas-web-ui/.gitkeep
