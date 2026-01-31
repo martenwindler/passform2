@@ -2,16 +2,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use futures::channel::oneshot;
 
 use rclrs;
-use rclrs::Node;
-use passform_msgs::srv::Discover;
-
-// Importiere deinen Rust-BaSyx-Client
-use crate::basyx::rest_server::RestServer;
+use rclrs::{Node, ServiceIDL, RclrsError, RclReturnCode}; 
+use passform_msgs::srv::Discover; 
 
 pub struct DiscoverPassform {
-    node: Arc<Node>,
+    pub node: Arc<Node>,
     discovery_performed: bool,
     base_services: HashMap<String, String>,
     basyx_config: HashMap<String, String>,
@@ -27,39 +25,49 @@ impl DiscoverPassform {
         }
     }
 
-    /// Führt die Discovery aus (Synchroner Call im Rust-Style)
     pub fn discover(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let discover_topic = "/passform/discover";
         let client = self.node.create_client::<Discover>(discover_topic)?;
+        let context = self.node.commands().context(); 
 
-        // Warten auf den Service (ähnlich wie wait_for_service)
-        while !client.wait_for_service(Duration::from_secs(1))? {
-            if !rclrs::ok() {
-                return Err("Interrupted while waiting for discovery service".into());
-            }
+        // Warten auf den Service
+        while !client.service_is_ready()? {
+            if !context.ok() { return Err("Interrupted".into()); }
             println!("Warte auf Discovery Service '{}'...", discover_topic);
+            thread::sleep(Duration::from_millis(500));
         }
 
-        let request = Discover::Request::default();
+        // Channel für die Antwort
+        let (tx, mut rx) = oneshot::channel::<<Discover as ServiceIDL>::Response>();
+        let request = <Discover as ServiceIDL>::Request::default();
         
-        // In Rust nutzen wir meistens einen synchronen Call-Ansatz für Discovery beim Startup
-        let future = client.call_async(&request);
+        // Service-Call absetzen
+        // In Jazzy ist msg ein Option, und wir unterdrücken die Promise-Warnung
+        let _promise = client.call_then(request, move |response, _info: rclrs::ServiceInfo| {
+            let _ = tx.send(response);
+        })?;
+
+        println!("Sende Discovery Request...");
         
-        // Polling der Future (Ersatz für das Python spin_once Konstrukt)
-        while rclpy::ok() {
-            if let Some(response) = future.read_value()? {
-                self.parse_response(response)?;
-                break;
+        // Polling auf die Antwort
+        loop {
+            if !context.ok() { return Err("Interrupted during call".into()); }
+            
+            match rx.try_recv() {
+                Ok(Some(response)) => {
+                    self.parse_response(response)?;
+                    break;
+                }
+                Ok(None) => thread::sleep(Duration::from_millis(100)),
+                Err(_) => return Err("Service response channel closed unexpectedly".into()),
             }
-            // Verhindert CPU-Maximierung beim Warten
-            thread::sleep(Duration::from_millis(100));
         }
 
         self.discovery_performed = true;
         Ok(())
     }
 
-    fn parse_response(&mut self, resp: Discover::Response) -> Result<(), Box<dyn std::error::Error>> {
+    fn parse_response(&mut self, resp: <Discover as ServiceIDL>::Response) -> Result<(), Box<dyn std::error::Error>> {
         if resp.server_description.is_empty() {
             return Err("Discovery erhalten, aber server_description ist leer.".into());
         }
@@ -71,40 +79,11 @@ impl DiscoverPassform {
                 .collect();
 
             match ds.name.to_lowercase().as_str() {
-                "services" => {
-                    self.base_services = data;
-                },
-                "basyx" => {
-                    self.basyx_config = data;
-                },
+                "services" => self.base_services = data,
+                "basyx" => self.basyx_config = data,
                 _ => {}
             }
         }
-
         Ok(())
-    }
-
-    /// Startet den BaSyx-Server basierend auf den Discovery-Daten
-    pub fn start_basyx(&self) -> Result<RestServer, Box<dyn std::error::Error>> {
-        if !self.discovery_performed {
-            return Err("Discovery wurde noch nicht ausgeführt!".into());
-        }
-
-        let reg_type = self.basyx_config.get("registry_type")
-            .ok_or("BaSyx registry_type fehlt")?;
-
-        if reg_type.to_lowercase() != "rest" {
-            return Err(format!("Nur REST BaSyx unterstützt, Typ ist aber: {}", reg_type).into());
-        }
-
-        let host = self.basyx_config.get("registry_host")
-            .ok_or("BaSyx registry_host fehlt")?;
-
-        // Erstellt den Rust-Client (Standardports 8081/8082)
-        Ok(RestServer::new(host, 8081, 8082, 3))
-    }
-
-    pub fn get_services(&self) -> &HashMap<String, String> {
-        &self.base_services
     }
 }

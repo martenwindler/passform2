@@ -1,7 +1,6 @@
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
-use crate::util::sanitize_id;
-use std::collections::HashMap;
+use crate::core::util::helper::sanitize_id;
 
 /// Repräsentiert die Versorgungsanforderungen
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -64,7 +63,7 @@ impl Module {
         let mut elements = Vec::new();
 
         // 1. Thumbnail als Blob hinzufügen (falls vorhanden)
-        if let Some(path) = &self.thumbnail_path {
+        if let Some(_path) = &self.thumbnail_path {
             // In einer echten Implementierung würden wir hier die Datei einlesen
             elements.push(json!({
                 "idShort": "thumbnail",

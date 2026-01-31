@@ -36,7 +36,7 @@ class Heartbeat:
         node = rclpy.create_node('heartbeat')
 
         qos_profile = rclpy.qos.qos_profile_system_default
-        qos_profile.liveliness=rclpy.qos.LivelinessPolicy.MANUAL_BY_TOPIC
+        qos_profile.liveliness=rclpy.qos.QoSLivelinessPolicy.MANUAL_BY_TOPIC
         qos_profile.liveliness_lease_duration=rclpy.duration.Duration(seconds=period + lease_delta)
         qos_profile.deadline=rclpy.duration.Duration(seconds=period + lease_delta)
 

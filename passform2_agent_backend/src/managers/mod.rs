@@ -4,6 +4,7 @@ pub mod config_manager;
 pub mod node_manager;
 pub mod path_manager;
 pub mod skill_manager;
+pub mod socket_io_manager;
 pub mod system_api;
 
 // Re-exports für einfacheren Zugriff

@@ -72,7 +72,7 @@ impl PrimitiveLifecycle {
     fn calculate_cost(&self, task: &Task) -> Cost {
         let mut cost = Cost::default();
         cost.duration = self.estimate_duration(task);
-        cost.earliest_start = self.node.get_clock().now().to_msg();
+        cost.earliest_start = self.node.get_clock().now().to_ros_msg();
         cost.request_id = task.request_id.clone();
         // Topic Pfad normalisieren
         cost.action_topic = format!("{}/{}", self.node.get_namespace(), "skill_id").replace("//", "/");

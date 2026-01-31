@@ -1,9 +1,9 @@
 use reqwest::blocking::Client;
 use serde_json::{json, Value};
 use std::time::Duration;
-use crate::util::sanitize_id;
-use crate::basyx::rest_registry::RestRegistry;
-use crate::basyx::conversion::SubmodelElement;
+use crate::core::util::sanitize_id;
+use crate::core::basyx::rest_registry::RestRegistry;
+use crate::core::basyx::conversion::SubmodelElement;
 
 pub struct RestServer {
     host: String,

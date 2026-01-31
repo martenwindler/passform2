@@ -1,7 +1,11 @@
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
-use crate::util::sanitize_id;
-use crate::types::location::Location; // Deine Location-Portierung
+use crate::core::util::helper::sanitize_id;
+
+// Fix E0599: Trait ToBasyx muss importiert werden, damit die Methode sichtbar ist
+use crate::core::types::location::{Location, ToBasyx}; 
+
+// Wir nutzen den Alias 'passform_msgs' aus deiner Cargo.toml
 use passform_msgs::msg::{Item as ItemMsg, Part as PartMsg};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -23,7 +27,6 @@ impl Item {
         }
     }
 
-    /// Entspricht self.add(other) in Python
     pub fn add(&mut self, other: &mut Item) -> Result<(), String> {
         if self.uid != other.uid {
             return Err(format!(
@@ -32,11 +35,10 @@ impl Item {
             ));
         }
         self.quantity += other.quantity;
-        other.quantity = 0; // "use all" Logik aus dem Python-Original
+        other.quantity = 0; 
         Ok(())
     }
 
-    /// Entspricht self.use(quantity) in Python
     pub fn use_qty(&mut self, mut quantity: i32) -> Item {
         if quantity < 0 { quantity = 0; }
         if quantity > self.quantity {
@@ -49,7 +51,6 @@ impl Item {
         new_item
     }
 
-    /// Prüft ob eine Location gesetzt ist (UID nicht leer)
     pub fn has_location(&self) -> bool {
         !self.location.get_aoi_uid().is_empty()
     }
@@ -60,24 +61,27 @@ impl Item {
             part: PartMsg {
                 uuid: self.uid.clone(),
                 name: self.name.clone(),
+                grasp_options: Vec::new(), 
+                // Fix E0308: Inertia ist eine Struktur, kein Vec. 
+                // .default() erzeugt eine gültige, leere Inertia-Nachricht.
+                inertia: geometry_msgs::msg::Inertia::default(), 
             },
+            // Fix E0599: Methode heißt in location.rs jetzt to_msg()
             location: self.location.to_msg(),
-            quantity: self.quantity,
+            quantity: self.quantity as u32, 
             uuid: self.uid.clone(),
         }
     }
 
-    /// Erzeugt ein Item aus einer ROS-Nachricht
     pub fn from_msg(msg: &ItemMsg) -> Self {
         Self {
             name: msg.part.name.clone(),
             uid: msg.part.uuid.clone(),
-            quantity: msg.quantity,
+            quantity: msg.quantity as i32, 
             location: Location::from_msg(&msg.location),
         }
     }
 
-    /// Erzeugt das BaSyx-JSON Format (SubmodelElementCollection)
     pub fn to_basyx_json(&self) -> Value {
         let id_short = format!("item_{}", sanitize_id(&self.uid));
         json!({
@@ -103,7 +107,8 @@ impl Item {
                     "valueType": "integer",
                     "value": self.quantity
                 },
-                self.location.to_basyx_json() // Location muss diese Methode implementieren
+                // Fix E0599
+                self.location.to_basyx_json() 
             ]
         })
     }

@@ -1,20 +1,54 @@
 # ──────────────────────────────────────────────────────────────
-# PASSFORM 2.0 - GLOBALE GITIGNORE
+# PASSFORM 2.0 - GLOBALE MASTER GITIGNORE
 # ──────────────────────────────────────────────────────────────
 
-# --- ROS 2 & Colcon ---
-# Ignoriert alle Build-Artefakte im Workspace
+# --- ROS 2 & Colcon Workspace (passform2_ws) ---
 passform2_ws/build/
 passform2_ws/install/
 passform2_ws/log/
-# Falls colcon im Root gerufen wurde
+passform2_ws/bin/
+passform2_ws/lib/
+
+# Alte Catkin/Build-Relikte & Colcon-Artefakte
+devel/
+logs/
 build/
 install/
 log/
+build_isolated/
+devel_isolated/
+bin/
+lib/
+msg_gen/
+srv_gen/
 .colcon/
 ament_index/
+CATKIN_IGNORE
+COLCON_IGNORE
+AMENT_IGNORE
 
-# --- Python (Backend & ROS Nodes) ---
+# Generierte ROS-Messages/Services Patterns
+msg/*Action.msg
+msg/*ActionFeedback.msg
+msg/*ActionGoal.msg
+msg/*ActionResult.msg
+msg/*Feedback.msg
+msg/*Goal.msg
+msg/*Result.msg
+msg/_*.py
+srv/_*.py
+*.cfgc
+/cfg/cpp/
+/cfg/*.py
+
+# --- Backend (Rust & Python) ---
+passform2_agent_backend/target/
+passform2_agent_backend/app/__pycache__/
+passform2_agent_backend/.cargo/
+target/
+Cargo.lock
+
+# Python Allgemein (für Root, Backend & Scripts)
 __pycache__/
 *.py[cod]
 *$py.class
@@ -23,30 +57,52 @@ __pycache__/
 *.egg-info/
 dist/
 *.egg
-# Virtuelle Umgebungen
 .venv/
 env/
 venv/
-# Umgebungsvariablen (WICHTIG: Enthält Passwörter/IPs)
 .env
 
-# --- Daten & SSoT ---
-# Wir ignorieren die Live-Konfiguration, da sie lokale IPs/Zustände enthält
-/data/*.json
-# Ausnahme: Falls du ein Template behalten willst, erstelle config.json.template
-!/data/config.json.template
+# --- Frontend (Elm, TypeScript, Vite) ---
+passform2_agent_frontend/node_modules/
+passform2_agent_frontend/elm-stuff/
+passform2_agent_frontend/dist/
+passform2_agent_frontend/.vite/
+passform2_agent_frontend/deps/
+passform2_agent_frontend/package-lock.json
+node_modules/
+/elm-stuff/
+.vite/
+deps/
 
-# --- IDEs & Editoren ---
+# Assets & Fonts
+**/*.woff2
+**/*.woff
+**/*.ttf
+**/*.eot
+
+# --- Daten & Security ---
+secret.key
+/data/*.json
+!/data/config.json.template
+# Lokale Logs
+log/list_*
+log/latest*
+
+# --- IDEs, Editoren & OS ---
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.project
+.cproject
+CMakeLists.txt.user
+qtcreator-*
+*.user
 .DS_Store
 Thumbs.db
 
-# --- Dokumentation & CAD/Assets ---
-# Ignoriert schwere Binärdateien und Zeichnungen
+# --- CAD, Dokumentation & Binärdateien ---
 *.jpg
 *.png
 *.drawio
@@ -54,27 +110,19 @@ Thumbs.db
 *.urdf
 *.dae
 *.pdf
+*.pcd
+*.dox
+*.wikidoc
 /docs/
+/planning/cfg
+/planning/docs
+/planning/src
 
 # --- Docker ---
 .dockerignore
-# Docker-Logs oder temporäre Container-Files
 *.log
 
-# --- Test & Coverage ---
-.coverage
-htmlcov/
-*.gcno
-*.gcda
-*.gcov
-
-# --- Temporäres ---
-*.tmp
-*.bak
-*.bak.*
-
-secret.key
-
+# --- Spezielle Verzeichnis-Erhaltung (Keep-Regeln) ---
 passform2_ws/src/ros2/*
 !passform2_ws/src/ros2/.gitkeep
 

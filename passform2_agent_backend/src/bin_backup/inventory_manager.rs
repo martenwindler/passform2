@@ -12,7 +12,7 @@ use passform_msgs::srv::{UpdateInventory, UpdateInventoryRequest, UpdateInventor
 
 // Eigene Module
 use crate::registration::DiscoverPassform;
-use crate::basyx::rest_server::RestServer;
+use crate::core::basyx::rest_server::RestServer;
 use crate::helper::load_yaml; // Unsere neue YAML-Funktion
 
 /// Rust-Entsprechung für ModuleInventory

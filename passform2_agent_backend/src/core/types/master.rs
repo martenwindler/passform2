@@ -1,8 +1,9 @@
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
-use crate::util::sanitize_id;
-use crate::types::bay::BaySubmodel; // Unser vorheriges Bay-Submodell
+use crate::core::util::helper::sanitize_id;
+// Korrigierter Pfad: BaySubmodel liegt in crate::core::types::bay
+use crate::core::types::bay::BaySubmodel; 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Master {
@@ -15,6 +16,7 @@ impl Master {
     pub fn new(unique_id: Option<String>, name: Option<String>) -> Self {
         Self {
             unique_id: unique_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
+            // sanitize_id erwartet einen &str, das passt hier
             name: sanitize_id(&name.unwrap_or_else(|| "PassForM_Master".to_string())),
             bays: Vec::new(),
         }
@@ -35,13 +37,15 @@ impl Master {
 
     /// Generiert die komplette AAS-Struktur als JSON für den BaSyx-Server
     pub fn to_basyx_json(&self) -> Value {
-        let mut submodels: Vec<Value> = self.bays
+        // Fix für E0282: Explizite Typangabe für den Closure-Parameter 'b'
+        let submodels: Vec<Value> = self.bays
             .iter()
-            .map(|b| b.to_basyx_json())
+            .map(|b: &BaySubmodel| b.to_basyx_json()) 
             .collect();
 
         // Füge das TechnicalData Submodell des Masters hinzu
-        submodels.push(json!({
+        let mut all_submodels = submodels;
+        all_submodels.push(json!({
             "idShort": "TechnicalData",
             "identification": {
                 "id": format!("{}_TD", self.unique_id),
@@ -67,7 +71,7 @@ impl Master {
                 },
                 "assetKind": "INSTANCE"
             },
-            "submodels": submodels
+            "submodels": all_submodels
         })
     }
 }

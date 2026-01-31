@@ -1,60 +1,107 @@
-use std::sync::Arc;
-use rclrs::{Context, Node, Executor, SpinOptions, CreateBasicExecutor};
-use crate::managers::AgentManager;
-use passform_agent_resources::msg::{AgentInfo, PathRequest};
-use tracing::{info, error};
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::any::Any;
+use rclrs::{Node, Publisher, SubscriptionOptions, RclrsError, Context, CreateBasicExecutor, SpinOptions, RclReturnCode};
+use passform_msgs::msg::{AgentInfo, PathRequest}; 
+use tracing::{info, error, warn};
 
 pub struct RosClient {
-    // Wir speichern den Node direkt als Struct, wie in deiner lib.rs definiert
     pub node: Node,
+    pub subscriptions: Mutex<Vec<Arc<dyn Any + Send + Sync>>>,
+    pub path_pub: Arc<Publisher<PathRequest>>,
+    pub is_running: Arc<AtomicBool>,
+    // NEU: Handle zur Tokio-Runtime speichern
+    pub rt_handle: tokio::runtime::Handle,
 }
 
 impl RosClient {
-    /// Erstellt einen neuen RosClient. 
-    /// Gibt den Client und den Executor zurück, da der Executor für das Spinning benötigt wird.
-    pub fn new(context: &Context) -> Result<(Self, Executor), rclrs::RclrsError> {
-        // 1. Nutzt den Trait 'CreateBasicExecutor' aus deiner lib.rs
-        let mut executor = context.create_basic_executor();
+    pub fn new(context: &Context) -> Result<Self, RclrsError> {
+        // Capture den Handle der aktuellen Tokio-Runtime (wird in main aufgerufen)
+        let rt_handle = tokio::runtime::Handle::current();
         
-        // 2. Erstellt den Node über den Executor (genau wie im Basic Usage Beispiel deines Codes)
-        let node = executor.create_node("passform_agent_backend")?;
-        
-        Ok((Self { node }, executor))
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        let context_clone = context.clone();
+        let is_running = Arc::new(AtomicBool::new(true));
+        let is_running_thread = is_running.clone();
+
+        // Hintergrund-Thread für ROS Executor
+        std::thread::spawn(move || {
+            let mut executor = context_clone.create_basic_executor();
+            
+            // Executor erstellt und besitzt den Node direkt
+            let node = match executor.create_node("passform_agent_backend") {
+                Ok(n) => n,
+                Err(e) => {
+                    error!("❌ Konnte ROS Node nicht erstellen: {:?}", e);
+                    return;
+                }
+            };
+
+            let _ = tx.send(node.clone());
+
+            info!("🔄 ROS 2 Executor Loop gestartet...");
+
+            while is_running_thread.load(Ordering::SeqCst) {
+                // SpinOptions müssen in jedem Durchlauf neu erstellt werden (kein Copy-Trait)
+                let mut spin_options = SpinOptions::default();
+                spin_options.timeout = Some(std::time::Duration::from_millis(100));
+
+                let _ = executor.spin(spin_options);
+            }
+            warn!("🛑 ROS 2 Executor Loop beendet.");
+        });
+
+        // Node sicher aus dem Thread empfangen
+        let node = rx.recv().map_err(|_| RclrsError::RclError { 
+            code: RclReturnCode::Error,
+            msg: None 
+        })?;
+
+        let path_pub = node.create_publisher::<PathRequest>("path_requests")?;
+
+        Ok(Self { 
+            node,
+            subscriptions: Mutex::new(Vec::new()),
+            path_pub: Arc::new(path_pub),
+            is_running,
+            rt_handle,
+        })
     }
 
-    pub fn publish_path_request(&self, _req: PathRequest) -> Result<(), rclrs::RclrsError> {
-        info!("Sende PathRequest über ROS...");
-        Ok(())
+    pub fn stop(&self) {
+        self.is_running.store(false, Ordering::SeqCst);
     }
 
-    pub async fn run(&self, mut executor: Executor, agent_manager: Arc<AgentManager>) -> Result<(), rclrs::RclrsError> {
-        let am_info = Arc::clone(&agent_manager);
+    pub fn publish_path_request(&self, req: PathRequest) -> Result<(), RclrsError> {
+        self.path_pub.publish(&req)
+    }
+
+    pub async fn run(&self, agent_manager: Arc<crate::managers::AgentManager>) -> Result<(), RclrsError> {
+        let am_clone = Arc::clone(&agent_manager);
+        // Handle für den Callback klonen
+        let rt = self.rt_handle.clone(); 
         
-        // Subscription erstellen (Node-Methoden sind jetzt direkt verfügbar)
-        let _agent_info_sub = self.node.create_subscription::<AgentInfo, _>(
-            "agent_info",
+        let sub = self.node.create_subscription::<AgentInfo, _>(
+            SubscriptionOptions::new("agent_info"),
             move |msg: AgentInfo| {
-                let am = Arc::clone(&am_info);
-                tokio::spawn(async move {
+                info!("📥 ROS Nachricht empfangen: ID={}, Typ={}", msg.agent_id, msg.module_type);
+                
+                let am = Arc::clone(&am_clone);
+                // WICHTIG: Nutze den Handle, um den Task in die Tokio-Runtime zu schieben
+                rt.spawn(async move {
                     am.sync_from_ros(
                         msg.agent_id,
                         msg.module_type,
-                        msg.position.x,
-                        msg.position.y,
-                        msg.orientation as i32,
+                        msg.position.x as i32, 
+                        msg.position.y as i32,
+                        msg.orientation as i32, 
                     ).await;
                 });
             },
         )?;
 
-        info!("🚀 ROS 2 Jazzy Backend aktiv.");
-
-        // 3. Das Spinning: Wir bewegen den Executor in einen blockierenden Thread
-        tokio::task::spawn_blocking(move || {
-            // Nutzt die spin-Methode aus deiner executor.rs:53
-            executor.spin(SpinOptions::default());
-        });
-
+        self.subscriptions.lock().unwrap().push(Arc::new(sub));
+        info!("📡 ROS 2 Subscriptions aktiv.");
         Ok(())
     }
 }

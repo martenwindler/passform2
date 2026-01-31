@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use rclrs::{Node, Publisher, QosProfile, LivelinessPolicy};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use rclrs::{Node, Publisher};
 use std_msgs::msg::Header;
 
 /// Ein Watchdog, der den Status auf "Stale" setzt, wenn kein Heartbeat kommt.
@@ -24,7 +24,6 @@ impl Watchdog {
     }
 
     pub fn on_heartbeat(&self, current_status: i32) {
-        // Zeitstempel aktualisieren
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -47,57 +46,54 @@ impl Watchdog {
 
         let mut timer_guard = self.timer.lock().unwrap();
         
-        // In Rust stoppen wir keinen Thread hart, wir lassen ihn auslaufen oder nutzen 
-        // koordinierte Timer. Hier simulieren wir den Python-Restart-Timer:
         *timer_guard = Some(std::thread::spawn(move || {
             std::thread::sleep(duration);
             let mut s = status_ptr.lock().unwrap();
             *s = timeout_val;
-            // Hier würde man in Rust eher ein Event triggern statt eine Exception zu werfen,
-            // da Exceptions in Threads den Hauptprozess nicht sauber beenden.
             eprintln!("Module timed out!");
         }));
     }
 
     pub fn stop(&self) {
         let mut timer_guard = self.timer.lock().unwrap();
-        *timer_guard = None; // Handle droppen
+        *timer_guard = None; 
     }
 }
 
 /// ROS 2 Heartbeat Publisher mit Liveliness-QoS
 pub struct Heartbeat {
-    publisher: Arc<Publisher<Header>>,
-    _timer: Arc<rclrs::Timer>,
+    pub publisher: Arc<Publisher<Header>>,
+    pub timer: Arc<rclrs::Timer>,
 }
 
 impl Heartbeat {
-    pub fn new(node: &Arc<Node>, period_sec: f64) -> Self {
-        let lease_delta = 0.02; // 20 ms
-        let total_duration = period_sec + lease_delta;
-
-        // QoS-Profil wie im Python-Original
-        let mut qos = QosProfile::default();
-        qos.liveliness = LivelinessPolicy::ManualByTopic;
-        qos.liveliness_lease_duration = Duration::from_secs_f64(total_duration);
-        qos.deadline = Duration::from_secs_f64(total_duration);
-
-        let publisher = node.create_publisher::<Header>("ymodule_broadcast", qos).unwrap();
+    pub fn new(node: &Node, period_sec: f64) -> Self {
+        // create_publisher nimmt in Jazzy nur den Topic-Namen (für Default QoS)
+        let publisher = node.create_publisher::<Header>("ymodule_broadcast")
+            .expect("Failed to create publisher");
         
         let publisher_clone = Arc::clone(&publisher);
-        let node_clone = Arc::clone(node);
+        let node_clone = node.clone();
         
-        let timer = node.create_timer(Duration::from_secs_f64(period_sec), move || {
-            let msg = Header {
-                stamp: node_clone.get_clock().now().to_msg(),
-                frame_id: "".to_string(),
-            };
-            publisher_clone.publish(&msg).unwrap();
-        }).unwrap();
+        let timer = node.create_timer_repeating(
+            std::time::Duration::from_secs_f64(period_sec),
+            move || {
+                let rcl_time = node_clone.get_clock().now().to_ros_msg().expect("Time conversion failed");
+                let msg = Header {
+                    stamp: builtin_interfaces::msg::Time {
+                        sec: rcl_time.sec,
+                        nanosec: rcl_time.nanosec,
+                    },
+                    frame_id: "".to_string(),
+                };
+                let _ = publisher_clone.publish(&msg);
+            }
+        ).expect("Failed to create timer");
 
         Self {
-            publisher,
-            _timer: timer,
+            // Fix E0308: Konvertierung in die interne Arc-Struktur
+            publisher: publisher.into(), 
+            timer: Arc::new(timer),
         }
     }
 }

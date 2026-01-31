@@ -2,13 +2,15 @@
 
 ![Ubuntu 24.04](https://img.shields.io/badge/Ubuntu%2024.04-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)
 ![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-A22846?style=for-the-badge&logo=raspberry-pi&logoColor=white)
-![Eclipse BaSyx](https://img.shields.io/badge/Eclipse%20BaSyx-004A96?style=for-the-badge&logo=eclipse-ide&logoColor=white)
 ![ROS 2 Jazzy](https://img.shields.io/badge/ROS%202%20Jazzy-22314E?style=for-the-badge&logo=ros&logoColor=white)
+![Eclipse BaSyx](https://img.shields.io/badge/Eclipse%20BaSyx-004A96?style=for-the-badge&logo=eclipse-ide&logoColor=white)
 ![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)
+![Tokio](https://img.shields.io/badge/Tokio-000000?style=for-the-badge&logo=rust&logoColor=white) 
 ![Elm](https://img.shields.io/badge/Elm-60B5CC?style=for-the-badge&logo=elm&logoColor=white)
-![SCSS](https://img.shields.io/badge/SCSS-CC6699?style=for-the-badge&logo=sass&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
-
+![SCSS](https://img.shields.io/badge/SCSS-CC6699?style=for-the-badge&logo=sass&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
 
 ROS2 ecosystem managing RFID events, heartbeats, system states, Raspberry Pi clusters.
 
@@ -16,42 +18,76 @@ ROS2 ecosystem managing RFID events, heartbeats, system states, Raspberry Pi clu
 
 ```text
 passform2/
-├── passform2_agent_backend/  # FastAPI Orchestrator
-│   ├── app/
-│   │   ├── managers/         # NodeManager, AgentManager, NfcManager
-│   │   ├── ros/              # ROS Client Bridge
-│   │   ├── system_api.py     # REST-Schnittstelle für Orchestrierung
-│   │   └── logic/            # A* Pfadplanung
-│   └── data/                 # Zentrale SSoT
-├── passform2_ws/             # Zentraler ROS 2 Workspace 
+├── passform2_agent_backend/    # Zentraler Orchestrator (Hybrid)
+│   ├── src/                    # Modern Rust Core (Axum, rclrs, Tokio)
+│   │   ├── managers/           # Asynchrone Logik (Agent-, Path-, Skill-Manager)
+│   │   ├── ros/                # ROS 2 Jazzy Bridge (rclrs Client)
+│   │   └── main.rs             # API-Entrypoint & Task-Orchestrierung
+│   ├── app/                    # Legacy Python Backend (FastAPI)
+│   ├── start__backend.sh       # Launcher (Standard: Rust, --legacy: Python)
+│   └── Cargo.toml              # Rust Dependencies & Build-Config
+├── passform2_agent_frontend/   # Web-3D-UI
+│   ├── src/                    # Frontend Logik
+│   ├── index.html              # 3D-Szenen Entrypoint
+│   └── vite.config.js          # Vite Build-System & Dev-Server
+├── passform2_ws/               # Zentraler ROS 2 Workspace (Jazzy)
 │   └── src/
-│       ├── passform_agent_msgs/      # Passform 2 Custom Interfaces/Messages
-│       ├── passform_agent_planning/  # Passform 2 ROS-Nodes (monitor_node, agent_node)
-│       └── passform_ros/             # Passform 1 integration
-├── deployment/               # Deployment-Vorlagen für Hardware-Module
-│   └── agent_docker/         # Docker-Files RPi 5
-├── frontend/                 # Web-3D-UI 
-└── Makefile                  # Zentrales Build-Tool
+│       ├── passform_agent_resources/ # Custom Messages & Services (SSoT)
+│       └── ros2_rust/          # rclrs & Code-Generatoren Source-Build
+├── data/                       # Zentrale SSoT (Konfigurationen & JSON-Data)
+├── deployment/                 # Docker- & Hardware-Provisionierung (RPi 5)
+├── utils/                      # Administrative Shell-Scripts & Maintenance-Tools
+└── Makefile                    # Globales Steuerungs-Tool (make install, make start-all)
+```
+
+Quickstart.
+```text
+make install
+```
+
+Build build-ws.
+```text
+make build-ws
+```
+
+Build backend.
+```text
+make backend
+```
+
+(Build backend-legacy python).
+```text
+make backend-legacy
+```
+
+Inspect backend. 
+```text
+http://127.0.0.1:8080/
+```
+
+Build agent.
+```text
+ros2 topic pub -1 /agent_info passform_agent_resources/msg/AgentInfo "{agent_id: 'Robby-01', module_type: 'Y-Module', position: {x: 5, y: 2}, orientation: 90.0}"
+```
+
+Inspect ROS system state.
+```text
+http://127.0.0.1:8080/
+```
+
+Inspect agent list.
+```text
+http://127.0.0.1:8080/api/agents
+```
+
+Inspect basyx.
+```text
+http://127.0.0.1:8080/basyx/
 ```
 
 Build frontend.
 ```text
 make frontend
-```
-
-Build backend rest.
-```text
-make backend-rest
-```
-
-Build backend ros.
-```text
-make backend-ros
-```
-
-Build all.
-```text
-make start-all
 ```
 
 ## Hardware

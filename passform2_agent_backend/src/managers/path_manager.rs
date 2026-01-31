@@ -4,12 +4,12 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tracing::{info, error, warn};
 // Fix 1: Correcte syntaxis voor import alias
-use axum::extract as ax_extract; 
+ 
 use axum::{extract::State, http::StatusCode, Json, response::IntoResponse};
 use socketioxide::SocketIo;
 
 // We gebruiken de ROS-Messages voor de mapping
-use passform_agent_resources::msg::PathRequest as RosPathRequest;
+use passform_msgs::msg::PathRequest as RosPathRequest;
 
 // --- DOMAIN MODELS (API / Web) ---
 

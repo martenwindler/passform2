@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
-use crate::util::sanitize_id;
+use crate::core::util::helper::sanitize_id;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BaySubmodel {

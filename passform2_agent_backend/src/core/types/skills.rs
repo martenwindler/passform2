@@ -1,8 +1,7 @@
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
-use crate::util::sanitize_id;
-use std::collections::HashMap;
+use crate::core::util::helper::sanitize_id;
 
 /// Alle verfügbaren Fähigkeitstypen (identisch zu Python Enum)
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

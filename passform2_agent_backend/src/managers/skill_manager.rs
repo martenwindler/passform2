@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
-use tracing::{info, error, warn};
+use tracing::{info, error};
 use socketioxide::SocketIo;
 
 // --- DOMAIN MODELS ---

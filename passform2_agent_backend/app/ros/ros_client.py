@@ -9,7 +9,7 @@ from rclpy.node import Node
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.timer import Timer
 
-from passform_agent_msgs.msg import AgentAnnounce, AgentInfo, PathRequest, PathComplete
+from passform_agent_resources.msg import AgentAnnounce, AgentInfo, PathRequest, PathComplete
 from app.config import config
 from app.managers.agent_manager import agent_manager
 

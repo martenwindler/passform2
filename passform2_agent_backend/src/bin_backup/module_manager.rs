@@ -13,7 +13,7 @@ use nav2_msgs::srv::{ManageLifecycleNodes, ManageLifecycleNodesRequest};
 
 // Eigene Module
 use crate::registration::DiscoverPassform;
-use crate::basyx::rest_server::RestServer;
+use crate::core::basyx::rest_server::RestServer;
 use crate::network;
 
 pub struct ModuleManager {

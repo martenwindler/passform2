@@ -1,14 +1,15 @@
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
 use passform_msgs::msg::{Location as LocationMsg, AreaOfInterest as AoiMsg};
-use geometry_msgs::msg::{Point, Quaternion, Pose, Polygon};
+use geometry_msgs::msg::{Point, Quaternion, Pose, Polygon, Point32};
+use std_msgs::msg::Header;
 
 /// Hilfstraits für die BaSyx-Konvertierung
 pub trait ToBasyx {
     fn to_basyx_json(&self) -> Value;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct LocalPoint { pub x: f64, pub y: f64, pub z: f64 }
 
 impl From<&Point> for LocalPoint {
@@ -29,14 +30,14 @@ impl ToBasyx for LocalPoint {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct LocalQuaternion { pub x: f64, pub y: f64, pub z: f64, pub w: f64 }
 
 impl From<&Quaternion> for LocalQuaternion {
     fn from(q: &Quaternion) -> Self { Self { x: q.x, y: q.y, z: q.z, w: q.w } }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct LocalPose {
     pub position: LocalPoint,
     pub orientation: LocalQuaternion,
@@ -64,7 +65,7 @@ impl ToBasyx for LocalPose {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct LocalAreaOfInterest {
     pub label: String,
     pub uid: String,
@@ -97,7 +98,7 @@ impl ToBasyx for LocalAreaOfInterest {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Location {
     pub frame_id: String,
     pub pose: LocalPose,
@@ -115,15 +116,44 @@ impl Location {
             aoi: LocalAreaOfInterest {
                 label: msg.aoi.label.clone(),
                 uid: msg.aoi.uuid.clone(),
-                points: msg.aoi.polygon.points.iter().map(|p| LocalPoint { x: p.x as f64, y: p.y as f64, z: p.z as f64 }).collect(),
+                // Beachte: msg.aoi.polygon.points nutzt f32 (Point32)
+                points: msg.aoi.polygon.points.iter().map(|p| LocalPoint { 
+                    x: p.x as f64, 
+                    y: p.y as f64, 
+                    z: p.z as f64 
+                }).collect(),
             },
         }
     }
 
     pub fn to_msg(&self) -> LocationMsg {
-        // Hier erfolgt die Rückkonvertierung in die ROS-Message
-        // (Weglassen der Details für Kürze, folgt dem Schema oben)
-        LocationMsg::default() 
+        LocationMsg {
+            header: Header {
+                frame_id: self.frame_id.clone(),
+                ..Default::default()
+            },
+            pose: Pose {
+                position: Point { x: self.pose.position.x, y: self.pose.position.y, z: self.pose.position.z },
+                orientation: Quaternion { 
+                    x: self.pose.orientation.x, 
+                    y: self.pose.orientation.y, 
+                    z: self.pose.orientation.z, 
+                    w: self.pose.orientation.w 
+                },
+            },
+            aoi: AoiMsg {
+                label: self.aoi.label.clone(),
+                uuid: self.aoi.uid.clone(),
+                polygon: Polygon {
+                    // Polygon nutzt Point32 (f32)
+                    points: self.aoi.points.iter().map(|p| Point32 { 
+                        x: p.x as f32, 
+                        y: p.y as f32, 
+                        z: p.z as f32 
+                    }).collect(),
+                },
+            },
+        }
     }
 
     pub fn get_aoi_uid(&self) -> &str {

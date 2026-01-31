@@ -1,12 +1,11 @@
+use rclrs::{Node, ServiceIDL};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use rclrs::Node;
 use serde_json::Value;
 
-use crate::basyx::rest_server::RestServer;
-use crate::log_level::LogLevel;
-use passform_msgs::srv::Discover;
+use crate::core::basyx::rest_server::RestServer;
+use crate::core::util::log_level::LogLevel;
 
 /// Der Connector verwaltet die aktive Verbindung zum BaSyx-Infrastruktur-Server.
 pub struct RestServerConnector {
@@ -27,7 +26,7 @@ impl RestServerConnector {
     }
 
     /// Verbindet basierend auf der Discovery-Response
-    pub fn connect_with_discover(&mut self, resp: &Discover::Response) {
+    pub fn connect_with_discover(&mut self, resp: &<passform_msgs::srv::Discover as ServiceIDL>::Response) {
         self.log(&format!("Verbindungsinfos erhalten: {:?}", resp), LogLevel::Debug);
         
         for ds in &resp.server_description {
@@ -38,7 +37,7 @@ impl RestServerConnector {
                     .map(|kv| (kv.key.clone(), kv.value.clone()))
                     .collect();
 
-                if data.get("registry_type").map(|s| s.as_str()) == Some("REST") {
+                if data.get("registry_type").map(|s: &String| s.as_str()) == Some("REST") {
                     if let Some(host) = data.get("registry_host") {
                         self.connect(host);
                         return;
@@ -51,11 +50,9 @@ impl RestServerConnector {
 
     pub fn connect(&mut self, registry_host: &str) {
         self.log(&format!("Erstelle BaSyx-Client für Registry: {}", registry_host), LogLevel::Info);
-        // Wir nutzen hier den RestServer, den wir bereits portiert haben
         self.client = Some(RestServer::new(registry_host, 8081, 8082, self.timeout.as_secs() as u32));
     }
 
-    /// Generische Add-Methode (ersetzt das Python isinstance-Gefriemel)
     pub fn add_aas(&mut self, aas_json: Value) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(ref client) = self.client {
             let id = aas_json["identification"]["id"].as_str()
@@ -78,7 +75,6 @@ impl RestServerConnector {
         }
     }
 
-    /// Cleanup: Löscht alle registrierten AAS vom Server (Drop-Trait Ersatz für __del__)
     pub fn destroy(&mut self) {
         if let Some(ref client) = self.client {
             for (id, _) in &self.managed_aas {
@@ -88,17 +84,18 @@ impl RestServerConnector {
         }
     }
 
-    /// Zentrales Logging, das ROS-Logger oder Print nutzt
+    /// Zentrales Logging
+    /// Fix E0061 & E0308: Korrektes rclrs 0.7.0 Logger-Builder Pattern
     pub fn log(&self, msg: &str, lvl: LogLevel) {
         if let Some(ref node) = self.node {
-            let logger = node.get_logger();
             match lvl {
-                LogLevel::Debug => logger.debug(msg),
-                LogLevel::Info => logger.info(msg),
-                LogLevel::Warn => logger.warn(msg),
-                LogLevel::Error => logger.error(msg),
-                LogLevel::Fatal => logger.fatal(msg),
-            }
+                // In Jazzy nutzt man oft das log! Makro mit dem Node-Logger
+                LogLevel::Debug => rclrs::log_debug!(node.logger(), "{}", msg),
+                LogLevel::Info  => rclrs::log_info!(node.logger(), "{}", msg),
+                LogLevel::Warn  => rclrs::log_warn!(node.logger(), "{}", msg),
+                LogLevel::Error => rclrs::log_error!(node.logger(), "{}", msg),
+                LogLevel::Fatal => rclrs::log_error!(node.logger(), "FATAL: {}", msg),
+            };
         } else {
             println!("[{:?}] {}", lvl, msg);
         }
@@ -107,7 +104,7 @@ impl RestServerConnector {
 
 /// Factory Ersatz durch Rust Enum/Match Pattern
 pub enum ConnectorConfig<'a> {
-    Discover(&'a Discover::Response),
+    Discover(&'a <passform_msgs::srv::Discover as ServiceIDL>::Response),
     Params(&'a HashMap<String, String>),
     Host(&'a str),
 }
@@ -126,7 +123,6 @@ pub fn connector_factory(config: ConnectorConfig, node: Option<Arc<Node>>) -> Re
     connector
 }
 
-// Implementierung für automatisches Cleanup beim Beenden
 impl Drop for RestServerConnector {
     fn drop(&mut self) {
         self.destroy();

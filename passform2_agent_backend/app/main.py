@@ -61,18 +61,17 @@ async def lifespan(app: FastAPI):
             await socket_manager.emit_event('mode', current_mode, target_sid=sid)
             await socket_manager.emit_event('hardware_update', list(hardware_registry.values()), target_sid=sid)
             
-            # 2. Agenten-Sync: WICHTIG - Wir laden die Datei JETZT frisch
-            # Damit verhindern wir, dass ein leerer RAM-Stand die Elm-Daten killt.
-            config_manager.load_from_ssot() # Datei neu einlesen
+            # 2. Agenten-Sync
+            config_manager.load_from_ssot() 
             agents_list = config_manager.current_data.get("agents", [])
             
-            # Falls es ein Dict ist, in Liste wandeln
             if isinstance(agents_list, dict):
                 agents_list = list(agents_list.values())
 
             await socket_manager.emit_event('active_agents', {"agents": agents_list}, target_sid=sid)
-            
-            logger.info(f"✅ Sync an Client {sid}: {len(agents_list)} Agenten aus config.json")
+            logger.info(f"✅ Sync an Client {sid}: {len(agents_list)} Agenten.")
+        except Exception as e: # <--- DIESER BLOCK HAT GEFEHLT
+            logger.error(f"❌ Fehler beim Sync für Client {sid}: {e}")
     
     # --- APP LÄUFT ---
     yield 

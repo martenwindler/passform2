@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use reqwest::blocking::Client;
 use std::time::Duration;
-use crate::util::sanitize_id;
+use crate::core::util::sanitize_id;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Endpoint {

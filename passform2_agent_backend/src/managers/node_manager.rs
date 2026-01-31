@@ -5,8 +5,7 @@ use tokio::process::{Child, Command};
 use tokio::sync::RwLock;
 use tracing::{info, error, warn};
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
-use tokio::signal::unix::{signal, SignalKind};
+use serde::Deserialize;
 
 // --- API SCHEMAS ---
 #[derive(Deserialize)]

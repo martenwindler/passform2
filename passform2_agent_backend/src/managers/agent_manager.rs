@@ -1,10 +1,12 @@
 use std::collections::{HashMap, VecDeque};
+use std::time::Instant;
 use std::sync::Arc;
-use std::time::{Instant};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
-use tracing::{info, warn};
 use chrono::Local;
+
+// Importiere den SocketManager für den Move-Sync
+use crate::managers::socket_io_manager::SocketIoManager;
 
 // --- DOMAIN MODELS ---
 
@@ -19,8 +21,6 @@ pub struct AgentEntry {
     pub is_dynamic: bool,
     pub payload: Option<serde_json::Value>,
     
-    // FIX: Instant kann nicht deserialisiert werden. 
-    // Wir überspringen es und nutzen eine Hilfsfunktion für den Default-Wert.
     #[serde(skip, default = "Instant::now")]
     pub last_seen: Instant,
 }
@@ -62,46 +62,72 @@ pub struct LogEntry {
 pub struct AgentManager {
     pub agents: RwLock<HashMap<String, AgentEntry>>,
     pub logs: RwLock<VecDeque<LogEntry>>,
+    pub socket_manager: Arc<SocketIoManager>,
     max_logs: usize,
 }
 
 impl AgentManager {
-    pub fn new() -> Self {
+    /// Erstellt einen neuen AgentManager mit Socket-Anbindung
+    pub fn new(socket_manager: Arc<SocketIoManager>) -> Self {
         Self {
             agents: RwLock::new(HashMap::new()),
             logs: RwLock::new(VecDeque::with_capacity(50)),
+            socket_manager,
             max_logs: 50,
         }
     }
 
+    /// Hilfsfunktion: Sendet den aktuellen Stand aller Agenten an das Frontend
+    async fn broadcast_update(&self) {
+        let agents_list: Vec<AgentEntry> = {
+            let agents_guard = self.agents.read().await;
+            agents_guard.values().cloned().collect()
+        };
+        
+        // Nutze 'emit_event' - die standardisierte Methode deines SocketIoManagers
+        self.socket_manager.emit_event(
+            "active_agents",
+            serde_json::json!({ "agents": agents_list })
+        ).await;
+    }
+
     pub async fn add_agent(&self, id: String, m_type: String, x: i32, y: i32) {
-        let mut agents = self.agents.write().await;
-        let new_agent = AgentEntry::new(id.clone(), m_type, x, y);
-        agents.insert(id.clone(), new_agent);
+        {
+            let mut agents = self.agents.write().await;
+            let new_agent = AgentEntry::new(id.clone(), m_type, x, y);
+            agents.insert(id.clone(), new_agent);
+        }
         self.log_to_system(format!("🚀 Modul {} erstellt.", id), "success").await;
+        self.broadcast_update().await;
     }
 
     pub async fn remove_agent(&self, id: &str) {
-        let mut agents = self.agents.write().await;
-        if agents.remove(id).is_some() {
+        let removed = {
+            let mut agents = self.agents.write().await;
+            agents.remove(id).is_some()
+        };
+        
+        if removed {
             self.log_to_system(format!("🗑 Modul {} entfernt.", id), "warning").await;
+            self.broadcast_update().await;
         }
     }
 
     pub async fn sync_from_ros(&self, id: String, m_type: String, x: i32, y: i32, orient: i32) {
-        let mut agents = self.agents.write().await;
-        let agent = agents.entry(id.clone()).or_insert_with(|| {
-            AgentEntry::new(id, m_type, x, y)
-        });
-        
-        agent.x = x;
-        agent.y = y;
-        agent.orientation = orient;
-        agent.last_seen = Instant::now();
-        agent.status = "active".to_string();
+        {
+            let mut agents = self.agents.write().await;
+            let agent = agents.entry(id.clone()).or_insert_with(|| {
+                AgentEntry::new(id, m_type, x, y)
+            });
+            
+            agent.x = x;
+            agent.y = y;
+            agent.orientation = orient;
+            agent.last_seen = Instant::now();
+            agent.status = "active".to_string();
+        }
+        self.broadcast_update().await;
     }
-
-    // --- MISSIONS-LOGIK (Refactored für Borrow Checker) ---
 
     pub async fn execute_mission(&self, ftf_id: String, path: Vec<(i32, i32)>, start_pos: (i32, i32), goal_pos: (i32, i32)) {
         self.log_to_system(format!("FTF {} führt Mission aus...", ftf_id), "info").await;
@@ -110,7 +136,6 @@ impl AgentManager {
             {
                 let mut agents = self.agents.write().await;
                 
-                // 1. FTF Status aktualisieren
                 if let Some(ftf) = agents.get_mut(&ftf_id) {
                     ftf.x = nx;
                     ftf.y = ny;
@@ -118,14 +143,12 @@ impl AgentManager {
                     ftf.last_seen = Instant::now();
                 }
 
-                // 2. Pickup-Logik (Wir suchen erst die ID, ohne ftf mutabel zu binden)
                 if (nx, ny) == start_pos {
                     let maybe_payload_id = agents.iter()
                         .find(|(id, a)| !a.is_dynamic && (a.x, a.y) == start_pos && *id != &ftf_id)
                         .map(|(id, _)| id.clone());
 
                     if let Some(tid) = maybe_payload_id {
-                        // Jetzt holen wir uns das FTF mutabel UND entfernen das Target
                         if let Some(target_agent) = agents.remove(&tid) {
                             if let Some(ftf) = agents.get_mut(&ftf_id) {
                                 if ftf.payload.is_none() {
@@ -137,9 +160,7 @@ impl AgentManager {
                     }
                 }
 
-                // 3. Drop-Logik
                 if (nx, ny) == goal_pos {
-                    // Wir nehmen das Payload kurz aus dem FTF heraus
                     let payload_to_drop = agents.get_mut(&ftf_id)
                         .and_then(|ftf| ftf.payload.take());
 
@@ -152,6 +173,7 @@ impl AgentManager {
                     }
                 }
             }
+            self.broadcast_update().await;
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         }
     }
