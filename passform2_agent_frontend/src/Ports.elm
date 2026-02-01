@@ -8,7 +8,7 @@ import Types exposing (..)
 import Types.Domain exposing (..)
 
 
--- --- OUTGOING (Elm -> JS) ---
+-- --- OUTGOING (Elm -> JS: Befehle an das Backend/System) ---
 
 port connectToBackend : String -> Cmd msg
 
@@ -25,13 +25,16 @@ port exportConfig : String -> Cmd msg
 
 port importConfigTrigger : () -> Cmd msg
 
--- NEU: Schickt das File-Objekt (JSON) an JS zum Auslesen
+-- Schickt das File-Objekt (JSON) an JS zum Auslesen
 port requestFileRead : Decode.Value -> Cmd msg
 
 port writeNfcTrigger : String -> Cmd msg
 
 port savePlanningWeights : Decode.Value -> Cmd msg
 
+port pushConfig : Encode.Value -> Cmd msg
+
+-- Universeller Port für Socket.io Emits
 port socketEmitPort : ( String, Encode.Value ) -> Cmd msg
 
 socketEmit : String -> Encode.Value -> Cmd msg
@@ -39,7 +42,10 @@ socketEmit eventName data =
     socketEmitPort ( eventName, data )
 
 
--- --- INCOMING (JS -> Elm) ---
+-- --- INCOMING (JS -> Elm: Daten vom Backend/Hardware) ---
+
+-- NEU: Empfängt die Skill-Library (12 Skills) vom Rust-Backend
+port skillsReceiver : (Decode.Value -> msg) -> Sub msg
 
 port socketStatusReceiver : (Bool -> msg) -> Sub msg
 
@@ -54,7 +60,7 @@ port systemLogReceiver : (Decode.Value -> msg) -> Sub msg
 
 port rfidReceiver : (Decode.Value -> msg) -> Sub msg
 
--- NEU: Empfängt den String-Inhalt der eingelesenen Datei
+-- Empfängt den String-Inhalt der eingelesenen Datei
 port fileContentRead : (String -> msg) -> Sub msg
 
 port configReceived : (String -> msg) -> Sub msg
@@ -63,17 +69,17 @@ port nfcStatusReceiver : (Decode.Value -> msg) -> Sub msg
 
 port hardwareUpdateReceiver : (Decode.Value -> msg) -> Sub msg
 
-port pushConfig : Encode.Value -> Cmd msg
-
--- --- EVENT-HELPER FÜR DIE 3D-VIEW (KORRIGIERT) ---
-
+-- Empfängt Agenten-Bewegungen aus der 3D-View
 port onAgentMoved : ({ agentId : String, oldX : Int, oldY : Int, newX : Int, newY : Int } -> msg) -> Sub msg
 
 
+-- --- EVENT-HELPER FÜR DIE 3D-VIEW ---
+
 onCellClicked : (GridCell -> msg) -> Attribute msg
 onCellClicked toMsg =
-    -- Elm hört auf das JS-Event "cell-clicked"
+    -- Elm hört auf das JS-Custom-Event "cell-clicked"
     on "cell-clicked" (Decode.map toMsg decodeCellClick)
+
 
 -- --- INTERNE DECODER ---
 
@@ -88,8 +94,8 @@ decodeAgentMove =
 
 decodeCellClick : Decode.Decoder GridCell
 decodeCellClick =
-    -- Hier muss "detail" stehen, weil CustomEvents ihre Daten dort ablegen!
-    Decode.at ["detail"] 
+    -- WICHTIG: CustomEvents legen Daten in "detail" ab
+    Decode.at [ "detail" ]
         (Decode.map2 GridCell
             (Decode.field "x" Decode.int)
             (Decode.field "y" Decode.int)
