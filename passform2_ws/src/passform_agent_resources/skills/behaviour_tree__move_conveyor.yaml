@@ -1,0 +1,29 @@
+type: MoveConveyor
+id_short: move_conveyor
+driver_topic: move_conveyor
+description:
+  en-us: Move the conveyor belt with a specific velocity for a given duration.
+  de: Bewege das Förderband mit einer bestimmten Geschwindigkeit für eine festgelegte Dauer.
+
+# Wir definieren hier die Eingabeparameter, die dein Python-Skript im __init__ erwartet
+input:
+  required:
+    - type: double
+      id_short: velocity
+      description:
+        en-us: Velocity in m/s (mapped to linear.x in Twist message).
+        de: Geschwindigkeit in m/s (wird auf linear.x der Twist-Nachricht gemappt).
+    - type: double
+      id_short: duration
+      description:
+        en-us: Duration of the movement in seconds.
+        de: Dauer der Bewegung in Sekunden.
+
+output:
+  - type: boolean
+    id_short: success
+
+# Optional: Hier könnten wir Standardwerte hinterlegen, falls das UI nichts sendet
+default_values:
+  velocity: 0.1
+  duration: 2.0

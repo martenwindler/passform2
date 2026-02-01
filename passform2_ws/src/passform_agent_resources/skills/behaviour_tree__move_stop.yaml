@@ -1,0 +1,19 @@
+type: MoveStop
+id_short: move_stop
+driver_topic: stop_movement # Angenommenes ROS-Interface für den Global Stop
+description:
+  en-us: Immediate stop of all active movements (Arm and Conveyor).
+  de: Sofortiger Stopp aller aktiven Bewegungen (Arm und Förderband).
+
+# Da ein Stopp-Befehl meist keine Parameter braucht (außer "jetzt!"), 
+# lassen wir die Inputs leer oder definieren einen "emergency" Schalter.
+input:
+  optional:
+    - type: boolean
+      id_short: emergency
+      description: "True for hard stop, False for controlled deceleration."
+      default: false
+
+output:
+  - type: boolean
+    id_short: success

@@ -1,8 +1,9 @@
 type: Release
+id_short: release
+driver_topic: test_topic
 description:
   en-us: Release of control over object.
   de: Abgabe der Kontrolle über das Object.
-driver_topic: test_topic
 output:
   - type: boolean
     id_short: success

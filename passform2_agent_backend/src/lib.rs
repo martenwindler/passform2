@@ -1,3 +1,4 @@
+pub mod behaviour_tree;
 pub mod core;
 pub mod com;
 pub mod managers;

@@ -1,0 +1,26 @@
+type: ToolUse
+id_short: tool_use
+driver_topic: tool_action # Interface für die Werkzeug-Funktion
+description:
+  en-us: Activate or use the currently attached tool with specific parameters.
+  de: Aktiviert oder nutzt das aktuell montierte Werkzeug mit spezifischen Parametern.
+
+# Hier mappen wir die Flexibilität für verschiedene Werkzeuge
+parameters:
+  action_type: "activate" # z.B. activate, deactivate, pulse, trigger
+  intensity: 1.0
+
+input:
+  required:
+    - type: string
+      id_short: tool_id
+      description: "Identifier of the tool to be used."
+  optional:
+    - type: double
+      id_short: duration
+      description: "How long the tool should be active (in seconds)."
+      default: 0.0
+
+output:
+  - type: boolean
+    id_short: success

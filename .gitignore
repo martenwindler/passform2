@@ -141,3 +141,7 @@ passform2_agent_backend/repos/basyx-aas-web-ui/*
 passform2_agent_backend/capabilities/*
 passform2_agent_backend/icons/*
 passform2_agent_backend/gen/*
+
+# --- PassForM2 WS --- 
+
+passform2_ws/src/passform2_ros-main

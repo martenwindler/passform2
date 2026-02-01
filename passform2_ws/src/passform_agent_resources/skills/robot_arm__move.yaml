@@ -1,0 +1,33 @@
+type: Move
+id_short: move
+driver_topic: test_topic1
+description:
+  en-us: Move along conveying direction.
+  de: Bewegung entlang der Förderrichtung.
+properties:
+  - type: Range
+    id_short: distance
+    value_type: Double
+    data: { min: 0.0, max: 0.3 }
+  - type: Range
+    id_short: velocity
+    value_type: Double
+    data: { min: 0.0, max: 1.0 }
+input:
+  required:
+    by_position:
+      - type: string
+        id_short: reference_frame
+      - type: geometry_msgs/Point
+    by_id:
+      - type: string
+        id_short: uuid
+  optional:
+    - type: double
+      id_short: velocity
+      data: { value: 1.0 }
+    - type: geometry_msgs/Quaternion
+      id_short: orientation
+output:
+  - type: boolean
+    id_short: success

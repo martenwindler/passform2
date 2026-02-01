@@ -1,0 +1,28 @@
+# passform2_ws/src/passform_agent_resources/skills/behaviour_tree__move_arm.yaml
+
+type: MoveArm
+id_short: move_arm
+driver_topic: move_arm
+description:
+  en-us: Move robotic arm to a specific pose.
+  de: Roboterarm zu einer Pose bewegen.
+
+# Daten-Mapping aus deinem Python-Skript
+predefined_poses:
+  pick:
+    position: { x: 0.3, y: -0.1, z: 0.025 }
+    orientation: { x: 1.0, y: 0.0, z: 0.0, w: 0.0 }
+  prepick:
+    position: { x: 0.3, y: -0.1, z: 0.08 }
+    orientation: { x: 1.0, y: 0.0, z: 0.0, w: 0.0 }
+  place:
+    position: { x: 0.2, y: 0.1, z: 0.025 }
+    orientation: { x: 1.0, y: 0.0, z: 0.0, w: 0.0 }
+  preplace:
+    position: { x: 0.2, y: 0.1, z: 0.08 }
+    orientation: { x: 1.0, y: 0.0, z: 0.0, w: 0.0 }
+
+input:
+  required:
+    - type: string
+      id_short: goal_pose

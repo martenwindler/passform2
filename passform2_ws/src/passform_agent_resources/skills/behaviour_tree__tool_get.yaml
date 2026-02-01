@@ -1,0 +1,21 @@
+type: ToolGet
+id_short: tool_get
+driver_topic: tool_manager # Angenommenes Interface für Werkzeugwechsel
+description:
+  en-us: Acquire a tool from the tool changer station.
+  de: Werkzeug aus der Werkzeugwechselstation aufnehmen.
+
+# Wir definieren Parameter, um verschiedene Werkzeuge identifizieren zu können
+parameters:
+  default_tool_id: "gripper_epick_01"
+  check_vacuum_after_get: true
+
+input:
+  required:
+    - type: string
+      id_short: tool_id
+      description: "ID of the tool to be acquired."
+
+output:
+  - type: boolean
+    id_short: success

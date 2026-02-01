@@ -1,0 +1,40 @@
+type: MoveEffector
+id_short: move_effector
+driver_topic: attach_object
+description:
+  en-us: Attach or detach an object to the end effector (MoveIt collision management).
+  de: Objekt am Endeffektor anfügen oder entfernen (MoveIt Kollisionsmanagement).
+
+# Wir extrahieren die Logik aus dem Python-Code in konfigurierbare Parameter
+parameters:
+  link_name: "epick_tcp"
+  touch_links: ["ground_plane"]
+  default_object_id: "cube"
+
+# Die Geometrie-Definitionen, die vorher im Python-Code standen
+object_definitions:
+  cube:
+    type: BOX
+    dimensions: [0.04, 0.04, 0.04]
+    pose:
+      position: { x: 0.3, y: -0.1, z: 0.02 }
+      orientation: { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }
+  # Platzhalter für die Mesh-Logik (vorher self.makeMesh)
+  workpiece:
+    type: MESH
+    resource: "package://ur_epick/meshes/cube.obj"
+    pose:
+      position: { x: 0.3, y: -0.1, z: 0.02 }
+
+input:
+  required:
+    - type: boolean
+      id_short: detach
+      description: "True to detach (REMOVE), False to attach (ADD)."
+    - type: string
+      id_short: object_id
+      description: "ID of the object to handle (e.g., 'cube' or 'workpiece')."
+
+output:
+  - type: boolean
+    id_short: success

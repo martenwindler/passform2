@@ -1,0 +1,15 @@
+type: RandomStatus
+id_short: random_status
+description:
+  en-us: Returns a random status (Running, Success, Failure) for testing logic branches.
+  de: Gibt einen zufälligen Status zurück, um Logikverzweigungen zu testen.
+
+# Da dies ein rein internes Behavior ist, braucht es kein driver_topic.
+# Wir können aber Parameter hinzufügen, um die Wahrscheinlichkeiten zu steuern.
+parameters:
+  success_chance: 0.5
+  running_chance: 0.3
+
+output:
+  - type: string
+    id_short: feedback

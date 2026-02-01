@@ -1,0 +1,20 @@
+type: ToolPut
+id_short: tool_put
+driver_topic: tool_manager
+description:
+  en-us: Return the current tool to the tool changer station.
+  de: Aktuelles Werkzeug in die Werkzeugwechselstation ablegen.
+
+parameters:
+  release_sequence: "standard_pneumatic_release"
+  safety_check_vacuum: true
+
+input:
+  required:
+    - type: string
+      id_short: slot_id
+      description: "Target slot in the tool changer station."
+
+output:
+  - type: boolean
+    id_short: success

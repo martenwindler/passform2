@@ -18,6 +18,10 @@ use passform_agent_backend::{
 use passform_agent_backend::ros::ros_client::RosClient;
 use passform_agent_backend::managers::path_manager::api_plan_path;
 
+use passform_agent_backend::behaviour_tree::skills::SkillLibrary;
+use passform_agent_backend::behaviour_tree::skill_node::SkillNode;
+use passform_agent_backend::behaviour_tree::{BehaviorNode, NodeStatus, build_tree}; // build_tree und NodeStatus hinzugefügt
+
 mod com;
 use crate::com::proxy::aas_proxy_handler;
 
@@ -51,6 +55,12 @@ fn setup_socket_handlers(io: &SocketIo, state: Arc<AppState>) {
                 s_inner.socket_manager.broadcast_hardware_update(serde_json::json!(update));
             }
         });
+
+        // Behaviour Tree Init
+        let lib = passform_agent_backend::behaviour_tree::skills::SkillLibrary::from_workspace();
+        // Skills jetzt über Socket.io ans Elm Frontend sendbar
+        let skills_json = serde_json::to_value(&lib.skills).unwrap_or_default();
+        let _ = socket.emit("available_skills", skills_json);
 
         // Disconnect Event
         let dc_state = state.clone();
@@ -135,6 +145,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("⚓ Axum API & Socket.io auf http://{}", addr);
         axum::serve(listener, app).await.unwrap();
     });
+
+    // 4.1
+
+    let skill_lib = SkillLibrary::from_workspace();
+    info!("Total Skills in Library: {}", skill_lib.skills.len());
+
+    // TEST: Den ersten Skill mal "an-ticken" zum Testen
+    if let Some(first_skill) = skill_lib.skills.first() {
+        let mut test_node = SkillNode::new(first_skill.clone());
+        test_node.tick().await; // Das sollte "🤖 BT Tick -> Skill: ..." loggen
+    }
+    
+    if let Some(complex_skill) = skill_lib.skills.iter().find(|s| s.skill_type == "CUSTOM") {
+    let mut root_node = passform_agent_backend::behaviour_tree::build_tree(complex_skill, &skill_lib);
+        
+        loop {
+            let status = root_node.tick().await;
+            if status != NodeStatus::Running {
+                info!("🏁 BT Test-Durchlauf fertig mit Status: {:?}", status);
+                break;
+            }
+            // Kurze Pause für die Lesbarkeit im Terminal
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+    }
 
     // 5. Tauri App Run
     let tauri_state = shared_state.clone();

@@ -1,5 +1,5 @@
 type: CUSTOM
-id_short: Pick-and-place
+id_short: pick_and_place
 driver_topic: pick_and_place
 description:
   en-us: Pick an object and place it at another position.
