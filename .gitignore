@@ -145,3 +145,8 @@ passform2_agent_backend/gen/*
 # --- PassForM2 WS --- 
 
 passform2_ws/src/passform2_ros-main
+
+# --- Redundant realtime writes --- 
+
+passform2_agent_backend/repos/basyx-aas-web-ui
+passform2_ws/src/ros2_rust
