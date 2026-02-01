@@ -21,20 +21,24 @@ export default defineConfig({
     },
   },
 
-  build: {
-    target: "esnext",
-    assetsInlineLimit: 100000000,
-    cssCodeSplit: false,
-    minify: "terser",
-    terserOptions: {
-      compress: {
-        drop_console: true,
-      },
-    },
-  },
-
   server: {
     port: 3000,
-    open: true,
+    strictPort: true, 
+    open: false,
+  },
+
+  envPrefix: ['VITE_', 'TAURI_'],
+
+  build: {
+    target: process.env.TAURI_PLATFORM === 'windows' ? 'chrome105' : 'esnext',
+    assetsInlineLimit: 100000000, 
+    cssCodeSplit: false,
+    minify: !process.env.TAURI_DEBUG ? 'terser' : false,
+    terserOptions: {
+      compress: {
+        drop_console: !process.env.TAURI_DEBUG,
+      },
+    },
+    sourcemap: !!process.env.TAURI_DEBUG
   }
 });

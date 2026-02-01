@@ -134,3 +134,10 @@ passform2_ws/src/ros2-rust/*
 
 passform2_agent_backend/repos/basyx-aas-web-ui/*
 !passform2_agent_backend/repos/basyx-aas-web-ui/.gitkeep
+
+
+# --- Tauri ---
+
+passform2_agent_backend/capabilities/*
+passform2_agent_backend/icons/*
+passform2_agent_backend/gen/*

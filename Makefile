@@ -27,7 +27,7 @@ ALLOW_OVERRIDE = action_msgs builtin_interfaces diagnostic_msgs geometry_msgs \
                  rosidl_default_generators rosidl_default_runtime service_msgs \
                  std_msgs test_interface_files test_msgs unique_identifier_msgs
 
-.PHONY: help install backend backend-legacy frontend start-all clean build-ws deploy logs
+.PHONY: help install backend backend-legacy frontend start-all clean build-ws deploy logs dev
 
 help:
 	@echo "PassForm 2.0 - Management Console"
@@ -53,6 +53,13 @@ install:
 	@echo "✅ Installation abgeschlossen."
 
 # --- DEVELOPMENT ---
+dev:
+	@echo "Checking Frontend dependencies..."
+	@if [ ! -d "passform2_agent_frontend/node_modules" ]; then \
+		cd passform2_agent_frontend && npm install; \
+	fi
+	@echo "Starting Tauri Environment..."
+	cd passform2_agent_backend && cargo tauri dev
 
 # Manueller Build des ROS Workspaces (Löst den Symlink-Fehler)
 build-ws:
