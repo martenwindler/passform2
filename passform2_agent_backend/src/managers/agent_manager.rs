@@ -1,12 +1,13 @@
+use chrono::Local;
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
-use chrono::Local;
+use tracing::{info, warn, error};
 
-// Importiere den SocketManager für den Move-Sync
 use crate::managers::socket_io_manager::SocketIoManager;
+use crate::managers::resource_manager::ResourceManager; 
 
 // --- DOMAIN MODELS ---
 
@@ -63,16 +64,18 @@ pub struct AgentManager {
     pub agents: RwLock<HashMap<String, AgentEntry>>,
     pub logs: RwLock<VecDeque<LogEntry>>,
     pub socket_manager: Arc<SocketIoManager>,
+    pub resource_manager: Arc<ResourceManager>,
     max_logs: usize,
 }
 
 impl AgentManager {
-    /// Erstellt einen neuen AgentManager mit Socket-Anbindung
-    pub fn new(socket_manager: Arc<SocketIoManager>) -> Self {
+    /// Erstellt einen neuen AgentManager mit Socket-Anbindung und ResourceManager
+    pub fn new(socket_manager: Arc<SocketIoManager>, resource_manager: Arc<ResourceManager>) -> Self {
         Self {
             agents: RwLock::new(HashMap::new()),
             logs: RwLock::new(VecDeque::with_capacity(50)),
             socket_manager,
+            resource_manager, // NEU
             max_logs: 50,
         }
     }
@@ -84,7 +87,6 @@ impl AgentManager {
             agents_guard.values().cloned().collect()
         };
         
-        // Nutze 'emit_event' - die standardisierte Methode deines SocketIoManagers
         self.socket_manager.emit_event(
             "active_agents",
             serde_json::json!({ "agents": agents_list })
@@ -92,28 +94,33 @@ impl AgentManager {
     }
 
     pub async fn add_agent(&self, id: String, m_type: String, x: i32, y: i32) {
-        {
-            let mut agents = self.agents.write().await;
-            let new_agent = AgentEntry::new(id.clone(), m_type, x, y);
-            agents.insert(id.clone(), new_agent);
-        }
-        self.log_to_system(format!("🚀 Modul {} erstellt.", id), "success").await;
-        self.broadcast_update().await;
-    }
-
-    pub async fn remove_agent(&self, id: &str) {
-        let removed = {
-            let mut agents = self.agents.write().await;
-            agents.remove(id).is_some()
-        };
+        // VALIDIERUNG: Prüfe im ResourceManager, ob dieser Typ bekannt ist
+        let m_type_lower = m_type.to_lowercase();
         
-        if removed {
-            self.log_to_system(format!("🗑 Modul {} entfernt.", id), "warning").await;
+        if self.resource_manager.agent_configs.contains_key(&m_type_lower) {
+            {
+                let mut agents = self.agents.write().await;
+                // Hier könnten wir später entscheiden, ob is_dynamic aus der Config kommt
+                let new_agent = AgentEntry::new(id.clone(), m_type, x, y);
+                agents.insert(id.clone(), new_agent);
+            }
+            self.log_to_system(format!("🚀 Modul {} vom Typ {} erstellt.", id, m_type_lower), "success").await;
             self.broadcast_update().await;
+        } else {
+            // Fehlerlog, wenn der Typ nicht in passform_agent_resources/config gefunden wurde
+            self.log_to_system(format!("⚠️ Fehler: Modul-Typ '{}' ist nicht registriert!", m_type), "error").await;
+            error!("Versuch unregistrierten Agent-Typ zu laden: {}", m_type);
         }
     }
 
+    // sync_from_ros sollte ebenfalls validieren
     pub async fn sync_from_ros(&self, id: String, m_type: String, x: i32, y: i32, orient: i32) {
+        let m_type_lower = m_type.to_lowercase();
+        if !self.resource_manager.agent_configs.contains_key(&m_type_lower) {
+            warn!("ROS-Sync für unbekannten Typ: {}", m_type);
+            // Wir lassen es trotzdem zu, loggen aber eine Warnung
+        }
+
         {
             let mut agents = self.agents.write().await;
             let agent = agents.entry(id.clone()).or_insert_with(|| {

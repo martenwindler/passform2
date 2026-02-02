@@ -12,6 +12,7 @@ use reqwest::Client;
 // --- RE-EXPORTS DER MANAGER ---
 // Wir holen die Structs aus ihren jeweiligen Untermodulen in 'managers'
 pub use crate::managers::{
+    resource_manager::ResourceManager,
     agent_manager::AgentManager,
     agent_manager::AgentEntry,
     config_manager::ConfigManager as DataConfigManager,
@@ -32,6 +33,9 @@ pub struct AppState {
     /// Dynamische Rohdaten von den Raspberry Pis (Socket.io Registry)
     pub hardware_registry: RwLock<HashMap<String, serde_json::Value>>,
     
+    // Bedient sich an passform2_ws/passform_agent_resources/
+    pub resource_manager: Arc<ResourceManager>,
+
     /// Die "High-Level" Agentenliste, verwaltet durch den AgentManager
     pub agent_manager: Arc<AgentManager>,
     

@@ -137,3 +137,8 @@ netsh interface portproxy add v4tov4 listenport=8000 listenaddress=0.0.0.0 conne
 ```text
 python3 ~/passform2/utils/pi__rfid_bridge.py
 ```
+
+## Stats
+
+- passform2_agent_backend by llvm-cov: Coverage: 0%, 01.02.26
+- passform2_agent_frontend by elm-coverage: Coverage: 26%, 01.02.26

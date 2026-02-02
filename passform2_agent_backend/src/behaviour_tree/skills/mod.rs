@@ -36,30 +36,26 @@ pub struct SkillLibrary {
 }
 
 impl SkillLibrary {
-    pub fn from_workspace() -> Self {
+    /// Die neue, flexible Methode, die den Pfad vom ResourceManager bekommt
+    pub fn from_path(path: &std::path::Path) -> Self {
         let mut skills = Vec::new();
-        let path = PathBuf::from("../passform2_ws/src/passform_agent_resources/skills");
 
-        if let Ok(abs_path) = fs::canonicalize(&path) {
+        if let Ok(abs_path) = fs::canonicalize(path) {
             info!("🔍 Suche Skills in: {:?}", abs_path);
         }
 
-        if let Ok(entries) = fs::read_dir(&path) {
+        if let Ok(entries) = fs::read_dir(path) {
             for entry in entries.flatten() {
                 let file_path = entry.path();
                 
-                // Wir filtern auf .yaml und ignorieren versteckte Dateien
                 if file_path.extension().and_then(|s| s.to_str()) == Some("yaml") {
                     if let Ok(content) = fs::read_to_string(&file_path) {
                         match serde_yaml::from_str::<SkillMetadata>(&content) {
                             Ok(mut skill) => {
-                                // NAMENS-LOGIK: Präfixe entfernen und id_short priorisieren
                                 let file_stem = file_path.file_stem()
                                     .unwrap_or_default()
                                     .to_string_lossy();
 
-                                // 1. Wenn id_short da ist, nimm das
-                                // 2. Sonst nimm den Dateinamen ohne Präfixe
                                 if let Some(ref id) = skill.id_short {
                                     skill.name = id.clone();
                                 } else {
@@ -84,5 +80,11 @@ impl SkillLibrary {
             warn!("⚠️ Skill-Verzeichnis nicht gefunden: {:?}", path);
         }
         Self { skills }
+    }
+
+    /// Behält die alte Funktionalität bei, nutzt aber intern from_path
+    pub fn from_workspace() -> Self {
+        let path = std::path::PathBuf::from("../passform2_ws/src/passform_agent_resources/skills");
+        Self::from_path(&path)
     }
 }

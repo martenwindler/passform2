@@ -15,8 +15,11 @@ use passform_agent_backend::{
     AppState, SocketIoManager, SkillManager, PathManager, 
     NodeManager, AgentManager, InfraConfigManager, DataConfigManager
 };
+
 use passform_agent_backend::ros::ros_client::RosClient;
 use passform_agent_backend::managers::path_manager::api_plan_path;
+use passform_agent_backend::managers::resource_manager::ResourceManager;
+use std::path::PathBuf;
 
 use passform_agent_backend::behaviour_tree::skills::SkillLibrary;
 use passform_agent_backend::behaviour_tree::skill_node::SkillNode;
@@ -92,14 +95,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
     info!("🚀 PassForm 2 Core & Tauri App starten...");
 
-    // 1. ROS 2 Initialisierung
+    // 1. Pfade & Ressourcen-Setup
+    // Wir definieren den Pfad zum Workspace relativ zum Ausführungsort
+    let resource_path = PathBuf::from("../passform2_ws/src/passform_agent_resources");
+    let resource_manager = Arc::new(ResourceManager::new(resource_path.clone()));
+
+    // 2. ROS 2 Initialisierung
     let ros_context = Arc::new(rclrs::Context::new(std::env::args(), rclrs::InitOptions::default())?);
     let ros_client = Arc::new(RosClient::new(&ros_context)?);
 
-    // 2. Manager & Layer Setup
+    // 3. Manager & Layer Setup
     let (layer, io) = SocketIo::builder().build_layer();
     let socket_manager = Arc::new(SocketIoManager::new(io.clone()));
-    let agent_manager = Arc::new(AgentManager::new(socket_manager.clone()));
+    
+    // AgentManager bekommt jetzt den ResourceManager injiziert
+    let agent_manager = Arc::new(AgentManager::new(
+        socket_manager.clone(), 
+        resource_manager.clone()
+    ));
     
     let shared_state = Arc::new(AppState {
         hardware_registry: RwLock::new(HashMap::new()),
@@ -108,48 +121,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         data_config: Arc::new(DataConfigManager::new()),
         http_client: HttpClient::new(),
         socket_manager,
+        // Resource Manager in AppState aufnehmen, falls noch nicht geschehen
+        resource_manager: resource_manager.clone(), 
         skill_manager: Arc::new(SkillManager::new()),
         path_manager: Arc::new(PathManager::new()),
         node_manager: Arc::new(NodeManager::new()),
         ros_client: ros_client.clone(),
     });
 
-    // 3. Spawne ROS 2 Bridge Task
-    let ros_am = agent_manager.clone();
-    let ros_cl = ros_client.clone();
-    tokio::spawn(async move {
-        if let Err(e) = ros_cl.run(ros_am).await {
-            error!("❌ ROS Bridge Fehler: {:?}", e);
-        }
-    });
-
-    // 4. Spawne Axum Server Task
-    let axum_state = shared_state.clone();
-    setup_socket_handlers(&io, axum_state.clone());
-
-    tokio::spawn(async move {
-        let app = Router::new()
-            .route("/", get(root_handler))
-            .route("/api/agents", get(get_agents))
-            .route("/api/plan-path", post(api_plan_path))
-            .route("/aas-api/*path", any(aas_proxy_handler))
-            .nest_service("/basyx", ServeDir::new("static/basyx-ui").fallback(
-                ServeFile::new("static/basyx-ui/index.html")
-            ))
-            .layer(layer)
-            .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
-            .with_state(axum_state);
-
-        let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        info!("⚓ Axum API & Socket.io auf http://{}", addr);
-        axum::serve(listener, app).await.unwrap();
-    });
-
-    // 4.1
-
-    let skill_lib = SkillLibrary::from_workspace();
+    // 4.1 Skill Library über ResourceManager laden
+    // Anstatt hartkodiert "from_workspace" zu nutzen, ...
+    let skill_lib = SkillLibrary::from_path(&resource_manager.skills_path);
     info!("Total Skills in Library: {}", skill_lib.skills.len());
+
+    // let mut test_node = SkillNode::new(first_skill.clone());
 
     // TEST: Den ersten Skill mal "an-ticken" zum Testen
     if let Some(first_skill) = skill_lib.skills.first() {
