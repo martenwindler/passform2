@@ -4,7 +4,7 @@ use std::time::Instant;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
-use tracing::{info, warn, error};
+use tracing::{warn, error};
 
 use crate::managers::socket_io_manager::SocketIoManager;
 use crate::managers::resource_manager::ResourceManager; 

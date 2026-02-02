@@ -5,7 +5,7 @@ use std::time::Duration;
 use futures::channel::oneshot;
 
 use rclrs;
-use rclrs::{Node, ServiceIDL, RclrsError, RclReturnCode}; 
+use rclrs::{Node, ServiceIDL}; 
 use passform_msgs::srv::Discover; 
 
 pub struct DiscoverPassform {

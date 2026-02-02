@@ -1,11 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use axum::{extract::State as AxumState, routing::{get, any, post}, Json, Router};
+use axum::{extract::State as AxumState, Json};
 use socketioxide::{extract::{Data, SocketRef}, SocketIo};
 use std::sync::Arc;
-use std::net::SocketAddr;
-use tracing::{info, error, warn};
-use tower_http::{services::{ServeDir, ServeFile}, cors::{Any, CorsLayer}};
+use tracing::{info, warn};
 use reqwest::Client as HttpClient;
 use tokio::sync::RwLock;
 use std::collections::HashMap;
@@ -17,19 +15,18 @@ use passform_agent_backend::{
 };
 
 use passform_agent_backend::ros::ros_client::RosClient;
-use passform_agent_backend::managers::path_manager::api_plan_path;
 use passform_agent_backend::managers::resource_manager::ResourceManager;
 use std::path::PathBuf;
 
 use passform_agent_backend::behaviour_tree::skills::SkillLibrary;
 use passform_agent_backend::behaviour_tree::skill_node::SkillNode;
-use passform_agent_backend::behaviour_tree::{BehaviorNode, NodeStatus, build_tree}; // build_tree und NodeStatus hinzugefügt
+use passform_agent_backend::behaviour_tree::{BehaviorNode, NodeStatus}; // build_tree und NodeStatus hinzugefügt
 
 mod com;
-use crate::com::proxy::aas_proxy_handler;
 
 // --- SOCKET.IO HANDLER ---
 
+#[allow(dead_code)]
 fn setup_socket_handlers(io: &SocketIo, state: Arc<AppState>) {
     io.ns("/", move |socket: SocketRef| {
         let s = state.clone();
@@ -55,7 +52,7 @@ fn setup_socket_handlers(io: &SocketIo, state: Arc<AppState>) {
                 let mut registry = s_inner.hardware_registry.write().await;
                 registry.insert(socket.id.to_string(), data);
                 let update: Vec<_> = registry.values().cloned().collect();
-                s_inner.socket_manager.broadcast_hardware_update(serde_json::json!(update));
+                s_inner.socket_manager.broadcast_hardware_update(serde_json::json!(update)).await; 
             }
         });
 
@@ -73,7 +70,7 @@ fn setup_socket_handlers(io: &SocketIo, state: Arc<AppState>) {
                 let mut registry = s_dc.hardware_registry.write().await;
                 if registry.remove(&socket.id.to_string()).is_some() {
                     let update: Vec<_> = registry.values().cloned().collect();
-                    s_dc.socket_manager.broadcast_hardware_update(serde_json::json!(update));
+                    s_dc.socket_manager.broadcast_hardware_update(serde_json::json!(update)).await;
                 }
             }
         });
@@ -105,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ros_client = Arc::new(RosClient::new(&ros_context)?);
 
     // 3. Manager & Layer Setup
-    let (layer, io) = SocketIo::builder().build_layer();
+    let (_layer, io) = SocketIo::builder().build_layer();
     let socket_manager = Arc::new(SocketIoManager::new(io.clone()));
     
     // AgentManager bekommt jetzt den ResourceManager injiziert
@@ -127,6 +124,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         path_manager: Arc::new(PathManager::new()),
         node_manager: Arc::new(NodeManager::new()),
         ros_client: ros_client.clone(),
+    });
+
+    // --- 4. Axum Server Task ---
+    let axum_state = shared_state.clone();
+    let io_layer = _layer.clone(); // Den Layer vom SocketIo Setup nutzen
+
+    tokio::spawn(async move {
+        let app = axum::Router::new()
+            .route("/", axum::routing::get(root_handler))
+            .route("/api/agents", axum::routing::get(get_agents))
+            // Hier binden wir auch deine Socket.io Schnittstelle an
+            .layer(io_layer)
+            .with_state(axum_state);
+
+        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8080));
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        
+        info!("⚓ Axum API & Socket.io Server läuft auf http://{}", addr);
+        axum::serve(listener, app).await.unwrap();
     });
 
     // 4.1 Skill Library über ResourceManager laden
@@ -159,10 +175,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 5. Tauri App Run
     let tauri_state = shared_state.clone();
     
+    setup_socket_handlers(&io, shared_state.clone());
+
     tauri::Builder::default()
         .manage(tauri_state) // State für Tauri Commands verfügbar machen
         .invoke_handler(tauri::generate_handler![get_system_status])
-        .on_window_event(move |window, event| {
+        .on_window_event(move |_window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let s = shared_state.clone();
                 // Cleanup beim Schließen
@@ -181,6 +199,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 // --- HTTP HANDLER ---
 
+#[allow(dead_code)]
 async fn root_handler() -> Json<serde_json::Value> {
     Json(serde_json::json!({ "service": "PassForm 2 Tauri Core", "status": "active" }))
 }

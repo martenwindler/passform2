@@ -9,6 +9,7 @@ use crate::AppState;
 use tracing::info;
 use serde_json::json;
 
+#[allow(dead_code)]
 pub async fn aas_proxy_handler(
     State(state): State<Arc<AppState>>,
     Path(path): Path<String>,
@@ -77,6 +78,7 @@ pub async fn aas_proxy_handler(
     }
 }
 
+#[allow(dead_code)]
 async fn handle_mock_shells(state: Arc<AppState>) -> Result<Response<Body>, StatusCode> {
     let mut shells = Vec::new();
 
