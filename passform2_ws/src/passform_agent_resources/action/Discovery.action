@@ -1,0 +1,19 @@
+# Request
+string agent_id             # Eindeutige ID (z.B. "ur5_arm_01")
+string version              # Firmware/Software Version des Agenten
+---
+# Result
+bool success                # Konnte der Agent registriert werden?
+string message              # Details (z.B. "Registrierung erfolgreich" oder "Skill-Konflikt")
+
+# Die "Intelligenz" des Agenten
+string[] available_skills   # Liste der Skill-Namen (z.B. ["pick", "place", "scan"])
+string hardware_spec_json   # Die Hardware-Spezifikationen als JSON-String
+string htn_domain_json      # Optionale HTN-Logik (Operatoren/Methoden), die dieser Agent mitbringt
+
+# Infrastruktur-Daten
+string ip_address           # Für direkte Kommunikation/Monitoring
+---
+# Feedback
+uint8 progress              # Fortschritt der Registrierung (0-100%)
+string current_stage        # "Scanning Hardware", "Validating Skills", "Syncing with Backend"

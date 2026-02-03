@@ -1,0 +1,66 @@
+agent_info:
+  name: "RPi5-Master-Core"
+  type: "SBC"
+  version: "5.0-8GB"
+
+hardware:
+  cpu:
+    model: "Cortex-A76"
+    cores: 4
+    architecture: "ARMv8.2-A"
+    clock_speed_max: "2.4GHz"
+  memory:
+    total_gb: 8
+    type: "LPDDR4X-4266"
+  storage:
+    boot_media: "NVMe-SSD"
+    capacity_gb: 256
+  interfaces:
+    gpio:
+      total_pins: 40
+      voltage: 3.3
+    pcie: "Gen2x1"
+    usb:
+      - { type: "3.0", count: 2 }
+      - { type: "2.0", count: 2 }
+    ethernet: "1Gbps"
+
+system_status_map:
+  thermal:
+    - { sensor: "cpu_temp", unit: "°C", threshold_warn: 75.0, threshold_crit: 85.0 }
+    - { sensor: "pmic_temp", unit: "°C" }
+  power:
+    - { source: "USB-C", voltage_v: 5.1, current_limit_a: 5.0 }
+    - { status: "low_voltage_warning", type: "boolean" }
+  load:
+    - cpu_usage_percent
+    - ram_usage_percent
+    - throttling_active
+
+# --- HTN DOMAIN DATA ---
+operators:
+  set_system_ready:
+    pre: ["!system_error", "all_slaves_connected"]
+    eff: ["system_ready"]
+  
+  initialize_mission:
+    pre: ["system_ready", "mission_requested"]
+    eff: ["mission_active", "!mission_requested"]
+
+methods:
+  startup_sequence:
+    - ["set_system_ready", "initialize_mission"]
+
+# --- ROS CAPABILITIES ---
+capabilities:
+  - action: "System"
+    topic: "/master/core_logic"
+    description: "Zentrale Systemsteuerung"
+  - action: "Wait"
+    topic: "/master/sync_timer"
+    description: "Synchronisation von Prozessschritten"
+
+network:
+  hostname: "rpi5-master"
+  static_ip: "192.168.3.10"
+  ros_domain_id: 42

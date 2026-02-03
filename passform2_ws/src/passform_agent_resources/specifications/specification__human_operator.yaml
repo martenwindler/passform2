@@ -1,0 +1,4 @@
+operator_info:
+  role: "developer"
+  id: "dev_01"
+  assigned_workstations: ["all"]

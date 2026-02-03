@@ -1,0 +1,11 @@
+id: "zone_eins"
+name: "Area Of Interest"
+
+# Geometrie als einfache Box (reicht für den Anfang)
+bounds:
+  min: { x: 0.0, y: 0.0 }
+  max: { x: 5.0, y: 8.0 }
+
+# Status-Sync
+topics:
+  presence: "/zones/zone_eins/occupied"

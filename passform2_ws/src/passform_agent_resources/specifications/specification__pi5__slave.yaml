@@ -1,0 +1,64 @@
+agent_info:
+  name: "RPi5-Slave-Node"
+  type: "SBC"
+  version: "5.0-4GB"
+
+hardware:
+  cpu:
+    model: "Cortex-A76"
+    cores: 4
+    architecture: "ARMv8.2-A"
+    clock_speed_max: "2.4GHz"
+  memory:
+    total_gb: 4 # Beispielhaft kleinere RAM-Version
+    type: "LPDDR4X-4266"
+  storage:
+    boot_media: "MicroSD"
+    capacity_gb: 32
+  interfaces:
+    gpio:
+      total_pins: 40
+      voltage: 3.3
+    pcie: "None"
+    usb:
+      - { type: "3.0", count: 2 }
+      - { type: "2.0", count: 2 }
+    ethernet: "1Gbps"
+
+system_status_map:
+  thermal:
+    - { sensor: "cpu_temp", unit: "°C", threshold_warn: 75.0, threshold_crit: 85.0 }
+  power:
+    - { source: "USB-C", voltage_v: 5.1, current_limit_a: 5.0 }
+    - { status: "low_voltage_warning", type: "boolean" }
+  load:
+    - cpu_usage_percent
+    - throttling_active
+
+# --- HTN DOMAIN DATA ---
+operators:
+  poll_io_sensors:
+    pre: ["system_ready"]
+    eff: ["io_states_updated"]
+
+  trigger_local_relay:
+    pre: ["io_states_updated", "command_received"]
+    eff: ["relay_active"]
+
+methods:
+  monitor_cycle:
+    - ["poll_io_sensors"]
+
+# --- ROS CAPABILITIES ---
+capabilities:
+  - action: "Sense"
+    topic: "/slave/gpio_inputs"
+    description: "Überwachung digitaler Eingänge"
+  - action: "Tool"
+    topic: "/slave/relay_outputs"
+    description: "Steuerung von GPIO-Ausgängen"
+
+network:
+  hostname: "rpi5-slave-01"
+  static_ip: "192.168.3.11"
+  ros_domain_id: 42

@@ -1,0 +1,49 @@
+agent_id: "ur5_gripper_01"
+type: "manipulator"
+hardware:
+  arm: "Universal Robots UR5"
+  effector: "Schunk Co-act EGP-C"
+  max_payload: 3.0 # kg
+
+# --- HTN DOMAIN DATA ---
+# Diese Daten werden vom ResourceManager gelesen und in den Planner geladen
+
+operators:
+  # Den Greifer schließen
+  close_gripper:
+    pre: ["gripper_open", "part_in_reach"]
+    eff: ["part_grasped", "!gripper_open"]
+  
+  # Den Greifer öffnen
+  open_gripper:
+    pre: ["part_grasped"]
+    eff: ["gripper_open", "!part_grasped", "part_at_current_location"]
+
+  # Den Arm zu einem logischen Ort bewegen
+  move_to:
+    pre: ["arm_free"]
+    eff: ["at_goal_location", "!at_home"]
+
+# --- METHODS (Hierarchische Rezepte) ---
+methods:
+  # Die Methode "pick_part" beschreibt, wie ein Teil aufgenommen wird
+  pick_part:
+    - ["move_to", "close_gripper"]
+
+  # Eine komplette Transfer-Mission
+  transfer_part:
+    - ["pick_part", "move_to", "open_gripper"]
+
+# --- CAPABILITIES (Verfügbare ROS-Interfaces) ---
+capabilities:
+  - action: "Move"
+    topic: "/ur5/move"
+    description: "Lineare oder PTP Bewegungen des Arms"
+  
+  - action: "Tool"
+    topic: "/ur5/gripper_control"
+    description: "Öffnen/Schließen des Schunk Greifers"
+
+  - action: "Sense"
+    topic: "/ur5/wrist_camera"
+    description: "Objekterkennung am Handgelenk"

@@ -1,0 +1,48 @@
+agent_id: "roller_conveyor_01"
+type: "transfer_module"
+hardware:
+  motor: "DC Brushless 24V"
+  sensor_entry: "Photoelectric_Switch_Front"
+  sensor_exit: "Photoelectric_Switch_Back"
+  load_capacity: 50.0 # kg
+
+# --- HTN DOMAIN DATA ---
+operators:
+  # Rolle vorwärts bewegen, um ein Paket aufzunehmen
+  load_from_external:
+    pre: ["!package_on_board", "external_feeder_ready"]
+    eff: ["package_on_board", "roller_busy"]
+
+  # Rolle vorwärts bewegen, um ein Paket abzugeben
+  unload_to_external:
+    pre: ["package_on_board", "external_receiver_ready"]
+    eff: ["!package_on_board", "roller_busy"]
+
+  # Interne Zentrierung des Pakets
+  center_package:
+    pre: ["package_on_board"]
+    eff: ["package_centered"]
+
+# --- METHODS ---
+methods:
+  # Kompletter Empfangsvorgang
+  receive_mission:
+    - ["load_from_external", "center_package"]
+
+  # Kompletter Abgabevorgang
+  dispatch_mission:
+    - ["unload_to_external"]
+
+# --- CAPABILITIES ---
+capabilities:
+  - action: "Tool"
+    topic: "/roller/motor_control"
+    description: "Startet/Stoppt das Förderband (Richtung, Geschwindigkeit)"
+  
+  - action: "Sense"
+    topic: "/roller/photo_sensors"
+    description: "Status der Lichtschranken (Belegt/Frei)"
+
+  - action: "System"
+    topic: "/roller/handshake"
+    description: "Spezifische Handshake-Logik mit anderen Agenten"
