@@ -135,28 +135,24 @@ passform2_ws/src/ros2-rust/*
 passform2_agent_backend/repos/basyx-aas-web-ui/*
 !passform2_agent_backend/repos/basyx-aas-web-ui/.gitkeep
 
-
 # --- Tauri ---
-
 passform2_agent_backend/capabilities/*
 passform2_agent_backend/icons/*
 passform2_agent_backend/gen/*
 
-# --- PassForM2 WS --- 
-
+# --- passform2_ws WS --- 
 passform2_ws/src/passform2_ros-main
 
-# --- Redundant package writes and artifacts --- 
+# --- passform2_ws/specifications --- 
+passform2_ws/src/passform2_ws/specifications
 
+# --- Redundant package writes and artifacts --- 
 **/**/package-lock.json
 passform2_agent_backend/repos/basyx-aas-web-ui
 passform2_ws/src/ros2_rust
-passfrom2_ws/src/ros2-rust
-passfrom2_ws/src/ros2
+passform2_ws/src/ros2-rust
+passform2_ws/src/ros2
 passform2_ws/.cargo
 
 # --- passform2_agent_frontend/coveragetests --- 
-
 passform2_agent_frontend/.coverage/**/**
-
-

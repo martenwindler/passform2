@@ -1,0 +1,22 @@
+resource_info:
+  name: "Cell-Network-Router"
+  type: "Network_Gateway"
+  vendor: "Tennet"
+  model: "Generic-Home-Router"
+
+networking_specs:
+  standard: "Wi-Fi 5 (802.11ac)"
+  frequency_bands: ["2.4GHz", "5GHz"]
+  lan_ports: 4
+  wan_ports: 1
+  max_throughput_mbps: 1200
+
+configuration:
+  subnet_mask: "255.255.255.0"
+  dhcp_range: { start: "192.168.1.100", end: "192.168.1.250" }
+  gateway_ip: "192.168.1.1"
+  security: "WPA2-PSK"
+
+physical:
+  location_id: "cabinet_01"
+  power_input: "12V / 1.5A"

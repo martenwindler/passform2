@@ -1,0 +1,28 @@
+resource_info:
+  name: "Operator-Station-Display"
+  type: "HMI_Display"
+  vendor: "Dell"
+  model: "U2723QE" # Beispiel: 27" 4K Monitor
+
+display_properties:
+  resolution: { width: 3840, height: 2160 }
+  aspect_ratio: "16:9"
+  refresh_rate_hz: 60
+  panel_type: "IPS"
+  size_inch: 27.0
+  color_depth_bit: 10
+
+connectivity:
+  inputs: [ "HDMI 2.0", "DisplayPort 1.4", "USB-C (DP Alt Mode)" ]
+  active_input: "USB-C"
+  power_delivery_w: 90 # Falls der Monitor den RPi5 mit Strom versorgt
+  usb_hub_active: true
+
+mounting:
+  vesa_standard: "100x100"
+  location_id: "workstation_01"
+  orientation: "landscape" # oder "portrait" für Hochkant-Dashboards
+
+energy:
+  power_consumption_typical_w: 25.9
+  energy_class: "F"

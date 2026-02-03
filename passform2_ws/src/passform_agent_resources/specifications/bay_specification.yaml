@@ -1,0 +1,27 @@
+resource_info:
+  name: "Assembly-Bay-Example"
+  type: "Up-to-state-Station"
+  vendor: "PassForm-Internal"
+  id_short: "bay_01"
+
+geometry:
+  # Koordinaten im globalen Fabrik-Koordinatensystem
+  origin: { x: 12.5, y: 8.2, z: 0.0 }
+  dimensions: { width: 1.2, depth: 1.5, height: 2.0 }
+  entry_angle_deg: 180.0 # Von wo müssen Agenten einfahren?
+
+capabilities:
+  charging:
+    available: true
+    type: "Inductive"
+    power_kw: 2.2
+  storage:
+    max_slots: 1
+    current_item_type: "Standard_Pallet_Euro"
+  sensors:
+    - { type: "Occupancy_IR", topic: "/sensors/bay_01/presence" }
+    - { type: "RFID_Reader", topic: "/sensors/bay_01/rfid" }
+
+logic_rules:
+  allow_maintenance: true
+  reserved_for_agent_type: ["AMR", "Mobile_Cobot"] # Nur autonome mobile Roboter
