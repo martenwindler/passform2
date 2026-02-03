@@ -1,6 +1,7 @@
 // src/managers/mod.rs
 pub mod agent_manager;
 pub mod config_manager;
+pub mod match_manager;
 pub mod node_manager;
 pub mod path_manager;
 pub mod resource_manager;

@@ -1,4 +1,4 @@
 string agent_id
 string module_type
-passform_agent_resources/GridPosition position
+geometry_msgs/Point position
 float32 orientation

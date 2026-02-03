@@ -11,6 +11,13 @@ pub enum SystemMode {
     Simulation,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SystemRole {
+    Master,
+    Client,
+}
+
 impl std::fmt::Display for SystemMode {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -23,12 +30,14 @@ impl std::fmt::Display for SystemMode {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Settings {
     pub current_mode: SystemMode,
+    pub role: SystemRole, // NEU: Rolle im System
+    pub agent_uuid: String, // NEU: Eigene ID für Clients
     pub backend_host: String,
     pub backend_port: u16,
     pub master_ip: String,
     pub heartbeat_hz: f64,
     pub timeout_factor: f64,
-    pub domain_ids: HashMap<String, i32>, // Wir nutzen String als Key für Serde-Kompatibilität
+    pub domain_ids: HashMap<String, i32>,
 }
 
 impl Default for Settings {
@@ -39,6 +48,8 @@ impl Default for Settings {
 
         Self {
             current_mode: SystemMode::Hardware,
+            role: SystemRole::Client, // Standardmäßig ein Client/Slave
+            agent_uuid: "unnamed_agent".to_string(),
             backend_host: "0.0.0.0".to_string(),
             backend_port: 8000,
             master_ip: "127.0.0.1".to_string(),
@@ -54,33 +65,30 @@ pub struct ConfigManager {
 }
 
 impl ConfigManager {
-    /// Bootstrapping der Config (Ersatz für SettingsConfigDict)
     pub fn new() -> Result<Self, ConfigError> {
         let s = ConfigLoader::builder()
-            // Defaults laden
             .add_source(config::Config::try_from(&Settings::default())?)
-            // .env Datei laden
             .add_source(File::with_name(".env").required(false))
-            // Environment Variablen (z.B. PASSFORM_BACKEND_PORT)
+            // Ermöglicht PASSFORM_ROLE=master oder PASSFORM_AGENT_UUID=ranger_01
             .add_source(Environment::with_prefix("PASSFORM").separator("_"))
             .build()?;
 
         let settings: Settings = s.try_deserialize()?;
 
-        // Validierung (Ersatz für @field_validator)
-        if settings.master_ip == "127.0.0.1" {
-            warn!("⚠️ MASTER_IP steht auf Localhost. Externe Clients finden das Backend so nicht!");
+        if settings.role == SystemRole::Master && settings.master_ip == "127.0.0.1" {
+            warn!("⚠️ MASTER konfiguriert, aber MASTER_IP ist Localhost. Externe Clients finden dich evtl. nicht.");
         }
 
-        info!("✅ Infrastruktur-Config geladen (Modus: {})", settings.current_mode);
-        info!("📡 Heartbeat-SSoT: {}Hz (Timeout-Faktor: {})", settings.heartbeat_hz, settings.timeout_factor);
+        info!("✅ Config geladen | Rolle: {:?} | Modus: {}", settings.role, settings.current_mode);
 
         Ok(Self {
             settings: RwLock::new(settings),
         })
     }
 
-    // --- GETTER & SETTER ---
+    pub async fn get_role(&self) -> SystemRole {
+        self.settings.read().await.role
+    }
 
     pub async fn get_current_mode(&self) -> SystemMode {
         self.settings.read().await.current_mode
@@ -92,24 +100,16 @@ impl ConfigManager {
         *s.domain_ids.get(&mode_key).unwrap_or(&0)
     }
 
-    pub async fn get_heartbeat_period(&self) -> f64 {
-        let hz = self.settings.read().await.heartbeat_hz;
-        1.0 / hz
-    }
-
     pub async fn set_mode(&self, mode: SystemMode) -> bool {
         let mut s = self.settings.write().await;
         if s.current_mode != mode {
-            let old_mode = s.current_mode;
             s.current_mode = mode;
-            info!("🔄 Modus-Wechsel: {} -> {} (ROS Domain {})", 
-                old_mode, mode, self.get_domain_id_internal(&s));
+            info!("🔄 Modus-Wechsel -> {} (Domain {})", mode, self.get_domain_id_internal(&s));
             return true;
         }
         false
     }
 
-    // Interne Hilfsfunktion für den Zugriff ohne neuen Read-Lock
     fn get_domain_id_internal(&self, s: &Settings) -> i32 {
         let mode_key = s.current_mode.to_string();
         *s.domain_ids.get(&mode_key).unwrap_or(&0)

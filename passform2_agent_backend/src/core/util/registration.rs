@@ -6,7 +6,7 @@ use futures::channel::oneshot;
 
 use rclrs;
 use rclrs::{Node, ServiceIDL}; 
-use passform_msgs::srv::Discover; 
+use passform_agent_resources::srv::Discover; 
 
 pub struct DiscoverPassform {
     pub node: Arc<Node>,

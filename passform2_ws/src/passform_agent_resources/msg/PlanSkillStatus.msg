@@ -1,2 +1,2 @@
-passform_agent_resources/Skill skill
+passform_agent_resources/PlanSkill skill
 diagnostic_msgs/DiagnosticStatus status

@@ -1,83 +1,75 @@
-use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
-use std::thread;
-use std::time::Duration;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
+use tracing::{info, warn};
+use crate::{AppState, SystemRole};
 
 pub struct Watchdog {
-    timeout: Duration,
-    callback: Arc<dyn Fn() + Send + Sync>,
+    state: Arc<AppState>,
     is_running: Arc<AtomicBool>,
-    reset_flag: Arc<AtomicBool>,
-    handle: Mutex<Option<thread::JoinHandle<()>>>,
+    timeout: Duration,
 }
 
 impl Watchdog {
-    pub fn new<F>(timeout_secs: f32, callback: F) -> Self 
-    where 
-        F: Fn() + Send + Sync + 'static 
-    {
-        let watchdog = Self {
-            timeout: Duration::from_secs_f32(timeout_secs),
-            callback: Arc::new(callback),
+    pub fn new(state: Arc<AppState>) -> Self {
+        Self {
+            state,
             is_running: Arc::new(AtomicBool::new(true)),
-            reset_flag: Arc::new(AtomicBool::new(false)),
-            handle: Mutex::new(None),
-        };
-
-        watchdog.start_internal();
-        watchdog
-    }
-
-    fn start_internal(&self) {
-        let timeout = self.timeout;
-        let callback = Arc::clone(&self.callback);
-        let is_running = Arc::clone(&self.is_running);
-        let reset_flag = Arc::clone(&self.reset_flag);
-
-        let mut handle_guard = self.handle.lock().unwrap();
-        *handle_guard = Some(thread::spawn(move || {
-            while is_running.load(Ordering::SeqCst) {
-                // Der eigentliche Watchdog-Check
-                // Wir schlafen in kleinen Intervallen, um schneller auf Resets/Stops zu reagieren
-                let start_time = std::time::Instant::now();
-                while start_time.elapsed() < timeout {
-                    if reset_flag.swap(false, Ordering::SeqCst) {
-                        // Reset wurde getriggert, fange Zeitmessung von vorne an
-                        break;
-                    }
-                    if !is_running.load(Ordering::SeqCst) {
-                        return;
-                    }
-                    thread::sleep(Duration::from_millis(50));
-                }
-
-                // Wenn wir hier ankommen und die Zeit abgelaufen ist ohne Reset...
-                if start_time.elapsed() >= timeout {
-                    (callback)();
-                    // Nachdem der Callback lief, beenden wir den Watchdog meistens
-                    is_running.store(false, Ordering::SeqCst);
-                }
-            }
-        }));
-    }
-
-    /// Setzt den Timer zurück (Heartbeat erhalten)
-    pub fn reset(&self) {
-        self.reset_flag.store(true, Ordering::SeqCst);
-    }
-
-    /// Beendet den Watchdog sauber
-    pub fn stop(&self) {
-        self.is_running.store(false, Ordering::SeqCst);
-        let mut handle_guard = self.handle.lock().unwrap();
-        if let Some(h) = handle_guard.take() {
-            let _ = h.join();
+            timeout: Duration::from_secs(3), // 3 Sekunden ohne Update = Stale
         }
     }
-}
 
-// Implementierung für das Drop-Trait (Sicherheit beim Löschen des Objekts)
-impl Drop for Watchdog {
-    fn drop(&mut self) {
-        self.stop();
+    pub async fn run(&self) {
+        info!("🛡️ System-Watchdog aktiv (Prüfintervall: 500ms)");
+        let mut interval = tokio::time::interval(Duration::from_millis(500));
+
+        while self.is_running.load(Ordering::SeqCst) {
+            interval.tick().await;
+
+            let role = self.state.infra_config.get_role().await;
+            match role {
+                SystemRole::Master => self.check_agent_entries().await,
+                SystemRole::Client => self.check_master_connection().await,
+            }
+        }
+    }
+
+    /// MASTER-LOGIK: Prüft alle AgentEntry-Objekte im AgentManager
+    async fn check_agent_entries(&self) {
+        let mut agents = self.state.agent_manager.agents.write().await;
+        let now = Instant::now();
+        let mut changes_detected = false;
+
+        for (id, agent) in agents.iter_mut() {
+            // Prüfung: Wie lange ist der letzte Kontakt her?
+            let elapsed = now.duration_since(agent.last_seen);
+
+            if elapsed > self.timeout {
+                // Nur reagieren, wenn der Status nicht bereits "stale" oder "offline" ist
+                if agent.status != "stale" && agent.status != "offline" {
+                    agent.status = "stale".to_string();
+                    warn!("⚠️ WATCHDOG: Agent '{}' ist jetzt STALE (Letzter Kontakt: {:?})", id, elapsed);
+                    changes_detected = true;
+                }
+            }
+        }
+
+        // Wenn sich Stati geändert haben, senden wir ein Update ans Dashboard
+        if changes_detected {
+            // Wir nutzen die broadcast-Logik über das Socket-Handle
+            let agents_list: Vec<_> = agents.values().cloned().collect();
+            let _ = self.state.socket_manager.io.emit(
+                "active_agents", 
+                serde_json::json!({ "agents": agents_list })
+            );
+        }
+    }
+
+    async fn check_master_connection(&self) {
+        // Logik für den Ranger-Client (Master-Heartbeat prüfen)
+    }
+
+    pub fn stop(&self) {
+        self.is_running.store(false, Ordering::SeqCst);
     }
 }

@@ -1,3 +1,3 @@
-passform_agent_resources/Location start
-passform_agent_resources/Location[] waypoint
-passform_agent_resources/Location end
+passform_agent_resources/WorldLocation start
+passform_agent_resources/WorldLocation[] waypoint
+passform_agent_resources/WorldLocation end

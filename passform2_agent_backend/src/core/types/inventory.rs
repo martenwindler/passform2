@@ -3,21 +3,21 @@ use serde_json::{json, Value};
 use crate::core::util::helper::sanitize_id;
 
 // Fix E0599: Trait ToBasyx muss importiert werden, damit die Methode sichtbar ist
-use crate::core::types::location::{Location, ToBasyx}; 
+use crate::core::types::location::{WorldLocation, ToBasyx}; 
 
-// Wir nutzen den Alias 'passform_msgs' aus deiner Cargo.toml
-use passform_msgs::msg::{Item as ItemMsg, Part as PartMsg};
+// Wir nutzen den Alias 'passform_agent_resources' aus deiner Cargo.toml
+use passform_agent_resources::msg::{WorldItem as ItemMsg, WorldPart as PartMsg};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Item {
+pub struct WorldItem {
     pub name: String,
     pub uid: String,
     pub quantity: i32,
-    pub location: Location,
+    pub location: WorldLocation,
 }
 
-impl Item {
-    pub fn new(name: &str, uid: &str, quantity: i32, location: Option<Location>) -> Self {
+impl WorldItem {
+    pub fn new(name: &str, uid: &str, quantity: i32, location: Option<WorldLocation>) -> Self {
         assert!(!uid.is_empty(), "unique id must not be empty");
         Self {
             name: name.to_string(),
@@ -27,7 +27,7 @@ impl Item {
         }
     }
 
-    pub fn add(&mut self, other: &mut Item) -> Result<(), String> {
+    pub fn add(&mut self, other: &mut WorldItem) -> Result<(), String> {
         if self.uid != other.uid {
             return Err(format!(
                 "Adding quantity to not matching item IDs: {} to {}",
@@ -39,7 +39,7 @@ impl Item {
         Ok(())
     }
 
-    pub fn use_qty(&mut self, mut quantity: i32) -> Item {
+    pub fn use_qty(&mut self, mut quantity: i32) -> WorldItem {
         if quantity < 0 { quantity = 0; }
         if quantity > self.quantity {
             quantity = 0;
@@ -78,7 +78,7 @@ impl Item {
             name: msg.part.name.clone(),
             uid: msg.part.uuid.clone(),
             quantity: msg.quantity as i32, 
-            location: Location::from_msg(&msg.location),
+            location: WorldLocation::from_msg(&msg.location),
         }
     }
 
@@ -86,7 +86,7 @@ impl Item {
         let id_short = format!("item_{}", sanitize_id(&self.uid));
         json!({
             "idShort": id_short,
-            "category": "Item",
+            "category": "WorldItem",
             "modelType": "SubmodelElementCollection",
             "value": [
                 {

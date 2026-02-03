@@ -1,3 +1,3 @@
 std_msgs/Header header
-Bay bay
+InfraBay bay
 diagnostic_msgs/DiagnosticStatus status

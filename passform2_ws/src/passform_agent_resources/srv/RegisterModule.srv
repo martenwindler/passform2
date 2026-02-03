@@ -2,7 +2,7 @@ uint8 DISCOVER = 0
 uint8 REGISTER = 1
 uint8 UNREGISTER = 2
 
-Module module
+InfraModule module
 string id
 string id_type
 uint8 reg_type  # type of registration type, see above

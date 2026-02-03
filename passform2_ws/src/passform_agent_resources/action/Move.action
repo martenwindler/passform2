@@ -5,7 +5,7 @@ geometry_msgs/PoseStamped pose # Optionale exakte Zielkoordinaten
 
 # Planungsparameter
 string profile                # "fast", "cautious", "heavy_load"
-passform_agent_resources/Condition stop_condition # Z.B. "Stoppe, wenn Sensor X anspricht"
+passform_agent_resources/PlanCondition stop_condition # Z.B. "Stoppe, wenn Sensor X anspricht"
 rcl_interfaces/Parameter[] constraints           # Dynamische Limits (max_vel, max_accel)
 
 # Kraft/Moment-Überwachung (Kollisionserkennung oder Fügen)
@@ -14,11 +14,11 @@ geometry_msgs/Wrench contact_threshold           # Ab welcher Kraft soll die Bew
 # Result
 bool reached                  # Ziel erreicht?
 uint8 status_code             # Grund für Ende (SUCCESS, OBSTACLE, THRESHOLD_EXCEEDED)
-passform_agent_resources/Location final_location
+passform_agent_resources/WorldLocation final_location
 string error_message
 ---
 # Feedback
-passform_agent_resources/Location current_location
+passform_agent_resources/WorldLocation current_location
 float32 distance_remaining
 float32 estimated_time_arrival
 geometry_msgs/Wrench current_wrench # Aktuelle Kräfte (wichtig für haptisches Feedback)

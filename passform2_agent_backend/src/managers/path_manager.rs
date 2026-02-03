@@ -9,7 +9,7 @@ use axum::{extract::State, http::StatusCode, Json, response::IntoResponse};
 use socketioxide::SocketIo;
 
 // We gebruiken de ROS-Messages voor de mapping
-use passform_msgs::msg::PathRequest as RosPathRequest;
+use passform_agent_resources::msg::NavPathRequest as RosPathRequest;
 
 // --- DOMAIN MODELS (API / Web) ---
 
@@ -65,7 +65,7 @@ impl PathManager {
             start_y: req.start.y,
             goal_x: req.goal.x,
             goal_y: req.goal.y,
-            // Let op: De compiler gaf aan dat agent_id NIET in PathRequest.msg staat.
+            // Let op: De compiler gaf aan dat agent_id NIET in NavPathRequest.msg staat.
             // Als je agent_id nodig hebt, moet je de .msg vijle aanpassen en colcon build doen.
         };
 

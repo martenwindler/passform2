@@ -12,8 +12,8 @@ use crate::relay::ActionRelay;
 use crate::mixins::SkillRequestMixin;
 
 // Nachrichten (generiert via rosidl)
-use passform_msgs::action::Passform;
-use passform_msgs::msg::{Task, Cost};
+use passform_agent_resources::action::Passform;
+use passform_agent_resources::msg::{Task, Cost};
 
 /// Basis-Klasse für alle Single-Skills (Primitive)
 pub struct PrimitiveLifecycle {
@@ -64,7 +64,7 @@ impl PrimitiveLifecycle {
         locations.iter().all(|loc| self.is_reachable(loc))
     }
 
-    pub fn is_reachable(&self, _location: &passform_msgs::msg::Location) -> bool {
+    pub fn is_reachable(&self, _location: &passform_agent_resources::msg::WorldLocation) -> bool {
         true // Override in spezifischen Skills
     }
 

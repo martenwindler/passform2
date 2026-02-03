@@ -7,8 +7,8 @@ use rclrs::{Node, Publisher, Service, Subscription};
 use rclrs_lifecycle::{LifecycleNode, LifecycleState, TransitionResult};
 
 // Nachrichten & Services
-use passform_msgs::msg::{Inventory, Location, AreaOfInterest};
-use passform_msgs::srv::{UpdateInventory, UpdateInventoryRequest, UpdateInventoryResponse};
+use passform_agent_resources::msg::{Inventory, WorldLocation, WorldAreaOfInterest};
+use passform_agent_resources::srv::{UpdateInventory, UpdateInventoryRequest, UpdateInventoryResponse};
 
 // Eigene Module
 use crate::registration::DiscoverPassform;

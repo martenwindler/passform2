@@ -3,7 +3,7 @@ use serde_json::Value;
 use tracing::{info, error};
 
 pub struct SocketIoManager {
-    io: SocketIo,
+    pub io: SocketIo,
 }
 
 impl SocketIoManager {

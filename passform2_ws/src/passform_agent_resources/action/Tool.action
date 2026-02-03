@@ -1,6 +1,6 @@
 # Request
 string target_id # uuid of tool
-passform_agent_resources/Location location # location of tooluse
+passform_agent_resources/WorldLocation location # location of tooluse
 bool pick # true: pick tool at location
 bool release # true: release tool at location
 geometry_msgs/Wrench wrench

@@ -7,7 +7,7 @@ use rclrs;
 use rclrs::{Node, Subscription, Publisher, QOS_PROFILE_DEFAULT};
 
 // ROS Messages
-use passform_msgs::msg::{Task, Cost};
+use passform_agent_resources::msg::{Task, Cost};
 
 /// In Rust kapseln wir die "Mixin"-Logik in einem Manager, 
 /// den der Node als Member besitzt.

@@ -1,4 +1,4 @@
 string request_id
 AgentInfo current
-GridPosition goal
+geometry_msgs/Point goal
 AgentInfo[] neighbors   

@@ -9,4 +9,4 @@ string mac  # UNUSED. MAC address of the currently present module
 string nfc_tag  # UNUSED. Identified NFC
 string uuid  # bay uuid
 string module_uuid  # UUID of the module currently present in the bay
-Supply supply  # currently active supply (power, vacuum, ...)
+InfraSupply supply  # currently active supply (power, vacuum, ...)

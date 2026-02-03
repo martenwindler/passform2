@@ -7,8 +7,8 @@ use rclrs::{Node, Publisher, Subscription, Client, QOS_PROFILE_DEFAULT};
 use rclrs_lifecycle::{LifecycleNode, LifecycleState, TransitionResult};
 
 // Nachrichten & Services
-use passform_msgs::msg::{Inventory, ModuleStatus, Item};
-use passform_msgs::srv::{RegisterModule, RegisterModuleRequest};
+use passform_agent_resources::msg::{Inventory, ModuleStatus, WorldItem};
+use passform_agent_resources::srv::{RegisterModule, RegisterModuleRequest};
 use nav2_msgs::srv::{ManageLifecycleNodes, ManageLifecycleNodesRequest};
 
 // Eigene Module
@@ -21,7 +21,7 @@ pub struct ModuleManager {
     // State
     basyx: Arc<Mutex<Option<RestServer>>>,
     base_services: HashMap<String, String>,
-    inventory: Arc<Mutex<Vec<Item>>>,
+    inventory: Arc<Mutex<Vec<WorldItem>>>,
     
     // Interfaces
     registration_client: Option<Arc<Client<RegisterModule>>>,

@@ -1,5 +1,5 @@
 string request_id
 AgentInfo winner
-GridPosition goal     
+geometry_msgs/Point goal     
 AgentInfo[] path
 float64 cost

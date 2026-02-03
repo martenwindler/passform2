@@ -1,14 +1,16 @@
 use serde_json::{json, Value};
 use crate::core::util::helper::sanitize_id;
-use crate::core::util::watchdog::Watchdog;
+// Watchdog Import entfernt, da wir auf tokio::task umsteigen
 use std::sync::{Arc, Mutex};
+use tokio::task::JoinHandle;
 
 /// Repräsentiert die gesamte Bay AAS
 pub struct Bay {
     pub unique_id: String,
     pub name: String,
     pub origin: [f64; 3],
-    pub watchdog: Option<Watchdog>,
+    // Wir speichern den Task-Handle, um den Timer abbrechen zu können
+    pub timeout_handle: Option<JoinHandle<()>>,
     // Wir speichern den internen Status als JSON-Value für die BaSyx-Kompatibilität
     status: Arc<Mutex<Value>>,
 }
@@ -43,7 +45,7 @@ impl Bay {
             unique_id: unique_id.to_string(),
             name: sanitized_name,
             origin,
-            watchdog: None,
+            timeout_handle: None,
             status: Arc::new(Mutex::new(status)),
         }
     }
@@ -96,7 +98,6 @@ impl Bay {
 
     pub fn is_free(&self) -> bool {
         let status = self.status.lock().unwrap();
-        // Navigiere im JSON zum 'occupation' Feld
         status["submodelElements"]
             .as_array()
             .and_then(|elems| elems.iter().find(|e| e["idShort"] == "occupation"))
@@ -104,7 +105,7 @@ impl Bay {
             .map(|val| !val)
             .unwrap_or(true)
     }
-
+    
     pub fn occupy(&mut self, module_uuid: &str) {
         let mut status = self.status.lock().unwrap();
         if let Some(elems) = status["submodelElements"].as_array_mut() {
@@ -115,22 +116,32 @@ impl Bay {
             }
         }
         
-        // Watchdog-Logik
+        // --- KORREKTUR: String klonen für den asynchronen Task ---
         let status_ptr = Arc::clone(&self.status);
-        self.watchdog = Some(Watchdog::new(2.0, move || {
+        let uuid_owned = module_uuid.to_string(); // <--- Wir machen aus &str ein String
+        
+        if let Some(handle) = self.timeout_handle.take() {
+            handle.abort();
+        }
+
+        self.timeout_handle = Some(tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs_f32(2.0)).await;
+            
             let mut s = status_ptr.lock().unwrap();
             if let Some(elems) = s["submodelElements"].as_array_mut() {
                 if let Some(t) = elems.iter_mut().find(|e| e["idShort"] == "timeout") {
                     t["value"] = json!(true);
                 }
             }
-            eprintln!("Watchdog: Bay module timed out.");
+            // Hier nutzen wir nun die 'owned' Version
+            eprintln!("AAS Watchdog: Bay module '{}' timed out.", uuid_owned);
         }));
     }
 
     pub fn free(&mut self) {
-        if let Some(wd) = self.watchdog.take() {
-            wd.stop();
+        // Timer stoppen
+        if let Some(handle) = self.timeout_handle.take() {
+            handle.abort();
         }
         
         let mut status = self.status.lock().unwrap();

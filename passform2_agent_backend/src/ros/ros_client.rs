@@ -2,13 +2,13 @@ use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::any::Any;
 use rclrs::{Node, Publisher, SubscriptionOptions, RclrsError, Context, CreateBasicExecutor, SpinOptions, RclReturnCode};
-use passform_msgs::msg::{AgentInfo, PathRequest}; 
+use passform_agent_resources::msg::{AgentInfo, NavPathRequest}; 
 use tracing::{info, error, warn};
 
 pub struct RosClient {
     pub node: Node,
     pub subscriptions: Mutex<Vec<Arc<dyn Any + Send + Sync>>>,
-    pub path_pub: Arc<Publisher<PathRequest>>,
+    pub path_pub: Arc<Publisher<NavPathRequest>>,
     pub is_running: Arc<AtomicBool>,
     // NEU: Handle zur Tokio-Runtime speichern
     pub rt_handle: tokio::runtime::Handle,
@@ -57,7 +57,7 @@ impl RosClient {
             msg: None 
         })?;
 
-        let path_pub = node.create_publisher::<PathRequest>("path_requests")?;
+        let path_pub = node.create_publisher::<NavPathRequest>("path_requests")?;
 
         Ok(Self { 
             node,
@@ -72,7 +72,7 @@ impl RosClient {
         self.is_running.store(false, Ordering::SeqCst);
     }
 
-    pub fn publish_path_request(&self, req: PathRequest) -> Result<(), RclrsError> {
+    pub fn publish_path_request(&self, req: NavPathRequest) -> Result<(), RclrsError> {
         self.path_pub.publish(&req)
     }
 

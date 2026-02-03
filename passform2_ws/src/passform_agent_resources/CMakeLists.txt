@@ -20,40 +20,42 @@ find_package(diagnostic_msgs REQUIRED)
 
 # 2. Interfaces generieren
 rosidl_generate_interfaces(${PROJECT_NAME}
-  # --- MESSAGES ---
+  # --- BASIS-TYPEN ZUERST (Wichtig für Jazzy!) ---
+  "msg/GridPosition.msg"      # Wird von AgentInfo/Announce genutzt
+  "msg/AgentInfo.msg"         # Wird von AgentAnnounce/PathResult genutzt
+  "msg/AgentState.msg"
+  "msg/AgentHeartbeat.msg"
+  
+  # --- RESTLICHE NACHRICHTEN ---
   "msg/AgentAnnounce.msg"
-  "msg/AgentInfo.msg"
-  "msg/AreaOfInterest.msg"
-  "msg/Award.msg"
-  "msg/BaseStatus.msg"
-  "msg/Bay.msg"
-  "msg/BayStatus.msg"
-  "msg/Blob.msg"
-  "msg/CFP.msg"
-  "msg/Condition.msg"
-  "msg/Cost.msg"
-  "msg/CostPropagation.msg"
-  "msg/Grasp.msg"
-  "msg/GridPosition.msg"
-  "msg/Heartbeat.msg"
-  "msg/Inventory.msg"
-  "msg/Item.msg"
-  "msg/Location.msg"
-  "msg/Module.msg"
-  "msg/ModuleStatus.msg"
-  "msg/Motion.msg"
-  "msg/OperatorTask.msg"
-  "msg/Part.msg"
-  "msg/PathComplete.msg"
-  "msg/PathRequest.msg"
-  "msg/PathResult.msg"
-  "msg/Proposal.msg"
-  "msg/Skill.msg"
-  "msg/SkillStatus.msg"
-  "msg/SkillType.msg"
-  "msg/Supply.msg"
-  "msg/Task.msg"
-  "msg/Tool.msg"
+  "msg/InfraBaseStatus.msg"
+  "msg/InfraBay.msg"
+  "msg/InfraBayStatus.msg"
+  "msg/InfraModule.msg"
+  "msg/InfraModuleStatus.msg"
+  "msg/InfraSupply.msg"
+  "msg/MatchAward.msg"
+  "msg/MatchCFP.msg"
+  "msg/MatchCost.msg"
+  "msg/MatchProposal.msg"
+  "msg/NavMotion.msg"
+  "msg/NavPathComplete.msg"
+  "msg/NavPathRequest.msg"
+  "msg/NavPathResult.msg"
+  "msg/PlanCondition.msg"
+  "msg/PlanOperatorTask.msg"
+  "msg/PlanSkill.msg"
+  "msg/PlanSkillStatus.msg"
+  "msg/PlanSkillType.msg"
+  "msg/PlanTask.msg"
+  "msg/WorldAreaOfInterest.msg"
+  "msg/WorldBlob.msg"
+  "msg/WorldGrasp.msg"
+  "msg/WorldInventory.msg"
+  "msg/WorldItem.msg"
+  "msg/WorldLocation.msg"
+  "msg/WorldPart.msg"
+  "msg/WorldTool.msg"
   
   # --- SERVICES ---
   "srv/CreateSkill.srv"
@@ -67,17 +69,20 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/UpdateInventory.srv"
   
   # --- ACTIONS ---
+  "action/Discovery.action"
   "action/Move.action"
-  "action/Passform.action"
+  "action/MoveBody.action"
+  "action/MoveTcp.action"
   "action/Sense.action"
+  "action/System.action"
   "action/Tool.action"
   "action/Wait.action"
   
   DEPENDENCIES std_msgs diagnostic_msgs geometry_msgs action_msgs rcl_interfaces
 )
 
-# 3. Installation der Ressourcen
-install(DIRECTORY config meshes skills urdf
+# 3. Installation der Ressourcen für das Backend
+install(DIRECTORY config meshes skills specifications urdf
   DESTINATION share/${PROJECT_NAME}
 )
 

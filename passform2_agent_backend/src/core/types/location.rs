@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
-use passform_msgs::msg::{Location as LocationMsg, AreaOfInterest as AoiMsg};
+use passform_agent_resources::msg::{WorldLocation as LocationMsg, WorldAreaOfInterest as AoiMsg};
 use geometry_msgs::msg::{Point, Quaternion, Pose, Polygon, Point32};
 use std_msgs::msg::Header;
 
@@ -99,13 +99,13 @@ impl ToBasyx for LocalAreaOfInterest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct Location {
+pub struct WorldLocation {
     pub frame_id: String,
     pub pose: LocalPose,
     pub aoi: LocalAreaOfInterest,
 }
 
-impl Location {
+impl WorldLocation {
     pub fn from_msg(msg: &LocationMsg) -> Self {
         Self {
             frame_id: msg.header.frame_id.clone(),
@@ -161,7 +161,7 @@ impl Location {
     }
 }
 
-impl ToBasyx for Location {
+impl ToBasyx for WorldLocation {
     fn to_basyx_json(&self) -> Value {
         json!({
             "idShort": "location",

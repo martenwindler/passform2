@@ -11,8 +11,8 @@ use crate::relay::ActionRelay;
 use crate::mixins::SkillRequestManager;
 
 // Nachrichten
-use passform_msgs::msg::{Task, Cost};
-use passform_msgs::action::Passform;
+use passform_agent_resources::msg::{Task, Cost};
+use passform_agent_resources::action::Passform;
 use std_msgs::msg::String as StringMsg;
 
 pub struct TaskManager {

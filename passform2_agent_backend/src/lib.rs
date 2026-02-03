@@ -20,10 +20,12 @@ pub use crate::managers::{
     path_manager::PathManager,
     skill_manager::SkillManager,
     socket_io_manager::SocketIoManager,
-    system_api::SystemApi as SystemApiManager,
+    system_api::SystemApi as SystemApiManager, 
+    match_manager::MatchManager
 };
 
 // Core, ROS
+pub use crate::core::config::{SystemRole, SystemMode};
 pub use crate::core::config::ConfigManager as InfraConfigManager;
 pub use crate::ros::ros_client::RosClient;
 
@@ -59,6 +61,7 @@ pub struct AppState {
     // Manager-Instanzen für die verschiedenen Domänen
     pub socket_manager: Arc<SocketIoManager>,
     pub skill_manager: Arc<SkillManager>,
+    pub match_manager: Arc<RwLock<Option<Arc<MatchManager>>>>,
     pub path_manager: Arc<PathManager>,
     pub node_manager: Arc<NodeManager>,
     pub data_config: Arc<DataConfigManager>, // SSoT (Grid, Agents)

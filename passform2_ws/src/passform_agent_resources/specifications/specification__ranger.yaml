@@ -1,0 +1,72 @@
+# Agilex RANGER - System Specification
+# Source: RANGER User Manual V1.0 (2023.03)
+
+metadata:
+  name: "Agilex RANGER"
+  type: "UGV"
+  model: "ranger_v1"
+  uuid: "ranger-default-01"
+  description: "High-maneuverability omnidirectional UGV with Ackerman and Slide modes"
+
+# Physische Dimensionen & Grenzen (Wichtig für PathPlanner & Collision Avoidance)
+physical_properties:
+  dimensions:
+    length: 0.741  # m (741mm)
+    width: 0.505   # m (505mm)
+    height: 0.354  # m (354mm)
+    weight: 48.0   # kg (Eigengewicht)
+    payload_max: 50.0 # kg
+  kinematics:
+    max_speed_linear: 2.6 # m/s
+    max_speed_angular: 1.5 # rad/s
+    climbing_ability: 10.0 # Grad
+    ground_clearance: 0.107 # m (107mm)
+    drive_type: "4WD_multi_mode" # Front/Rear Ackerman, Dual-Ackerman, Slide, Spin
+
+# Kommunikations-Schnittstellen
+interfaces:
+  bus: "CAN_2.0B"
+  ros_bridge: "ranger_base"
+  driver_topic: "/ranger/cmd_vel"
+  feedback_topic: "/ranger/status"
+
+# Verfügbare Skills (Basis-Operationen)
+# Diese werden in deine SkillLibrary geladen
+skills:
+  - name: "move_to"
+    type: "navigation"
+    driver_topic: "/navigate_to_pose"
+    properties:
+      precision: 0.1 # m
+      modes: ["ackerman", "slide", "spin"]
+
+  - name: "change_drive_mode"
+    type: "hardware_config"
+    properties:
+      target_mode:
+        type: "enum"
+        values: ["front_ackerman", "rear_ackerman", "dual_ackerman", "oblique", "spin"]
+
+  - name: "self_spin"
+    type: "recovery"
+    description: "Robot performs a 360-degree rotation in place"
+    properties:
+      speed: 0.5 # rad/s
+
+# Digital Twin Submodels (BaSyx Mapping)
+aas_mapping:
+  id_short: "RANGER_AAS"
+  submodels:
+    - id_short: "OperationalData"
+      elements:
+        - { id_short: "battery_voltage", type: "Property", value_type: "float" }
+        - { id_short: "drive_mode", type: "Property", value_type: "string" }
+    - id_short: "Maintenance"
+      elements:
+        - { id_short: "operating_hours", type: "Property", value_type: "float" }
+
+# Navigation Stack Parameter (Nav2 / MoveBase)
+navigation_config:
+  local_planner: "teb_local_planner" # Empfohlen für Multi-Mode Kinematik
+  footprint: [[0.37, 0.25], [0.37, -0.25], [-0.37, -0.25], [-0.37, 0.25]]
+  min_turning_radius: 0.0 # Wichtig: 0.0 im Spin-Mode möglich

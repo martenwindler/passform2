@@ -26,7 +26,7 @@ impl RestServerConnector {
     }
 
     /// Verbindet basierend auf der Discovery-Response
-    pub fn connect_with_discover(&mut self, resp: &<passform_msgs::srv::Discover as ServiceIDL>::Response) {
+    pub fn connect_with_discover(&mut self, resp: &<passform_agent_resources::srv::Discover as ServiceIDL>::Response) {
         self.log(&format!("Verbindungsinfos erhalten: {:?}", resp), LogLevel::Debug);
         
         for ds in &resp.server_description {
@@ -104,7 +104,7 @@ impl RestServerConnector {
 
 /// Factory Ersatz durch Rust Enum/Match Pattern
 pub enum ConnectorConfig<'a> {
-    Discover(&'a <passform_msgs::srv::Discover as ServiceIDL>::Response),
+    Discover(&'a <passform_agent_resources::srv::Discover as ServiceIDL>::Response),
     Params(&'a HashMap<String, String>),
     Host(&'a str),
 }

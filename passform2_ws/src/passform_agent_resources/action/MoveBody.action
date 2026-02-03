@@ -1,0 +1,9 @@
+# Goal: Wohin soll sich der Body/TCP bewegen?
+geometry_msgs/PoseStamped target_pose
+---
+# Result: War die Bewegung erfolgreich?
+bool success
+string message
+---
+# Feedback: Wie weit ist der Roboter?
+float32 distance_to_goal

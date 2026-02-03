@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use rclrs;
 use rclrs_action::{ActionClient, ClientGoalHandle, ServerGoalHandle};
-use passform_msgs::action::Passform;
+use passform_agent_resources::action::Passform;
 
 /// Das ActionRelay leitet Ziele von einem lokalen ActionServer 
 /// an externe ActionServer (Treiber) weiter.
