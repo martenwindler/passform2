@@ -1,0 +1,78 @@
+# Ecovacs Deebot - System Specification
+# Kompatibel mit Deebot T9/T10/X1/N8 Serien
+
+metadata:
+  name: "Ecovacs Deebot"
+  type: "VacuumRobot"
+  model: "deebot_generic_v1"
+  uuid: "deebot-wlan-01"
+  description: "Consumer grade vacuum and mopping robot integrated via WLAN Bridge"
+
+# Physische Dimensionen
+physical_properties:
+  dimensions:
+    length: 0.353  # m (Durchmesser 353mm)
+    width: 0.353   # m
+    height: 0.093  # m (93mm - wichtig für Unterfahren von Hindernissen)
+    weight: 4.5    # kg
+    payload_max: 0.0 # Nicht für Transport ausgelegt
+  kinematics:
+    max_speed_linear: 0.3 # m/s
+    max_speed_angular: 0.8 # rad/s
+    climbing_ability: 2.0  # Grad (Türschwellen bis ca. 2cm)
+    ground_clearance: 0.01 # m
+    drive_type: "differential" # Zwei angetriebene Räder + Stützrad
+
+# WLAN & API Schnittstellen
+interfaces:
+  connection_type: "WLAN_2.4GHz"
+  api_protocol: "XMPP_MQTT_Bridge" # Protokoll der Deebot-Bridge
+  ros_bridge_node: "deebot_bridge_node"
+  driver_topic: "/deebot/cmd_vel"
+  status_topic: "/deebot/status"
+  map_topic: "/deebot/map"
+
+# Verfügbare Skills für MatchManager
+skills:
+  - name: "start_cleaning"
+    type: "operation"
+    description: "Startet den Standard-Reinigungsvorgang"
+    properties:
+      modes: ["auto", "spot", "area"]
+
+  - name: "dock_to_charge"
+    type: "logistics"
+    description: "Rückkehr zur Ladestation"
+    properties:
+      force_dock: true
+
+  - name: "set_suction_power"
+    type: "hardware_config"
+    properties:
+      level:
+        type: "enum"
+        values: ["quiet", "standard", "max", "max_plus"]
+
+  - name: "get_consumables_status"
+    type: "diagnostic"
+    description: "Fragt Lebensdauer von Bürsten und Filtern ab"
+
+# Digital Twin Submodels (BaSyx/AAS Mapping)
+aas_mapping:
+  id_short: "DEEBOT_AAS"
+  submodels:
+    - id_short: "Maintenance"
+      elements:
+        - { id_short: "main_brush_life", type: "Property", value_type: "float" }
+        - { id_short: "side_brush_life", type: "Property", value_type: "float" }
+        - { id_short: "filter_life", type: "Property", value_type: "float" }
+    - id_short: "Sensors"
+      elements:
+        - { id_short: "dust_bin_present", type: "Property", value_type: "boolean" }
+        - { id_short: "water_tank_level", type: "Property", value_type: "string" }
+
+# Navigation Stack Parameter
+# Deebots nutzen meist SLAM direkt auf dem Gerät, nicht Nav2 extern
+navigation_config:
+  internal_navigation: true
+  footprint_padding: 0.05 # 5cm Puffer für Sicherheit

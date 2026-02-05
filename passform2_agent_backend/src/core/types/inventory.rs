@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
-use crate::core::util::helper::sanitize_id;
+use crate::core::util::util::sanitize_id;
 
 // Fix E0599: Trait ToBasyx muss importiert werden, damit die Methode sichtbar ist
 use crate::core::types::location::{WorldLocation, ToBasyx}; 

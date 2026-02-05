@@ -1,6 +1,8 @@
 use serde::{Serialize, Deserialize};
+use num_derive::FromPrimitive;    
+use num_traits::FromPrimitive;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, FromPrimitive)]
 #[repr(i32)]
 pub enum Status {
     Ok = 0,
@@ -10,25 +12,17 @@ pub enum Status {
     Running = 4,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+impl From<i32> for Status {
+    fn from(value: i32) -> Self {
+        Status::from_i32(value).unwrap_or(Status::Error)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, FromPrimitive)]
 #[repr(i32)]
 pub enum ConnectionStatus {
     Connected = 0,
     Disconnected = 1,
     Timeout = 2,
-    UnknownError = 3,
-}
-
-// Hilfsimplementierung für die Konvertierung von Integern (z.B. aus ROS-Messages)
-impl From<i32> for Status {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => Status::Ok,
-            1 => Status::Warn,
-            2 => Status::Error,
-            3 => Status::Stale,
-            4 => Status::Running,
-            _ => Status::Error, // Fallback
-        }
-    }
+    Unknown = 3,
 }

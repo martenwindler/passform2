@@ -1,109 +1,56 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
-use tracing::{info, error};
-use socketioxide::SocketIo;
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
+use tracing::info;
+use rclrs;
 
-// --- DOMAIN MODELS ---
+use passform_agent_resources::msg::PlanTask;
+use passform_agent_resources::msg::PlanTaskCost;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Skill {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub complexity: f64,
+pub struct SkillActionManager {
+    node: rclrs::Node,
+    task_requests: Arc<Mutex<BTreeMap<String, Option<PlanTaskCost>>>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SkillExecutionRequest {
-    pub agent_id: String,
-    pub skill_id: String,
-    pub parameters: serde_json::Value,
-}
-
-#[derive(Serialize, Clone, Debug)]
-pub struct SkillStatusUpdate {
-    pub agent_id: String,
-    pub skill_id: String,
-    pub status: String, // "running", "completed", "failed"
-    pub progress: i32,    // 0-100
-}
-
-// --- MANAGER ---
-
-pub struct SkillManager {
-    // Katalog aller verfügbaren Skills im System (aus SSoT geladen)
-    pub registry: RwLock<HashMap<String, Skill>>,
-    // Tracking der laufenden Skills
-    pub active_executions: RwLock<HashMap<String, SkillStatusUpdate>>,
-}
-
-impl SkillManager {
-    pub fn new() -> Self {
-        info!("✅ SkillManager: Zentrale Skill-Registry bereit.");
+impl SkillActionManager {
+    pub fn new(node: rclrs::Node) -> Self {
         Self {
-            registry: RwLock::new(HashMap::new()),
-            active_executions: RwLock::new(HashMap::new()),
+            node,
+            task_requests: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
-    /// Lädt die Skill-Definitionen (z.B. aus der config.json)
-    pub async fn load_skills_from_ssot(&self, skills_data: Vec<Skill>) {
-        let mut registry = self.registry.write().await;
-        registry.clear();
-        for skill in skills_data {
-            registry.insert(skill.id.clone(), skill);
-        }
-        info!("📚 {} Skills in die Registry geladen.", registry.len());
+    pub fn register_driver_client(&mut self, _agent_id: &str, _topic: &str) {
+        info!("Action-Client deaktiviert (Stub).");
     }
 
-    /// Triggert die Ausführung eines Skills über ROS
-    pub async fn trigger_skill(
-        &self, 
-        req: SkillExecutionRequest, 
-        _ros_client: Arc<crate::ros::ros_client::RosClient>,
-        io: &SocketIo
-    ) {
-        let registry = self.registry.read().await;
-        
-        if !registry.contains_key(&req.skill_id) {
-            error!("❌ Skill '{}' existiert nicht in der Registry!", req.skill_id);
-            return;
-        }
+    pub async fn execute_action_relay(&self, _handle: String, _agent_id: &str) { }
 
-        info!("⚡ Starte Skill '{}' für Agent '{}'", req.skill_id, req.agent_id);
-
-        // Hier würde der rclrs-Publisher eine Nachricht absetzen
-        // ros_client.publish_skill_trigger(req.clone());
-
-        // Initialen Status ans Frontend senden
-        let initial_status = SkillStatusUpdate {
-            agent_id: req.agent_id.clone(),
-            skill_id: req.skill_id.clone(),
-            status: "running".to_string(),
-            progress: 0,
-        };
-
-        self.update_execution_status(initial_status, io).await;
+    pub async fn get_last_result(&self) -> String {
+        "Disabled".to_string()
     }
 
-    /// Callback-Handler für Status-Updates von ROS
-    pub async fn update_execution_status(&self, update: SkillStatusUpdate, io: &SocketIo) {
-        let mut active = self.active_executions.write().await;
-        
-        info!("🔄 Skill-Update: Agent {} -> {} ({}%)", 
-            update.agent_id, update.status, update.progress);
+    pub async fn abort_current_action(&self) { }
 
-        // In der Registry speichern
-        active.insert(update.agent_id.clone(), update.clone());
+    pub async fn request_cost(&self, _task: PlanTask, _skill_types: Vec<i32>, _topic: &str) -> PlanTaskCost {
+        PlanTaskCost::default()
+    }
+}
 
-        // Direkt per WebSocket an das Elm-Frontend pushen
-        io.emit("skill_status_update", &update).ok();
+pub struct PrimitiveLifecycle {
+    pub node: Arc<rclrs::Node>,
+    pub uuid: String,
+}
 
-        // Wenn fertig, aus aktiven Executions entfernen (Cleanup)
-        if update.status == "completed" || update.status == "failed" {
-            active.remove(&update.agent_id);
-        }
+impl PrimitiveLifecycle {
+    pub fn new(node: Arc<rclrs::Node>) -> Self {
+        // Deklarieren und direkt konsumieren
+        let uuid_param = node.declare_parameter::<Arc<str>>("uuid")
+            .default(Arc::from("default_primitive"))
+            .mandatory()
+            .expect("UUID Parameter Fehler");
+
+        let uuid = uuid_param.get().to_string();
+            
+        Self { node, uuid }
     }
 }

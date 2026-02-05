@@ -60,7 +60,7 @@ make backend
 make backend-legacy
 ```
 
-Inspect backend. 
+Inspect backend (ROS system state). 
 ```text
 http://127.0.0.1:8080/
 ```
@@ -70,9 +70,29 @@ Build agent.
 ros2 topic pub -1 /agent_info passform_agent_resources/msg/AgentInfo "{agent_id: 'Robby-01', module_type: 'Y-Module', position: {x: 5, y: 2}, orientation: 90.0}"
 ```
 
-Inspect ROS system state.
+Build test config
+```
+# Agent 1: Ranger (FTF)
+ros2 topic pub -1 /agent_info passform_agent_resources/msg/AgentInfo "{agent_id: 'Ranger-01', module_type: 'ranger', position: {x: 3, y: 1}, orientation: 0.0}" & \
+# Agent 2: UR5 Roboterarm
+ros2 topic pub -1 /agent_info passform_agent_resources/msg/AgentInfo "{agent_id: 'UR5-Arm-01', module_type: 'ur5', position: {x: 4, y: 1}, orientation: 90.0}" & \
+# Agent 3: Förderband
+ros2 topic pub -1 /agent_info passform_agent_resources/msg/AgentInfo "{agent_id: 'Conv-01', module_type: 'conveyor', position: {x: 5, y: 1}, orientation: 0.0}" & \
+# Agent 4: Y-Module
+ros2 topic pub -1 /agent_info passform_agent_resources/msg/AgentInfo "{agent_id: 'Y-Mod-01', module_type: 'y-module', position: {x: 6, y: 1}, orientation: 180.0}" & \
+# Agent 5: Zweiter Ranger
+ros2 topic pub -1 /agent_info passform_agent_resources/msg/AgentInfo "{agent_id: 'Ranger-02', module_type: 'ranger', position: {x: 3, y: 2}, orientation: 0.0}" & \
+# Agent 6: BaSyx Inventory/Speicher
+ros2 topic pub -1 /agent_info passform_agent_resources/msg/AgentInfo "{agent_id: 'Store-01', module_type: 'bay', position: {x: 4, y: 2}, orientation: 0.0}" & \
+# Agent 7: Weiterer Greifer/Zubehör
+ros2 topic pub -1 /agent_info passform_agent_resources/msg/AgentInfo "{agent_id: 'Gripper-01', module_type: 'ur5__gripper', position: {x: 5, y: 2}, orientation: 270.0}" & \
+# Agent 8: Der Human Operator
+ros2 topic pub -1 /agent_info passform_agent_resources/msg/AgentInfo "{agent_id: 'Operator-Max', module_type: 'human_operator', position: {x: 6, y: 2}, orientation: 0.0}"
+```
+
+Inspect heartbeat(s).
 ```text
-http://127.0.0.1:8080/
+ros2 topic echo /ymodule_broadcast
 ```
 
 Inspect agent list.
@@ -83,6 +103,14 @@ http://127.0.0.1:8080/api/agents
 Inspect basyx.
 ```text
 http://127.0.0.1:8080/basyx/
+http://127.0.0.1:8080/basyx/aas/
+http://127.0.0.1:8080/basyx/aas-api/
+http://127.0.0.1:8080/basyx/shells
+http://127.0.0.1:8080/basyx/shell-descriptors/
+http://127.0.0.1:8080/basyx/shells/{id}/submodels
+http://127.0.0.1:8080/aas-api/registry/shell-descriptors
+http://127.0.0.1:8080/aas-api/server/shells
+http://127.0.0.1:8080/basyx/description
 ```
 
 Build frontend.
@@ -137,6 +165,13 @@ netsh interface portproxy add v4tov4 listenport=8000 listenaddress=0.0.0.0 conne
 ```text
 python3 ~/passform2/utils/pi__rfid_bridge.py
 ```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/agilexrobotics/ranger_ros2/humble/docs/ranger.png" alt="IMG_1196" width="350">
+</p>
+
+
+(tbd.)
 
 ## Stats
 

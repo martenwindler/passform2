@@ -50,6 +50,8 @@ install:
 	$(PYTHON) -m pip install python-socketio eventlet flask-cors flask uvicorn fastapi
 	@echo ">>> Installiere Frontend-Abhängigkeiten..."
 	cd $(FRONTEND_DIR) && npm install
+	@echo ">>> Registriere Rust-Abhängigkeiten..."
+	cd $(BACKEND_DIR) && cargo add get_if_addrs mime_guess http-body-util
 	@echo "✅ Installation abgeschlossen."
 
 # --- DEVELOPMENT ---
@@ -75,7 +77,10 @@ build-ws:
 # Startet das neue Rust-Backend
 backend:
 	@echo ">>> Starte Modern Rust Backend..."
-	cd $(BACKEND_DIR) && ./start__backend.sh
+	cd $(BACKEND_DIR) && \
+	source /opt/ros/jazzy/setup.bash && \
+	source ../$(WS_DIR)/install/setup.bash && \
+	cargo run
 
 # Startet das alte Python-Backend
 backend-legacy:

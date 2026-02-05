@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
-use crate::core::util::helper::sanitize_id;
+use crate::core::util::util::sanitize_id;
 
 /// Repräsentiert die Versorgungsanforderungen
 #[derive(Debug, Serialize, Deserialize, Clone)]

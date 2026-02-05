@@ -2,7 +2,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tracing::{info, warn};
-use crate::{AppState, SystemRole};
+// Importiere Status aus deinem core::types Modul
+use crate::{AppState, SystemRole, Status};
 
 pub struct Watchdog {
     state: Arc<AppState>,
@@ -40,28 +41,32 @@ impl Watchdog {
         let now = Instant::now();
         let mut changes_detected = false;
 
+        // DEBUG-LOG: Damit du siehst, dass er prüft
+        if !agents.is_empty() {
+            info!("🕵️ Watchdog: Prüfe {} Agenten...", agents.len());
+        }
+
         for (id, agent) in agents.iter_mut() {
-            // Prüfung: Wie lange ist der letzte Kontakt her?
             let elapsed = now.duration_since(agent.last_seen);
 
             if elapsed > self.timeout {
-                // Nur reagieren, wenn der Status nicht bereits "stale" oder "offline" ist
-                if agent.status != "stale" && agent.status != "offline" {
-                    agent.status = "stale".to_string();
-                    warn!("⚠️ WATCHDOG: Agent '{}' ist jetzt STALE (Letzter Kontakt: {:?})", id, elapsed);
+                if agent.status != Status::Stale && agent.status != Status::Error {
+                    agent.status = Status::Stale;
+                    warn!("⚠️ WATCHDOG: Agent '{}' ist jetzt STALE (Letzter Kontakt vor {:?})", id, elapsed);
                     changes_detected = true;
                 }
+            } else {
+                // Optional: Zeige an, dass der Agent gesund ist
+                // info!("✅ Agent '{}' ist aktiv (letzter Kontakt vor {:?})", id, elapsed);
             }
         }
 
-        // Wenn sich Stati geändert haben, senden wir ein Update ans Dashboard
         if changes_detected {
-            // Wir nutzen die broadcast-Logik über das Socket-Handle
             let agents_list: Vec<_> = agents.values().cloned().collect();
-            let _ = self.state.socket_manager.io.emit(
+            let _ = self.state.socket_manager.emit_event(
                 "active_agents", 
                 serde_json::json!({ "agents": agents_list })
-            );
+            ).await;
         }
     }
 

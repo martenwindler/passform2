@@ -1,5 +1,5 @@
 use serde_json::{json, Value};
-use crate::core::util::helper::sanitize_id;
+use crate::core::util::util::sanitize_id;
 // Watchdog Import entfernt, da wir auf tokio::task umsteigen
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;

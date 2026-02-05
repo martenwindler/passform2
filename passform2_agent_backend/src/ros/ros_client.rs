@@ -95,6 +95,7 @@ impl RosClient {
                         msg.position.x as i32, 
                         msg.position.y as i32,
                         msg.orientation as i32, 
+                        0, // (status_code)
                     ).await;
                 });
             },

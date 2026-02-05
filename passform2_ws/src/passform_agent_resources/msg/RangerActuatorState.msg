@@ -1,0 +1,3 @@
+uint32 id
+RangerMotorState motor
+RangerDriverState driver

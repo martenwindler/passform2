@@ -5,80 +5,64 @@ use std::time::Duration;
 pub mod network {
     use super::*;
 
-    /// Gibt die primäre lokale IP-Adresse zurück (Dummy-UDP-Socket-Trick)
+    const LOCALHOST: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+
+    /// Gibt die primäre lokale IP zurück (die IP, die "ins Internet" oder ins LAN zeigt)
     pub fn get_ip() -> IpAddr {
-        let socket = match UdpSocket::bind("0.0.0.0:0") {
-            Ok(s) => s,
-            Err(_) => return IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-        };
-
-        // Muss nicht erreichbar sein, hilft dem OS aber, das richtige Interface zu wählen
-        if socket.connect("10.255.255.255:1").is_err() {
-            return IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-        }
-
-        match socket.local_addr() {
-            Ok(addr) => addr.ip(),
-            Err(_) => IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-        }
+        UdpSocket::bind("0.0.0.0:0")
+            .and_then(|socket| {
+                socket.connect("8.8.8.8:80")?; // Nutzt Google DNS als Ziel, um Interface-Wahl zu erzwingen
+                socket.local_addr()
+            })
+            .map(|addr| addr.ip())
+            .unwrap_or(LOCALHOST)
     }
 
-    /// Gibt alle IPv4 Adressen der Netzwerk-Interfaces zurück
-    /// Benötigt das Crate: get_if_addrs
-    pub fn get_all_ip() -> Vec<IpAddr> {
-        match get_if_addrs::get_if_addrs() {
-            Ok(ifaces) => ifaces
-                .into_iter()
-                .filter(|iface| !iface.is_loopback())
-                .map(|iface| iface.ip())
-                .collect(),
-            Err(_) => vec![IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))],
-        }
+    /// Automatische Erkennung der Bay-ID ohne Schema-Vorgabe
+    /// Sucht nach der ersten privaten IPv4 und extrahiert das dritte Oktett.
+    pub fn auto_get_bay_id() -> Result<i32, String> {
+        let ips = get_all_ips_internal();
+        
+        ips.iter()
+            .find(|ip| is_private_ip(ip))
+            .and_then(|ip| match ip {
+                IpAddr::V4(v4) => Some(v4.octets()[2] as i32),
+                _ => None,
+            })
+            .ok_or_else(|| format!("Keine private IP im LAN gefunden. Verfügbar: {:?}", ips))
     }
 
-    /// Extrahiert die "Bay ID" basierend auf dem IP-Schema (z.B. 192.168.<BAY>.x)
-    pub fn get_bay_by_ip(addr_list: &[IpAddr], scheme: &str) -> Result<i32, String> {
-        for ip in addr_list {
-            let ip_str = ip.to_string();
-            if ip_str.starts_with(scheme) {
-                let parts: Vec<&str> = ip_str.split('.').collect();
-                if parts.len() >= 3 {
-                    if let Ok(bay) = parts[2].parse::<i32>() {
-                        return Ok(bay);
-                    }
-                }
+    /// Hilfsfunktion: Prüft ob eine IP im privaten Bereich liegt (192.168.x.x oder 10.x.x.x)
+    fn is_private_ip(ip: &IpAddr) -> bool {
+        match ip {
+            IpAddr::V4(v4) => {
+                let o = v4.octets();
+                (o[0] == 192 && o[1] == 168) || (o[0] == 10) || (o[0] == 172 && (o[1] >= 16 && o[1] <= 31))
             }
+            _ => false,
         }
-        Err(format!(
-            "No IP matching PassForM IP scheme ({}.<BAY>.x). Active IPs: {:?}",
-            scheme, addr_list
-        ))
     }
 
-    /// Prüft die Erreichbarkeit eines Hosts via System-Ping
+    /// Interne Hilfsfunktion für alle IPs
+    fn get_all_ips_internal() -> Vec<IpAddr> {
+        get_if_addrs::get_if_addrs()
+            .map(|ifaces| ifaces.into_iter().filter(|i| !i.is_loopback()).map(|i| i.ip()).collect())
+            .unwrap_or_else(|_| vec![LOCALHOST])
+    }
+
+    /// Prüft Erreichbarkeit (Ping)
     pub fn ip_reachable(host: &str) -> bool {
-        let status = Command::new("ping")
-            .arg("-q")
-            .arg("-c")
-            .arg("2")
-            .arg("-W")
-            .arg("1")
-            .arg(host)
-            .status();
-
-        match status {
-            Ok(s) => s.success(),
-            Err(_) => false,
-        }
+        Command::new("ping")
+            .args(["-q", "-c", "1", "-W", "1", host])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
     }
 
-    /// Prüft, ob ein TCP-Port auf einem Host belegt ist
+    /// Prüft TCP Port
     pub fn is_port_in_use(host: &str, port: u16) -> bool {
-        let address = format!("{}:{}", host, port);
-        // Timeout ist wichtig, damit Rust nicht ewig wartet
-        TcpStream::connect_timeout(
-            &address.parse().expect("Invalid address"),
-            Duration::from_secs(1)
-        ).is_ok()
+        format!("{host}:{port}").parse()
+            .map(|addr| TcpStream::connect_timeout(&addr, Duration::from_secs(1)).is_ok())
+            .unwrap_or(false)
     }
 }

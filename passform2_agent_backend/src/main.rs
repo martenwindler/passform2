@@ -9,26 +9,27 @@ use tokio::sync::RwLock;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-// Library-Importe aus dem Backend-Crate
-// SystemRole und SystemMode werden nun über den Crate-Root importiert (dank deiner lib.rs)
+// Library-Importe aus dem Backend-Crate (SSoT)
 use passform_agent_backend::{
-    AppState, SocketIoManager, SkillManager, PathManager, 
-    NodeManager, AgentManager, InfraConfigManager, DataConfigManager, MatchManager, SystemRole, SystemMode
+    AppState, SocketIoManager, SkillActionManager, PathManager, 
+    NodeManager, AgentManager, InfraConfigManager, DataConfigManager, 
+    MatchManager, SystemRole, SystemMode
 };
 
 use passform_agent_backend::core::util::watchdog::Watchdog;
 use passform_agent_backend::ros::ros_client::RosClient;
-use passform_agent_backend::managers::resource_manager::ResourceManager;
+use passform_agent_backend::managers::{
+    resource_manager::ResourceManager,
+    protocol_manager::ProtocolManager,
+    system_api::SystemApi,
+    basyx_manager::BasyxManager
+};
 
 // Behavior Tree & HTN Planner Importe
 use passform_agent_backend::behaviour_tree::skills::SkillLibrary;
-use passform_agent_backend::behaviour_tree::skill_node::SkillNode;
-use passform_agent_backend::behaviour_tree::{BehaviorNode, NodeStatus, WorldState, HTNPlanner};
-
-mod com;
+use passform_agent_backend::behaviour_tree::{NodeStatus, WorldState, HTNPlanner};
 
 // --- SOCKET.IO HANDLER ---
-
 fn setup_socket_handlers(io: &SocketIo, state: Arc<AppState>) {
     io.ns("/", move |socket: SocketRef| {
         let s = state.clone();
@@ -62,7 +63,6 @@ fn setup_socket_handlers(io: &SocketIo, state: Arc<AppState>) {
                 let mut registry = s_inner.hardware_registry.write().await;
                 registry.insert(sid, data);
                 let update: Vec<_> = registry.values().cloned().collect();
-                // Nutzt die generische broadcast Methode
                 let _ = s_inner.socket_manager.io.emit("hardware_update", serde_json::json!(update));
             });
         });
@@ -89,7 +89,6 @@ fn setup_socket_handlers(io: &SocketIo, state: Arc<AppState>) {
 }
 
 // --- TAURI COMMANDS ---
-
 #[tauri::command]
 async fn get_system_status(state: tauri::State<'_, Arc<AppState>>) -> Result<serde_json::Value, String> {
     let mode = state.infra_config.settings.read().await.current_mode;
@@ -97,13 +96,12 @@ async fn get_system_status(state: tauri::State<'_, Arc<AppState>>) -> Result<ser
 }
 
 // --- MAIN ---
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
     info!("🚀 PassForm 2 Core & Tauri App starten...");
 
-    // 1. Infrastruktur-Config laden (Hier entscheidet sich die Rolle!)
+    // 1. Infrastruktur-Config laden
     let infra_config = Arc::new(InfraConfigManager::new().expect("❌ Config Error"));
     let role = infra_config.get_role().await;
 
@@ -118,13 +116,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 4. Manager & Layer Setup
     let (layer, io) = SocketIo::builder().build_layer();
     let socket_manager = Arc::new(SocketIoManager::new(io.clone()));
-    
+    let system_api = Arc::new(SystemApi::new());
+
+    // SkillActionManager benötigt den ROS-Node
+    let skill_manager = Arc::new(SkillActionManager::new(ros_client.node.clone()));
+
     let agent_manager = Arc::new(AgentManager::new(
         socket_manager.clone(), 
         resource_manager.clone()
     ));
     
-    // Initialisierung des AppState
+    // Initialisierung des AppState (SSoT)
     let shared_state = Arc::new(AppState {
         hardware_registry: RwLock::new(HashMap::new()),
         agent_manager,
@@ -133,7 +135,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         http_client: HttpClient::new(),
         socket_manager,
         resource_manager: resource_manager.clone(), 
-        skill_manager: Arc::new(SkillManager::new()),
+        skill_manager,
         path_manager: Arc::new(PathManager::new()),
         node_manager: Arc::new(NodeManager::new()),
         ros_client: ros_client.clone(),
@@ -143,43 +145,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             operators: HashMap::new(), 
             methods: HashMap::new(),
         }),
+        system_api,
     });
 
+    // --- JuSt AnOtHeR lItTlE ROS 2 SETUP ---
+    let _heartbeat = passform_agent_backend::ros::ros_heartbeat::Heartbeat::new(&ros_client.node, 1.0);
+
+    // --- ROS 2 SUBSCRIBER SETUP ---
+    let am_clone = shared_state.agent_manager.clone();
+    let rt_handle = tokio::runtime::Handle::current();
+
+    let _agent_sub = ros_client.node.create_subscription::<passform_agent_resources::msg::AgentInfo, _>(
+        "agent_info",
+        move |msg: passform_agent_resources::msg::AgentInfo| {
+            let am = am_clone.clone();
+            rt_handle.spawn(async move {
+                am.sync_from_ros(
+                    msg.agent_id,
+                    msg.module_type,
+                    msg.position.x as i32,
+                    msg.position.y as i32,
+                    msg.orientation as i32,
+                    0, // status_code (0 = Status::Ok)
+                ).await;
+            });
+        },
+    ).expect("❌ Failed to create agent_info subscription");
+
+    // Watchdog starten
     let watchdog = Arc::new(Watchdog::new(shared_state.clone()));
     let watchdog_thread = watchdog.clone();
-
     tokio::spawn(async move {
         watchdog_thread.run().await;
+    });
+
+    // Protocol Manager starten
+    let mut protocol_manager = ProtocolManager::new(shared_state.clone());
+    tokio::spawn(async move {
+        protocol_manager.run().await;
     });
 
     // --- 5. ROLLEN-WEICHE ---
     if role == SystemRole::Master {
         info!("👑 Modus: MASTER. Starte MatchManager...");
-        
         let match_manager = Arc::new(MatchManager::new(shared_state.clone()));
-        
-        // In den AppState registrieren
         let mm_for_state = match_manager.clone();
         let state_lock = shared_state.clone();
         tokio::spawn(async move {
             let mut mm_slot = state_lock.match_manager.write().await;
             *mm_slot = Some(mm_for_state);
         });
-
-        // Run Loop starten
         let mm_thread = match_manager.clone();
         tokio::spawn(async move {
             mm_thread.run().await;
         });
-    } else {
-        info!("🤖 Modus: CLIENT. Starte Agenten-Dienste...");
-        // Hier können Hardware-spezifische Dienste gestartet werden
     }
 
     // --- 6. Axum Server Task ---
     let axum_state = shared_state.clone();
     let io_layer = layer.clone(); 
-
     tokio::spawn(async move {
         let app = axum::Router::new()
             .route("/", axum::routing::get(root_handler))
@@ -187,17 +211,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .route("/api/resources/specs", axum::routing::get(get_hardware_specs))
             .route("/api/resources/interfaces", axum::routing::get(get_ros_interfaces))
             .route("/api/planner/plan", axum::routing::post(handle_planning_request))
+            .route("/basyx", axum::routing::any(BasyxManager::proxy_handler))
+            .route("/basyx/", axum::routing::any(BasyxManager::proxy_handler))
+            .route("/basyx/index.html", axum::routing::any(BasyxManager::proxy_handler))
+            .route("/basyx/*path", axum::routing::any(BasyxManager::proxy_handler))
+            .route("/aas-api/*path", axum::routing::any(BasyxManager::proxy_handler))
             .layer(io_layer)
             .with_state(axum_state);
 
         let addr = std::net::SocketAddr::from(([0, 0, 0, 0], 8080));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        
         info!("⚓ Axum API & Socket.io Server läuft auf http://{}", addr);
         axum::serve(listener, app).await.unwrap();
     });
 
-    // 7. Skill Library & BT Test (Beispielhaft für einen CUSTOM Skill)
+    // 7. BT Test Logic
     let skill_lib = SkillLibrary::from_path(&resource_manager.skills_path);
     if let Some(complex_skill) = skill_lib.skills.iter().find(|s| s.skill_type == "CUSTOM") {
         let mut root_node = passform_agent_backend::behaviour_tree::build_tree(complex_skill, &skill_lib);
@@ -212,7 +240,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 8. Tauri App Run
     setup_socket_handlers(&io, shared_state.clone());
-
     let tauri_state = shared_state.clone();
     tauri::Builder::default()
         .manage(tauri_state)
@@ -234,7 +261,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 // --- HTTP HANDLER ---
-
 async fn root_handler() -> Json<serde_json::Value> {
     Json(serde_json::json!({ "service": "PassForm 2 Tauri Core", "status": "active" }))
 }
@@ -264,9 +290,7 @@ async fn handle_planning_request(
     let tasks: Vec<String> = payload["tasks"].as_array()
         .map(|t| t.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
         .unwrap_or_default();
-
     let current_state = state.world_state.read().await.clone();
-    
     match state.planner.plan(current_state, tasks) {
         Ok(plan) => Json(serde_json::json!({ "status": "success", "plan": plan })),
         Err(e) => Json(serde_json::json!({ "status": "error", "message": e })),

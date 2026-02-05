@@ -30,8 +30,8 @@ impl std::fmt::Display for SystemMode {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Settings {
     pub current_mode: SystemMode,
-    pub role: SystemRole, // NEU: Rolle im System
-    pub agent_uuid: String, // NEU: Eigene ID für Clients
+    pub role: SystemRole,
+    pub agent_uuid: String,
     pub backend_host: String,
     pub backend_port: u16,
     pub master_ip: String,
@@ -48,7 +48,7 @@ impl Default for Settings {
 
         Self {
             current_mode: SystemMode::Hardware,
-            role: SystemRole::Client, // Standardmäßig ein Client/Slave
+            role: SystemRole::Client,
             agent_uuid: "unnamed_agent".to_string(),
             backend_host: "0.0.0.0".to_string(),
             backend_port: 8000,

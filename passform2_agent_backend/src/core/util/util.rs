@@ -1,6 +1,7 @@
 use serde::de::DeserializeOwned;
 use std::fs::File;
 use std::path::Path;
+use serde::{Serialize, Deserialize}; // Falls du das Enum über das Socket senden willst
 
 /// Bereinigt eine ID für BaSyx (nur alphanumerisch und Unterstriche)
 pub fn sanitize_id(id: &str) -> String {
@@ -24,4 +25,27 @@ pub fn load_yaml<T: DeserializeOwned>(path: &Path) -> Result<T, Box<dyn std::err
     let file = File::open(path)?;
     let decoded: T = serde_yaml::from_reader(file)?;
     Ok(decoded)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[repr(i32)] 
+pub enum LogLevel {
+    Debug = 0,
+    Info = 1,
+    Warn = 2,
+    Error = 3,
+    Fatal = 4,
+}
+
+// Erlaubt: LogLevel::Info as i32
+impl From<i32> for LogLevel {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => LogLevel::Debug,
+            1 => LogLevel::Info,
+            2 => LogLevel::Warn,
+            3 => LogLevel::Error,
+            _ => LogLevel::Fatal,
+        }
+    }
 }

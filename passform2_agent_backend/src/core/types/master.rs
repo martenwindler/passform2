@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
-use crate::core::util::helper::sanitize_id;
+use crate::core::util::util::sanitize_id;
 // Korrigierter Pfad: BaySubmodel liegt in crate::core::types::bay
 use crate::core::types::bay::BaySubmodel; 
 
