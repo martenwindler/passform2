@@ -73,6 +73,8 @@ type Msg
     | HardwareMsg HardwareMsg
     | AgentsMsg AgentsMsg
     | SystemMsg SystemMsg 
+    | ToggleSidebar
+    | SwitchSidebarTab SidebarTab
     | NoOp
 
 
@@ -126,8 +128,6 @@ type HardwareMsg
 type AgentsMsg
     = ToggleMode
     | ToggleViewMode
-    | ToggleSidebar
-    | SwitchSidebarTab SidebarTab
     | CloseMenu
     | OpenMenu Int Int
     | SetCurrentAsDefault

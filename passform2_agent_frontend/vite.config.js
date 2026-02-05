@@ -7,7 +7,7 @@ import cssnano from 'cssnano';
 export default defineConfig({
   plugins: [
     elmPlugin(),
-    viteSingleFile()
+    // viteSingleFile()
   ],
 
   css: {
@@ -22,9 +22,16 @@ export default defineConfig({
   },
 
   server: {
-    port: 3000,
-    strictPort: true, 
-    open: false,
+    port: 3005,
+    strictPort: true,
+    proxy: {
+      // Das hier wirkt wie eine .htaccess Rule:
+      // Alles was mit /atome anfängt, wird intern ignoriert oder umgeleitet
+      '^/atome.*': {
+        target: 'http://localhost:3000',
+        rewrite: (path) => '/',
+      },
+    },
   },
 
   envPrefix: ['VITE_', 'TAURI_'],

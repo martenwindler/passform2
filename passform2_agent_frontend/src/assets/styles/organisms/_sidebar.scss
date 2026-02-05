@@ -1,23 +1,5 @@
 @use '../base/variables' as *;
 
-:root {
-  --rail-width: 58px; 
-  --drawer-width: 320px;
-}
-
-// --- HAUPT-LAYOUT (Grid System) ---
-.content-area {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    height: calc(100vh - 60px);
-    overflow: hidden;
-}
-
-.grid-viewport {
-    @apply h-full w-full relative overflow-hidden;
-    min-width: 0;
-}
-
 // --- SIDEBAR ORGANISM ---
 .sidebar-container {
     display: flex;
@@ -26,7 +8,6 @@
     
     transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: width;
-    overflow: hidden; 
 
     width: var(--rail-width);
 
@@ -67,7 +48,7 @@
 
 // 2. CONTENT DRAWER
 .sidebar-content {
-    @apply h-full bg-drawer-bg flex flex-col shadow-2xl shrink-0;
+    @apply bg-drawer-bg flex flex-col shadow-2xl shrink-0;
     width: var(--drawer-width);
     min-width: var(--drawer-width); 
     border-l: 1px solid rgba(255, 255, 255, 0.05);
@@ -79,7 +60,7 @@
 
     // HIER: Fix für die Panel-Breite
     .tab-body {
-        @apply flex-1 flex flex-col overflow-y-auto overflow-x-hidden;
+        @apply flex-1 flex flex-col overflow-x-hidden;
         
         // Damit die Inhalte (Planning, Agents etc.) die volle Breite nutzen
         > div {
@@ -93,13 +74,14 @@
     width: var(--drawer-width);
     min-width: var(--drawer-width); 
     max-width: var(--drawer-width); // Harte Grenze nach rechts
-    overflow-x: hidden; // WICHTIG: Nichts darf rechts rausstehen
     border-l: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: auto !important;
 }
 
 // 3. INNERE SEKTIONEN (Fix für das "nach rechts gerückt" Gefühl)
 // Diese Klassen werden in deinen Tabs (Planning, Agents etc.) genutzt
 .sidebar-tab-content, .sidebar-section {
+    overflow: auto !important;
     @apply w-full flex flex-col gap-4 py-lg;
 
     // Standard-Padding für alle Texte und Inputs

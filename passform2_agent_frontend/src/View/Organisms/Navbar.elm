@@ -15,9 +15,10 @@ view model =
             , span [ class "navbar-title text-h3 hidden sm:inline ml-3 text-white" ] [ text "Passform 2.0" ]
             ]
         
-        , -- 2. Mitte: Status-Pille (Zentraler Anker, bleibt immer da)
+        , -- 2. Mitte: Status-Pille (AKTUELL DEAKTIVIERT)
           div [ class "navbar-center hidden md:flex" ]
-            [ div [ class "status-pill combined-status" ]
+            [ {- 
+              div [ class "status-pill combined-status" ]
                 [ viewIndicator "REST" (if model.connected then Online else Error)
                 , div [ class "status-divider" ] [] 
                 , viewIndicator "ROS" (if model.rosConnected then Online else Error)
@@ -32,6 +33,7 @@ view model =
                         Simulation -> Standby
                     )
                 ]
+              -}
             ]
 
         , -- 3. Rechts: Actions (Werden im LandingMode ausgeblendet)

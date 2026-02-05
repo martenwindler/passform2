@@ -10,12 +10,18 @@ import View.Organisms.Sidebar.Sections.ActiveModuleSection as ActiveModuleSectio
 {-|
 Der Agents-Tab fungiert als Orchestrator. 
 -}
+
 view : Model -> Html Msg
 view model =
-    div [ class "sidebar-tab-content tab-agents h-full flex flex-col" ] -- Neu: tab-agents
+    div [ class "sidebar-tab-content tab-agents h-full flex flex-col" ]
         [ ActiveModuleSection.view model
         , div [ class "mt-auto pt-4 border-t border-white/5" ]
-            [ Button.danger "Gesamtes Gitter leeren" (AgentsMsg ClearGrid) True True ]
+            [ Button.danger 
+                "Gesamtes Gitter leeren" 
+                (AgentsMsg ClearGrid) 
+                False -- isPrimary
+                True  -- isDisabled (Hier auf True setzen!)
+            ]
         ]
 
 {-| 

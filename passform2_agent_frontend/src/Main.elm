@@ -99,6 +99,12 @@ init flags =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        ToggleSidebar ->
+            ( { model | sidebarOpen = not model.sidebarOpen }, Cmd.none )
+
+        SwitchSidebarTab tab ->
+            ( { model | activeSidebarTab = tab, sidebarOpen = True }, Cmd.none )
+
         PlanningMsg pMsg ->
             Planning.update pMsg model
 
@@ -113,8 +119,6 @@ update msg model =
 
         NoOp ->
             ( model, Cmd.none )
-
--- --- SUBSCRIPTIONS ---
 
 -- --- SUBSCRIPTIONS ---
 

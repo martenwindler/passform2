@@ -129,6 +129,11 @@ Build frontend.
 make frontend
 ```
 
+Build styleguide.
+```text
+elm-book src/View/Styleguide/Styleguide.elm --serve --port 8085
+```
+
 ## Hardware
 
 <p align="center">

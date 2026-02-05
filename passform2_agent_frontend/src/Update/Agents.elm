@@ -241,15 +241,11 @@ update msg model =
         ToggleViewMode ->
             ( { model | is3D = not model.is3D }, Cmd.none )
 
-        ToggleSidebar ->
-            ( { model | sidebarOpen = not model.sidebarOpen }, Cmd.none )
-
         CloseMenu ->
             ( { model | activeMenu = Nothing }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
-
 
 -- Hilfsfunktionen
 getRequiredWidth : Dict (Int, Int) a -> Int

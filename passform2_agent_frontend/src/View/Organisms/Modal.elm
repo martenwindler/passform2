@@ -45,7 +45,12 @@ viewBody model menuType =
             div [ class "settings-form" ]
                 [ div [ class "flex flex-col gap-2 mb-4" ]
                     [ label [ class "text-label mb-2 block" ] [ text "Modul hinzufügen" ]
-                    , button [ onClick (AgentsMsg (StartAgent FTF cell)), class "btn-ftf btn-full text-button" ] [ text "FTF (Transport)" ]
+                    -- FTF Button deaktiviert
+                    , button 
+                        [ class "btn-ftf btn-full text-button disabled"
+                        , disabled True 
+                        ] 
+                        [ text "FTF (Transport)" ]
                     , button [ onClick (AgentsMsg (StartAgent Conveyeur cell)), class "btn-secondary btn-full text-button" ] [ text "Conveyeur Modul" ]
                     , button [ onClick (AgentsMsg (StartAgent RollenModul cell)), class "btn-secondary btn-full text-button" ] [ text "Rollen Modul" ]
                     , button [ onClick (AgentsMsg (StartAgent Greifer cell)), class "btn-secondary btn-full text-button" ] [ text "Greifer Modul" ]
@@ -54,8 +59,18 @@ viewBody model menuType =
                     ]
                 
                 , div [ class "flex flex-col gap-2 mt-6 pt-4 border-t border-white/10" ]
-                    [ button [ onClick (PlanningMsg (SetPathStart cell)), class "btn-secondary btn-full text-info border-info/20 text-button" ] [ text "⊕ Als Startpunkt setzen" ]
-                    , button [ onClick (PlanningMsg (SetPathGoal cell)), class "btn-secondary btn-full text-success border-success/20 text-button" ] [ text "⚑ Als Zielpunkt setzen" ]
+                    [ -- Startpunkt deaktiviert
+                      button 
+                        [ class "btn-secondary btn-full text-info border-info/20 text-button disabled"
+                        , disabled True 
+                        ] 
+                        [ text "⊕ Als Startpunkt setzen" ]
+                    -- Zielpunkt deaktiviert
+                    , button 
+                        [ class "btn-secondary btn-full text-success border-success/20 text-button disabled"
+                        , disabled True 
+                        ] 
+                        [ text "⚑ Als Zielpunkt setzen" ]
                     ]
                 ]
 
@@ -85,7 +100,7 @@ viewBody model menuType =
             div [ class "settings-form" ]
                 [ div [ class "flex justify-between items-center mb-4" ]
                     [ div [ class "agent-id-badge text-data" ] [ text ("ID: " ++ aid) ]
-                    , div [ class "text-caption font-bold opacity-60" ] [ text posText ] -- Die Koordinaten!
+                    , div [ class "text-caption font-bold opacity-60" ] [ text posText ]
                     ]
                 
                 , div [ class "hardware-status-row" ]
@@ -106,8 +121,18 @@ viewBody model menuType =
                     ]
 
                 , div [ class "flex flex-col gap-2 mt-6 pt-4 border-t border-white/10" ]
-                    [ button [ onClick (PlanningMsg (SetPathStart cell)), class "btn-secondary btn-full text-info border-info/20 text-button" ] [ text "⊕ Als Startpunkt setzen" ]
-                    , button [ onClick (PlanningMsg (SetPathGoal cell)), class "btn-secondary btn-full text-success border-success/20 text-button" ] [ text "⚑ Als Zielpunkt setzen" ]
+                    [ -- Startpunkt deaktiviert
+                      button 
+                        [ class "btn-secondary btn-full text-info border-info/20 text-button disabled"
+                        , disabled True 
+                        ] 
+                        [ text "⊕ Als Startpunkt setzen" ]
+                    -- Zielpunkt deaktiviert
+                    , button 
+                        [ class "btn-secondary btn-full text-success border-success/20 text-button disabled"
+                        , disabled True 
+                        ] 
+                        [ text "⚑ Als Zielpunkt setzen" ]
                     ]
                 ]
 
