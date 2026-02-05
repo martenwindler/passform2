@@ -44,9 +44,9 @@ init : Flags -> ( Model, Cmd Msg )
 init flags =
     let
         initialAgents =
-            Dict.empty -- Oder dein Standard-Gitter, falls vorhanden
+            Dict.empty
     in
-    ( { activeLayout = LandingMode -- HIER WAR DER FEHLER: Das Feld hat gefehlt
+    ( { activeLayout = LandingMode
       , mode = Simulation
       , backendIP = flags.backendIP
       , connected = True
@@ -54,6 +54,13 @@ init flags =
       , canConnected = False
       , rangerBattery = Nothing
       , agents = initialAgents
+      
+      -- --- NEU: Diese 3 Felder fehlten ---
+      , bays = []
+      , inventory = []
+      , worldState = Dict.empty
+      -- -----------------------------------
+
       , savedDefault = initialAgents
       , connectedHardware = []
       , logs = [ { message = "System bereit.", level = Success } ] 
@@ -109,17 +116,28 @@ update msg model =
 
 -- --- SUBSCRIPTIONS ---
 
+-- --- SUBSCRIPTIONS ---
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Ports.socketStatusReceiver (SetConnected >> HardwareMsg)
         , Ports.rosStatusReceiver (SetRosConnected >> HardwareMsg)
         
-        -- 1. Live-Updates (sind schon Decode.Value)
+        -- 1. Live-Updates für Agenten
         , Ports.activeAgentsReceiver (UpdateAgents >> AgentsMsg)
         
-        -- 2. Datei-Inhalte (sind Strings)
-        -- Wir wandeln den String in ein Decode.Value um, damit UpdateAgents damit arbeiten kann
+        -- 2. NEU: Digitaler Zwilling (Bays & Layout)
+        , Ports.initialBaysReceiver (\val -> HardwareMsg (HandleInitialBays (Decode.decodeValue Decoders.decodeBayList val)))
+        , Ports.bayUpdateReceiver (\val -> HardwareMsg (HandleBayUpdate (Decode.decodeValue Decoders.decodeBay val)))
+        
+        -- 3. NEU: Logistik & Weltzustand
+        , Ports.inventoryReceiver (\val -> HardwareMsg (HandleInventoryUpdate (Decode.decodeValue Decoders.decodeInventory val)))
+        , Ports.worldStateReceiver (HandleWorldState >> SystemMsg)
+        , Ports.specsReceiver (HandleSpecsUpdate >> HardwareMsg)
+        , Ports.rosInterfacesReceiver (HandleRosInterfaces >> HardwareMsg)
+
+        -- 4. Datei-Inhalte (Konfigurations-Import)
         , Ports.configReceived (\jsonString -> 
             case Decode.decodeString Decode.value jsonString of
                 Ok val -> AgentsMsg (UpdateAgents val)
@@ -131,14 +149,17 @@ subscriptions model =
                 Err _ -> NoOp
           )
         
+        -- 5. System-Rückmeldungen & Hardware-Events
         , Ports.pathCompleteReceiver handlePathComplete
         , Ports.systemLogReceiver (\val -> HardwareMsg (HandleSystemLog (Decode.decodeValue Decoders.decodeSystemLog val)))
         , Ports.rfidReceiver (\val -> HardwareMsg (HandleRfid (Decode.decodeValue Decoders.decodeRfid val)))
         , Ports.nfcStatusReceiver (\val -> HardwareMsg (HandleNfcStatus (Decode.decodeValue Decode.string val)))
         , Ports.hardwareUpdateReceiver (\val -> HardwareMsg (HandleHardwareUpdate (Decode.decodeValue Decoders.hardwareListDecoder val)))
-        --, Ports.onAgentMoved (\d -> 
-        --    AgentsMsg (MoveAgent d.agentId { x = d.newX, y = d.newY })
-        --   )
+        
+        -- 6. Interaktion aus der 3D-View
+        , Ports.onAgentMoved (\d -> 
+            AgentsMsg (MoveAgent d.agentId { x = d.newX, y = d.newY })
+          )
         ]
 
 {-| 
@@ -207,7 +228,10 @@ view3D model =
         , attribute "agents" (model.agents |> Decoders.encodeAgentMap |> Encode.encode 0)
         , attribute "path" (Decoders.encodePath model.currentPath |> Encode.encode 0)
         
-        -- Positionen
+        -- NEU: Die Buchten für die Unterlegung (Umrandung)
+        , attribute "bays" (model.bays |> Decoders.encodeBayList |> Encode.encode 0)
+        
+        -- Positionen (Original Inline Logik)
         , attribute "start-pos" 
             (model.pathStart 
                 |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) 
@@ -226,11 +250,10 @@ view3D model =
         , Ports.onCellClicked (HandleGridClick >> AgentsMsg)
 
         -- 2. NEU: Drag & Drop Ende abfangen
-        -- Wir hören auf das CustomEvent von JS und wandeln es in AgentsMsg (MoveAgent ...) um 
         , Html.Events.on "agent-moved" (Decode.at ["detail"] decodeMoveAgent)
         ]
         []
-
+    
 -- Hilfsfunktion für die Positionen, um die View sauber zu halten
 encodePos : Maybe GridCell -> String
 encodePos maybeCell =

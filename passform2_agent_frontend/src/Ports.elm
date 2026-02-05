@@ -44,7 +44,23 @@ socketEmit eventName data =
 
 -- --- INCOMING (JS -> Elm: Daten vom Backend/Hardware) ---
 
--- NEU: Empfängt die Skill-Library (12 Skills) vom Rust-Backend
+-- NEU: Digitaler Zwilling & Layout (Spatial Mapping)
+port initialBaysReceiver : (Decode.Value -> msg) -> Sub msg
+
+port bayUpdateReceiver : (Decode.Value -> msg) -> Sub msg
+
+-- NEU: Logistik & Inventar (BaSyx/InventoryManager)
+port inventoryReceiver : (Decode.Value -> msg) -> Sub msg
+
+-- NEU: HTN Planner & Weltzustand
+port worldStateReceiver : (Decode.Value -> msg) -> Sub msg
+
+-- NEU: Hardware Spezifikationen & ROS-Interfaces
+port specsReceiver : (Decode.Value -> msg) -> Sub msg
+
+port rosInterfacesReceiver : (Decode.Value -> msg) -> Sub msg
+
+-- BESTAND:
 port skillsReceiver : (Decode.Value -> msg) -> Sub msg
 
 port socketStatusReceiver : (Bool -> msg) -> Sub msg
@@ -83,15 +99,18 @@ onCellClicked toMsg =
 
 -- --- INTERNE DECODER ---
 
-decodeAgentMove : Decode.Decoder { oldX : Int, oldY : Int, newX : Int, newY : Int }
+{-| Zerlegt das CustomEvent "agent-moved" für Drag & Drop Updates -}
+decodeAgentMove : Decode.Decoder { agentId : String, oldX : Int, oldY : Int, newX : Int, newY : Int }
 decodeAgentMove =
     Decode.at [ "detail" ] <|
-        Decode.map4 (\ox oy nx ny -> { oldX = ox, oldY = oy, newX = nx, newY = ny })
+        Decode.map5 (\id ox oy nx ny -> { agentId = id, oldX = ox, oldY = oy, newX = nx, newY = ny })
+            (Decode.field "agentId" Decode.string)
             (Decode.field "oldX" Decode.int)
             (Decode.field "oldY" Decode.int)
             (Decode.field "newX" Decode.int)
             (Decode.field "newY" Decode.int)
 
+{-| Zerlegt das CustomEvent "cell-clicked" aus der ThreeGridScene -}
 decodeCellClick : Decode.Decoder GridCell
 decodeCellClick =
     -- WICHTIG: CustomEvents legen Daten in "detail" ab

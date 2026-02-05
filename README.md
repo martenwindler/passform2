@@ -100,6 +100,11 @@ Inspect agent list.
 http://127.0.0.1:8080/api/agents
 ```
 
+Inspect bays.
+```text
+http://127.0.0.1:8080/api/bays
+```
+
 Inspect inventory list.
 ```text
 http://127.0.0.1:8080/api/inventory

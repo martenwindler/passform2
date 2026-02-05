@@ -1,6 +1,7 @@
 module Types.Domain exposing (..)
 
 import Dict exposing (Dict)
+import Json.Decode as Decode
 
 -- --- BASIS TYPEN ---
 
@@ -35,13 +36,53 @@ type SidebarTab
     | TabAgents
     | TabHardware
     | TabRanger
-    | TabGrid    -- Neu: Das Gitter bekommt seinen eigenen Slot
+    | TabGrid    
     | TabLogs 
 
 -- --- ENTITIES ---
 
 type alias GridCell = 
     { x : Int, y : Int }
+
+-- NEU: Räumliche Punkt-Daten für 3D und Bays
+type alias Point =
+    { x : Float, y : Float, z : Float }
+
+type alias Quaternion =
+    { x : Float, y : Float, z : Float, w : Float }
+
+type alias Pose =
+    { position : Point
+    , orientation : Quaternion
+    }
+
+-- --- NEU: BUCHTEN (BAYS) & LAYOUT ---
+
+type alias Bay =
+    { unique_id : String
+    , name : String
+    , origin : Point
+    , is_virtual : Bool
+    , status : HardwareStatus
+    , occupation : Bool
+    , module_uuid : String
+    }
+
+-- --- NEU: INVENTAR & ITEMS ---
+
+type alias WorldLocation =
+    { frame_id : String
+    , pose : Pose
+    }
+
+type alias WorldItem =
+    { name : String
+    , uid : String
+    , quantity : Int
+    , location : WorldLocation
+    }
+
+-- --- BESTANDS-ENTITIES ---
 
 type alias SystemLog =
     { message : String
@@ -76,16 +117,4 @@ type alias PlanningWeights =
     , human_extra_weight : Float
     , proximity_penalty : Float
     , hardware_safety_factor : Float
-    }
-
-type alias Bid =
-    { agentId : String
-    , cost : Float
-    , position : GridCell
-    }
-
-type alias CNPResult =
-    { winnerId : String
-    , fullPath : List GridCell
-    , totalCost : Float
     }

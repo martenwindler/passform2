@@ -14,16 +14,20 @@ export class ThreeGridScene extends HTMLElement {
     
     private gridCells: THREE.Mesh[][] = [];
     private agentMeshes: Map<string, THREE.Object3D> = new Map();
+    private bayMeshes: Map<string, THREE.LineSegments> = new Map(); // NEU: Speicher für die Buchten-Umrandungen
     private pathLine: THREE.Line | null = null;
     
     private readonly defaultGroundColor = 0x2d3748;
     private readonly startColor = 0x48bb78; 
     private readonly goalColor = 0x3182ce;  
+    private readonly occupiedBayColor = 0x00f2ff; // Cyan für belegte Buchten
+    private readonly vacantBayColor = 0x4a5568;   // Dunkelgrau für freie Buchten
+
     private startPos: {x: number, y: number} | null = null;
     private goalPos: {x: number, y: number} | null = null;
 
     private targetCameraPos = new THREE.Vector3(0, 20, 0);
-    private lerpSpeed = 0.1; // Etwas schneller für besseres Feedback
+    private lerpSpeed = 0.1; 
     private isDragging = false;
     private isMouseDown = false;
     private draggedAgentKey: string | null = null;
@@ -44,8 +48,6 @@ export class ThreeGridScene extends HTMLElement {
         this.scene.add(dirLight);
 
         this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-        // WICHTIG: Der "Up"-Vektor definiert, was im Bild "Oben" ist. 
-        // Für eine Draufsicht auf die X/Z Ebene setzen wir ihn auf die Z-Achse.
         this.camera.up.set(0, 0, -1); 
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -60,7 +62,8 @@ export class ThreeGridScene extends HTMLElement {
     }
 
     static get observedAttributes() {
-        return ['agents', 'is-3d', 'grid-width', 'grid-height', 'path', 'start-pos', 'goal-pos', 'allow-interaction'];
+        // 'bays' wurde hier hinzugefügt
+        return ['agents', 'is-3d', 'grid-width', 'grid-height', 'path', 'start-pos', 'goal-pos', 'allow-interaction', 'bays'];
     }
 
     attributeChangedCallback(name: string, oldVal: string, newVal: string) {
@@ -76,6 +79,9 @@ export class ThreeGridScene extends HTMLElement {
                         const list = Array.isArray(parsed) ? parsed : (parsed.agents || []);
                         this.updateAgents(list);
                     }
+                    break;
+                case 'bays': // NEU: Reagiert auf die Buchten-Daten aus Elm
+                    if (newVal) this.updateBays(JSON.parse(newVal));
                     break;
                 case 'path': if(newVal) this.drawPath(JSON.parse(newVal)); break;
                 case 'start-pos':
@@ -144,6 +150,42 @@ export class ThreeGridScene extends HTMLElement {
         this.updateCameraFocus();
     }
 
+    private updateBays(bays: any[]) {
+        const currentIds = new Set(bays.map(b => b.unique_id));
+        
+        // 1. Entferne Bays, die nicht mehr existieren
+        [...this.bayMeshes.keys()].forEach(id => {
+            if (!currentIds.has(id)) {
+                this.scene.remove(this.bayMeshes.get(id)!);
+                this.bayMeshes.delete(id);
+            }
+        });
+
+        // 2. Erzeuge oder aktualisiere Bay-Umrandungen
+        bays.forEach(bay => {
+            let wireframe = this.bayMeshes.get(bay.unique_id);
+            const color = bay.occupation ? this.occupiedBayColor : this.vacantBayColor;
+            
+            if (!wireframe) {
+                // Erzeuge EdgesGeometry für eine Plane (Umrandung eines Quadrats)
+                const geo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(0.98, 0.98));
+                const mat = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
+                wireframe = new THREE.LineSegments(geo, mat);
+                
+                wireframe.rotateX(-Math.PI / 2);
+                // Minimal über dem Boden (0.005), um Z-Fighting zu vermeiden
+                wireframe.position.set(bay.x + 0.5, 0.005, bay.y + 0.5);
+                
+                this.scene.add(wireframe);
+                this.bayMeshes.set(bay.unique_id, wireframe);
+            } else {
+                // Nur die Farbe anpassen, wenn die Bay bereits existiert
+                (wireframe.material as THREE.LineBasicMaterial).color.setHex(color);
+                wireframe.position.set(bay.x + 0.5, 0.005, bay.y + 0.5);
+            }
+        });
+    }
+
     private updateCameraFocus() {
         const w = parseInt(this.getAttribute('grid-width') || '6');
         const h = parseInt(this.getAttribute('grid-height') || '4');
@@ -154,27 +196,23 @@ export class ThreeGridScene extends HTMLElement {
         const dist = Math.max(w, h);
 
         if (is3D) {
-            this.camera.up.set(0, 1, 0); // Normaler Up-Vektor für 3D
+            this.camera.up.set(0, 1, 0); 
             this.targetCameraPos.set(centerX + dist, dist, centerZ + dist);
         } else {
-            this.camera.up.set(0, 0, -1); // "Norden" ist oben für 2D
+            this.camera.up.set(0, 0, -1); 
             this.targetCameraPos.set(centerX, dist * 1.5, centerZ);
         }
     }
 
     private animate() {
         requestAnimationFrame(() => this.animate());
-        
         const w = parseInt(this.getAttribute('grid-width') || '6');
         const h = parseInt(this.getAttribute('grid-height') || '4');
-
         this.camera.position.lerp(this.targetCameraPos, this.lerpSpeed);
         this.camera.lookAt(w / 2, 0, h / 2);
-        
         this.renderer.render(this.scene, this.camera);
     }
 
-    // --- RESTLICHE METHODEN (getMouseCoords, onMouseDown, etc. bleiben gleich wie vorher) ---
     private getMouseCoords(e: MouseEvent) { 
         const r = this.renderer.domElement.getBoundingClientRect(); 
         return { x: ((e.clientX - r.left) / r.width) * 2 - 1, y: -((e.clientY - r.top) / r.height) * 2 + 1 }; 
@@ -257,7 +295,6 @@ export class ThreeGridScene extends HTMLElement {
             const tz = (agent.y ?? agent.position?.y ?? 0) + 0.5;
 
             if (!mesh) {
-                // Hier geben wir jetzt Typ UND Dynamik mit!
                 mesh = this.createAgentMesh(agent.module_type, agent.is_dynamic);
                 this.scene.add(mesh);
                 this.agentMeshes.set(agent.agent_id, mesh);
@@ -265,7 +302,6 @@ export class ThreeGridScene extends HTMLElement {
             } else {
                 mesh.position.lerp(new THREE.Vector3(tx, mesh.position.y, tz), 0.2);
             }
-            // Drehung aus Elm anwenden
             mesh.rotation.y = (agent.orientation || 0) * (Math.PI / 180);
         });
     }
@@ -274,8 +310,7 @@ export class ThreeGridScene extends HTMLElement {
         const group = new THREE.Group();
         type = type.toLowerCase();
 
-        if (isDynamic || type === 'ftf') {
-            // Gelbes FTF mit "Auge" (Fahrtrichtung)
+        if (isDynamic || type === 'ftf' || type === 'ranger') {
             const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.2, 0.8), new THREE.MeshPhongMaterial({ color: 0xffd700 }));
             body.position.set(0, 0.1, 0); 
             group.add(body);
@@ -283,17 +318,14 @@ export class ThreeGridScene extends HTMLElement {
             eye.position.set(0, 0.2, 0.35); 
             group.add(eye);
         } else if (type.includes('greifer')) {
-            // Orangefarbener, hoher Greifer
             const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.8), new THREE.MeshPhongMaterial({ color: 0xed8936 }));
             mesh.position.set(0, 0.3, 0);
             group.add(mesh);
         } else if (type.includes('rollen')) {
-            // Blaues, flaches Rollenmodul
             const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.15, 0.85), new THREE.MeshPhongMaterial({ color: 0x3182ce }));
             mesh.position.set(0, 0.075, 0);
             group.add(mesh);
         } else {
-            // Standard: Grauer Block (Mensch, Station, Tisch)
             const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 0.8), new THREE.MeshPhongMaterial({ color: 0x718096 }));
             mesh.position.set(0, 0.15, 0);
             group.add(mesh);
@@ -305,7 +337,7 @@ export class ThreeGridScene extends HTMLElement {
         if (this.pathLine) { this.scene.remove(this.pathLine); }
         if (!nodes || nodes.length < 2) return;
         const pts = nodes.map(n => new THREE.Vector3((n.x ?? n.position.x) + 0.5, 0.1, (n.y ?? n.position.y) + 0.5));
-        this.pathLine = new THREE.Line(new THREE.BufferGeometry().setFromPointsn(pts), new THREE.LineBasicMaterial({ color: 0x00f2ff }));
+        this.pathLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x00f2ff }));
         this.scene.add(this.pathLine);
     }
 

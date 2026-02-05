@@ -7,10 +7,6 @@ import Types.Domain exposing (..)
 
 -- --- FLAGS ---
 
-{-|
-Daten, die beim Start der App von JavaScript (index.html)
-an Elm übergeben werden.
--}
 type alias Flags =
     { backendIP : String
     , savedConfig : Maybe String
@@ -35,6 +31,11 @@ type alias Model =
     , canConnected : Bool
     , rangerBattery : Maybe Float
     , agents : Dict (Int, Int) AgentModule
+    -- --- NEU: Digital Twin & Logistics Data ---
+    , bays : List Bay
+    , inventory : List WorldItem
+    , worldState : Dict String Decode.Value -- Rohdaten für den Planner
+    -- -----------------------------------------
     , savedDefault : Dict (Int, Int) AgentModule
     , logs : List SystemLog
     , pathStart : Maybe GridCell
@@ -84,6 +85,8 @@ type SystemMsg
     | FileDropped Decode.Value  
     | FileSelected Decode.Value 
     | ResetToLanding            
+    -- NEU: Weltzustand für HTN Planner
+    | HandleWorldState Decode.Value
 
 
 type PlanningMsg
@@ -105,6 +108,13 @@ type HardwareMsg
     | HandleSystemLog (Result Decode.Error SystemLog)
     | HandleRfid (Result Decode.Error String)
     | HandleNfcStatus (Result Decode.Error String)
+    -- --- NEU: Digital Twin Handlers ---
+    | HandleInitialBays (Result Decode.Error (List Bay))
+    | HandleBayUpdate (Result Decode.Error Bay)
+    | HandleInventoryUpdate (Result Decode.Error (List WorldItem))
+    | HandleSpecsUpdate Decode.Value
+    | HandleRosInterfaces Decode.Value
+    -- ----------------------------------
     | RequestNfcWrite String
     | SetMode String
     | ChangeHz Float

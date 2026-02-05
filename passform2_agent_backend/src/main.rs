@@ -1,13 +1,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use axum::{extract::State as AxumState, Json};
-use socketioxide::{extract::{Data, SocketRef}, SocketIo};
+use axum::{extract::State as AxumState, Json, http::Method};
+use socketioxide::{extract::{Data, SocketRef}, SocketIo, SocketIoConfig};
 use std::sync::Arc;
 use tracing::{info, warn, error};
 use reqwest::Client as HttpClient;
 use tokio::sync::RwLock;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use tower_http::cors::{Any, CorsLayer};
 
 // Library-Importe aus dem Backend-Crate (SSoT)
 use passform_agent_backend::{
@@ -43,6 +44,10 @@ fn setup_socket_handlers(io: &SocketIo, state: Arc<AppState>) {
             
             let current_world = sync_state.world_state.read().await;
             let _ = sync_socket.emit("world_state", serde_json::json!(current_world.0));
+
+            // In main.rs -> setup_socket_handlers -> Initial Sync Block
+            let plant_guard = sync_state.plant_model.read().await;
+            let _ = sync_socket.emit("initial_bays", serde_json::json!(plant_guard.bays));
 
             let agents_guard = sync_state.agent_manager.agents.read().await;
             let agents_list: Vec<_> = agents_guard.values().cloned().collect();
@@ -119,7 +124,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ros_client = Arc::new(RosClient::new(&ros_context)?);
 
     // 4. Manager & Layer Setup
-    let (layer, io) = SocketIo::builder().build_layer();
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST])
+        .allow_headers(Any);
+
+    let (layer, io) = SocketIo::builder()
+        .with_config(SocketIoConfig::default())
+        .build_layer();
+
     let socket_manager = Arc::new(SocketIoManager::new(io.clone()));
     let system_api = Arc::new(SystemApi::new());
     let inventory_manager = Arc::new(InventoryManager::new(socket_manager.clone()));
@@ -130,17 +143,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Beispielhafte Buchten hinzufügen (kann auch aus einer Config kommen)
-    // Reihe 1: Die Haupt-Produktionslinie
-    plant.create_bay("Bay-Ranger-1", [3.0, 1.0, 0.0]); // Startpunkt Ranger 01
-    plant.create_bay("Bay-UR5-1",    [4.0, 1.0, 0.0]); // Platz für Roboterarm
-    plant.create_bay("Bay-Conv-1",   [5.0, 1.0, 0.0]); // Förderband-Platz
-    plant.create_bay("Bay-YMod-1",   [6.0, 1.0, 0.0]); // Y-Modul Endpunkt
+    // Reihe 1: Positionen X: 1.0 bis 4.0 | Y: 1.0
+    plant.create_bay("Bay-Tisch-1", [1.0, 1.0, 0.0]);
+    plant.create_bay("Bay-Tisch-2", [2.0, 1.0, 0.0]);
+    plant.create_bay("Bay-Tisch-3", [3.0, 1.0, 0.0]);
+    plant.create_bay("Bay-Tisch-4", [4.0, 1.0, 0.0]);
 
-    // Reihe 2: Logistik & Support
-    plant.create_bay("Bay-Ranger-2", [3.0, 2.0, 0.0]); // Startpunkt Ranger 02
-    plant.create_bay("Bay-Store-1",  [4.0, 2.0, 0.0]); // Lager/Speicher (Agent 6)
-    plant.create_bay("Bay-Gripper-1",[5.0, 2.0, 0.0]); // Zubehör-Platz
-    plant.create_bay("Bay-Human-1",  [6.0, 2.0, 0.0]); // Arbeitsplatz Human Operator
+    // Reihe 2: Positionen X: 1.0 bis 4.0 | Y: 2.0
+    plant.create_bay("Bay-Tisch-5", [1.0, 2.0, 0.0]);
+    plant.create_bay("Bay-Tisch-6", [2.0, 2.0, 0.0]);
+    plant.create_bay("Bay-Tisch-7", [3.0, 2.0, 0.0]);
+    plant.create_bay("Bay-Tisch-8", [4.0, 2.0, 0.0]);
 
     let plant_arc = Arc::new(RwLock::new(plant));
 
@@ -159,11 +172,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // SkillActionManager benötigt den ROS-Node
-    let skill_manager = Arc::new(SkillActionManager::new(ros_client.node.clone()));
-
+    // 1. Zuerst AgentManager (da SkillManager ihn braucht)
     let agent_manager = Arc::new(AgentManager::new(
         socket_manager.clone(), 
+        resource_manager.clone(),
+        plant_arc.clone()
+    ));
+
+    // 2. Dann SkillActionManager (nutzt jetzt die Variable agent_manager)
+    let skill_manager = Arc::new(SkillActionManager::new(
+        ros_client.node.clone(),
+        plant_arc.clone(),
+        agent_manager.clone(), // Jetzt existiert die Variable!
         resource_manager.clone()
     ));
     
@@ -295,10 +315,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- 6. Axum Server Task ---
     let axum_state = shared_state.clone();
     let io_layer = layer.clone(); 
+    let cors_layer = cors.clone(); // Klon für den Thread
+
     tokio::spawn(async move {
         let app = axum::Router::new()
             .route("/", axum::routing::get(root_handler))
             .route("/api/agents", axum::routing::get(get_agents))
+            .route("/api/bays", axum::routing::get(get_bays))
             .route("/api/resources/specs", axum::routing::get(get_hardware_specs))
             .route("/api/resources/interfaces", axum::routing::get(get_ros_interfaces))
             .route("/api/planner/plan", axum::routing::post(handle_planning_request))
@@ -309,6 +332,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .route("/aas-api/*path", axum::routing::any(BasyxManager::proxy_handler))
             .route("/api/inventory/basyx", axum::routing::get(get_inventory_basyx))
             .route("/api/inventory", axum::routing::get(get_inventory))
+            .layer(cors_layer) // <--- Hier wird CORS jetzt korrekt gefunden
             .layer(io_layer)
             .with_state(axum_state);
 
@@ -356,6 +380,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 // --- HTTP HANDLER ---
 async fn root_handler() -> Json<serde_json::Value> {
     Json(serde_json::json!({ "service": "PassForm 2 Tauri Core", "status": "active" }))
+}
+
+async fn get_bays(AxumState(state): AxumState<Arc<AppState>>) -> Json<Vec<passform_agent_backend::Bay>> {
+    let plant_guard = state.plant_model.read().await;
+    // Wir geben einfach die Liste der Buchten aus dem PlantModel zurück
+    Json(plant_guard.bays.clone())
 }
 
 async fn get_agents(AxumState(state): AxumState<Arc<AppState>>) -> Json<Vec<serde_json::Value>> {

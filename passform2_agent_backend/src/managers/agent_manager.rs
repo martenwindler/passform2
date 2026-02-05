@@ -4,9 +4,10 @@ use std::time::Instant;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
-use tracing::{warn, error};
+use tracing::{warn, error, info};
 
 use crate::core::types::AgentEntry;
+use crate::core::types::plant_model::PlantModel; // NEU
 use crate::managers::socket_io_manager::SocketIoManager;
 use crate::managers::resource_manager::ResourceManager; 
 use crate::core::types::Status;
@@ -18,10 +19,9 @@ pub struct LogEntry {
     pub timestamp: String,
 }
 
-// --- MANAGER ---
-
 pub struct AgentManager {
     pub agents: RwLock<HashMap<String, AgentEntry>>,
+    pub plant: Arc<RwLock<PlantModel>>, // NEU: Zugriff auf das Layout
     pub logs: RwLock<VecDeque<LogEntry>>,
     pub socket_manager: Arc<SocketIoManager>,
     pub resource_manager: Arc<ResourceManager>,
@@ -29,9 +29,14 @@ pub struct AgentManager {
 }
 
 impl AgentManager {
-    pub fn new(socket_manager: Arc<SocketIoManager>, resource_manager: Arc<ResourceManager>) -> Self {
+    pub fn new(
+        socket_manager: Arc<SocketIoManager>, 
+        resource_manager: Arc<ResourceManager>,
+        plant: Arc<RwLock<PlantModel>> // NEU
+    ) -> Self {
         Self {
             agents: RwLock::new(HashMap::new()),
+            plant,
             logs: RwLock::new(VecDeque::with_capacity(50)),
             socket_manager,
             resource_manager,
@@ -39,14 +44,11 @@ impl AgentManager {
         }
     }
 
-    /// Hilfsmethode: Rechnet die Signalstärke in das JSON-Objekt ein (Manager-Logik)
+    /// Hilfsmethode: Rechnet die Signalstärke in das JSON-Objekt ein
     fn agent_to_json(agent: &AgentEntry, timeout_period: f64) -> serde_json::Value {
         let mut val = serde_json::to_value(agent).unwrap_or(serde_json::json!({}));
-        
         let elapsed = agent.last_seen.elapsed().as_secs_f64();
-        let signal_strength = if elapsed >= timeout_period {
-            0
-        } else {
+        let signal_strength = if elapsed >= timeout_period { 0 } else {
             (100.0 * (1.0 - elapsed / timeout_period)) as i32
         };
 
@@ -56,13 +58,37 @@ impl AgentManager {
         val
     }
 
+    /// Vergleicht Agenten-Position mit Bay-Koordinaten (Spatial Mapping)
+    async fn update_spatial_mapping(&self, agent_id: &str, x: f64, y: f64) {
+        let mut plant_guard = self.plant.write().await;
+        let threshold = 0.5; // 50cm Toleranzbereich
+
+        for bay in plant_guard.bays.iter_mut() {
+            // Distanzberechnung (Euklidisch)
+            let dx = x - bay.origin[0];
+            let dy = y - bay.origin[1];
+            let distance = (dx * dx + dy * dy).sqrt();
+
+            if distance < threshold {
+                if !bay.occupation || bay.module_uuid != agent_id {
+                    info!("📍 Agent {} hat Bay {} belegt", agent_id, bay.name);
+                    bay.occupation = true;
+                    bay.module_uuid = agent_id.to_string();
+                }
+            } else if bay.module_uuid == agent_id {
+                // Agent war hier, ist aber jetzt weg
+                info!("💨 Agent {} hat Bay {} verlassen", agent_id, bay.name);
+                bay.occupation = false;
+                bay.module_uuid = String::new();
+            }
+        }
+    }
+
     async fn broadcast_update(&self) {
-        let timeout = 10.0; // Standard-Timeout für Broadcasts
+        let timeout = 10.0;
         let agents_json: Vec<serde_json::Value> = {
             let agents_guard = self.agents.read().await;
-            agents_guard.values()
-                .map(|a| Self::agent_to_json(a, timeout))
-                .collect()
+            agents_guard.values().map(|a| Self::agent_to_json(a, timeout)).collect()
         };
         
         self.socket_manager.emit_event(
@@ -73,31 +99,25 @@ impl AgentManager {
 
     pub async fn add_agent(&self, id: String, m_type: String, x: i32, y: i32) {
         let m_type_lower = m_type.to_lowercase();
-        
         if self.resource_manager.agent_configs.contains_key(&m_type_lower) {
             {
                 let mut agents = self.agents.write().await;
                 let new_agent = AgentEntry::new(id.clone(), m_type, x, y);
                 agents.insert(id.clone(), new_agent);
             }
+            self.update_spatial_mapping(&id, x as f64, y as f64).await;
             self.log_to_system(format!("🚀 Modul {} vom Typ {} erstellt.", id, m_type_lower), "success").await;
             self.broadcast_update().await;
         } else {
-            self.log_to_system(format!("⚠️ Fehler: Modul-Typ '{}' ist nicht registriert!", m_type), "error").await;
             error!("Versuch unregistrierten Agent-Typ zu laden: {}", m_type);
         }
     }
 
     pub async fn sync_from_ros(&self, id: String, m_type: String, x: i32, y: i32, orient: i32, status_code: i32) {
-        let m_type_lower = m_type.to_lowercase();
-        if !self.resource_manager.agent_configs.contains_key(&m_type_lower) {
-            warn!("ROS-Sync für unbekannten Typ: {}", m_type);
-        }
-
         {
             let mut agents = self.agents.write().await;
             let agent = agents.entry(id.clone()).or_insert_with(|| {
-                AgentEntry::new(id, m_type, x, y)
+                AgentEntry::new(id.clone(), m_type, x, y)
             });
             
             agent.x = x;
@@ -106,6 +126,9 @@ impl AgentManager {
             agent.last_seen = Instant::now();
             agent.status = Status::from(status_code); 
         }
+        
+        // Räumliche Prüfung bei jedem ROS-Update
+        self.update_spatial_mapping(&id, x as f64, y as f64).await;
         self.broadcast_update().await;
     }
 
@@ -122,6 +145,7 @@ impl AgentManager {
                     ftf.last_seen = Instant::now();
                 }
             }
+            self.update_spatial_mapping(&ftf_id, nx as f64, ny as f64).await;
             self.broadcast_update().await;
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         }
@@ -148,11 +172,9 @@ impl AgentManager {
     pub async fn get_active_agents_json(&self, timeout_period: f64) -> serde_json::Value {
         let agents = self.agents.read().await;
         let mut map = serde_json::Map::new();
-        
         for a in agents.values() {
             let key = format!("{},{}", a.x, a.y);
-            let val = Self::agent_to_json(a, timeout_period);
-            map.insert(key, val);
+            map.insert(key, Self::agent_to_json(a, timeout_period));
         }
         serde_json::Value::Object(map)
     }

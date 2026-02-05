@@ -14,23 +14,47 @@ moduleTypeDecoder =
     string
         |> Decode.map
             (\s ->
-                case s of
+                case String.toLower s of
                     "ftf" ->
+                        FTF
+
+                    "ranger" ->
                         FTF
 
                     "conveyeur" ->
                         Conveyeur
 
+                    "conveyor" ->
+                        Conveyeur
+
                     "rollen_ns" ->
+                        RollenModul
+
+                    "rollenmodul" ->
                         RollenModul
 
                     "mensch" ->
                         Mensch
 
+                    "human_operator" ->
+                        Mensch
+
                     "greifer" ->
                         Greifer
 
+                    "ur5__gripper" ->
+                        Greifer
+
                     "tisch" ->
+                        Station
+
+                    "station" ->
+                        Station
+
+                    "y-module" ->
+                        Station
+
+                    "ur5" ->
                         Station
 
                     _ ->
@@ -63,20 +87,13 @@ hardwareStatusDecoder =
     string
         |> Decode.map
             (\s ->
-                case s of
-                    "online" ->
-                        Online
-
-                    "missing" ->
-                        Missing
-
-                    "error" ->
-                        Error
-
-                    _ ->
-                        UnknownStatus
+                case String.toLower s of
+                    "online" -> Online
+                    "ok" -> Online     -- Rust sendet oft "Ok"
+                    "missing" -> Missing
+                    "error" -> Error
+                    _ -> UnknownStatus
             )
-
 
 moduleTypeToString : ModuleType -> String
 moduleTypeToString mt =
@@ -252,20 +269,25 @@ hardwareListDecoder =
     Decode.list hardwareDeviceDecoder
 
 
-decodeModuleType : Decoder ModuleType
 decodeModuleType =
     Decode.string
         |> Decode.andThen
             (\str ->
-                case String.toLower str of
-                    "ftf" -> Decode.succeed FTF
-                    "conveyeur" -> Decode.succeed Conveyeur
-                    "rollenmodul" -> Decode.succeed RollenModul
-                    "rollen_ns" -> Decode.succeed RollenModul -- Mapping für dein Backend
-                    "mensch" -> Decode.succeed Mensch
-                    "greifer" -> Decode.succeed Greifer
-                    "station" -> Decode.succeed Station
-                    _ -> Decode.succeed (UnknownModule str)
+                let
+                    s = String.toLower str
+                in
+                if String.contains "tisch" s then
+                    Decode.succeed Station
+                else
+                    case s of
+                        "ftf" -> Decode.succeed FTF
+                        "ranger" -> Decode.succeed FTF
+                        "conveyeur" -> Decode.succeed Conveyeur
+                        "rollenmodul" -> Decode.succeed RollenModul
+                        "mensch" -> Decode.succeed Mensch
+                        "greifer" -> Decode.succeed Greifer
+                        "station" -> Decode.succeed Station
+                        _ -> Decode.succeed (UnknownModule str)
             )
 
 -- --- PLANNING & PATH DECODERS ---
@@ -401,4 +423,102 @@ encodeAgent agent =
         , ( "orientation", Encode.int agent.orientation )
         , ( "is_dynamic", Encode.bool agent.is_dynamic )
         , ( "signal_strength", Encode.int agent.signal_strength )
+        ]
+
+
+{-| Hilfsdecoder: Verwandelt [3.0, 1.0, 0.0] in ein Point-Record -}
+decodeOriginAsPoint : Decoder Point
+decodeOriginAsPoint =
+    Decode.list float
+        |> Decode.andThen
+            (\coords ->
+                case coords of
+                    [ x, y, z ] ->
+                        Decode.succeed { x = x, y = y, z = z }
+
+                    _ ->
+                        Decode.fail "Origin muss eine Liste mit genau 3 Floats sein."
+            )
+
+{-| Der Haupt-Decoder für die Bays -}
+decodeBay : Decoder Bay
+decodeBay =
+    Decode.succeed Bay
+        |> andMap (field "unique_id" string)
+        |> andMap (field "name" string)
+        |> andMap (field "origin" decodeOriginAsPoint) -- Nutzt den Array-zu-Record Wandler
+        |> andMap (field "is_virtual" bool)
+        |> andMap (field "status" hardwareStatusDecoder)
+        |> andMap (field "occupation" bool)
+        |> andMap (field "module_uuid" string)
+
+{-| Hilfsdecoder für das [x, y, z] Array aus Rust -}
+decodeOrigin : Decoder { x : Float, y : Float, z : Float }
+decodeOrigin =
+    Decode.list float
+        |> Decode.andThen
+            (\l ->
+                case l of
+                    [ x, y, z ] -> Decode.succeed { x = x, y = y, z = z }
+                    _ -> Decode.fail "Origin muss eine Liste mit genau 3 Floats sein [x, y, z]"
+            )
+
+decodeBayList : Decoder (List Bay)
+decodeBayList =
+    Decode.list decodeBay
+
+{-| Hilfsfunktion für die Liste der Inventar-Items -}
+decodeInventory : Decoder (List WorldItem)
+decodeInventory =
+    Decode.list decodeWorldItem
+
+{-| Decoder für ein einzelnes Welt-Item (Inventory) -}
+decodeWorldItem : Decoder WorldItem
+decodeWorldItem =
+    Decode.succeed WorldItem
+        |> andMap (field "name" string)
+        |> andMap (field "uid" string)
+        |> andMap (field "quantity" int)
+        |> andMap (field "location" decodeWorldLocation)
+
+decodeWorldLocation : Decoder WorldLocation
+decodeWorldLocation =
+    Decode.succeed WorldLocation
+        |> andMap (field "frame_id" string)
+        |> andMap (field "pose" decodePose)
+
+decodePose : Decoder Pose
+decodePose =
+    Decode.map2 Pose
+        (field "position" decodePoint)
+        (field "orientation" decodeQuaternion)
+
+decodePoint : Decoder Point
+decodePoint =
+    Decode.map3 Point
+        (field "x" float)
+        (field "y" float)
+        (field "z" float)
+
+decodeQuaternion : Decoder Quaternion
+decodeQuaternion =
+    Decode.map4 Quaternion
+        (field "x" float)
+        (field "y" float)
+        (field "z" float)
+        (field "w" float)
+
+encodeBayList : List Bay -> Encode.Value
+encodeBayList bays =
+    Encode.list encodeBay bays
+
+encodeBay : Bay -> Encode.Value
+encodeBay bay =
+    Encode.object
+        [ ( "unique_id", Encode.string bay.unique_id )
+        , ( "name", Encode.string bay.name )
+        , ( "x", Encode.float bay.origin.x )
+        , ( "y", Encode.float bay.origin.y )
+        , ( "occupation", Encode.bool bay.occupation )
+        , ( "status", Encode.string "Ok" ) -- Oder dein Status-Mapper
         ]
