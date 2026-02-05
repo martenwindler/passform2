@@ -11,9 +11,8 @@ use std::path::PathBuf;
 
 // Library-Importe aus dem Backend-Crate (SSoT)
 use passform_agent_backend::{
-    AppState, SocketIoManager, SkillActionManager, PathManager, 
-    NodeManager, AgentManager, InfraConfigManager, DataConfigManager, 
-    MatchManager, SystemRole, SystemMode
+    AppState, PlantModel, SocketIoManager, SkillActionManager, PathManager, 
+    NodeManager, AgentManager, InventoryManager, InfraConfigManager, DataConfigManager, MatchManager, RfidManager, SystemRole, SystemMode
 };
 
 use passform_agent_backend::core::util::watchdog::Watchdog;
@@ -42,16 +41,22 @@ fn setup_socket_handlers(io: &SocketIo, state: Arc<AppState>) {
             let mode = sync_state.infra_config.settings.read().await.current_mode;
             let _ = sync_socket.emit("mode", mode.to_string());
             
+            let current_world = sync_state.world_state.read().await;
+            let _ = sync_socket.emit("world_state", serde_json::json!(current_world.0));
+
             let agents_guard = sync_state.agent_manager.agents.read().await;
             let agents_list: Vec<_> = agents_guard.values().cloned().collect();
             let _ = sync_socket.emit("active_agents", serde_json::json!({ "agents": agents_list }));
-            
+
+            // Innerhalb von tokio::spawn im Socket-Handler:
+            let items_guard = sync_state.inventory_manager.items.read().await;
+            let items_list: Vec<_> = items_guard.values().cloned().collect();
+            let _ = sync_socket.emit("inventory_update", serde_json::json!({ "items": items_list }));
+
             let _ = sync_socket.emit("hardware_specs", serde_json::json!(sync_state.resource_manager.hardware_specs));
             
-            let current_world = sync_state.world_state.read().await;
-            let _ = sync_socket.emit("world_state", serde_json::json!(current_world.0));
-            
             let _ = sync_socket.emit("socket_status", true);
+
         });
 
         // 2. Hardware Update Event
@@ -117,6 +122,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (layer, io) = SocketIo::builder().build_layer();
     let socket_manager = Arc::new(SocketIoManager::new(io.clone()));
     let system_api = Arc::new(SystemApi::new());
+    let inventory_manager = Arc::new(InventoryManager::new(socket_manager.clone()));
+
+    let mut plant = PlantModel::new(
+        Some("plant_model_master_01".to_string()), 
+        Some("PassForM_Production_Line".to_string())
+    );
+
+    // Beispielhafte Buchten hinzufügen (kann auch aus einer Config kommen)
+    // Reihe 1: Die Haupt-Produktionslinie
+    plant.create_bay("Bay-Ranger-1", [3.0, 1.0, 0.0]); // Startpunkt Ranger 01
+    plant.create_bay("Bay-UR5-1",    [4.0, 1.0, 0.0]); // Platz für Roboterarm
+    plant.create_bay("Bay-Conv-1",   [5.0, 1.0, 0.0]); // Förderband-Platz
+    plant.create_bay("Bay-YMod-1",   [6.0, 1.0, 0.0]); // Y-Modul Endpunkt
+
+    // Reihe 2: Logistik & Support
+    plant.create_bay("Bay-Ranger-2", [3.0, 2.0, 0.0]); // Startpunkt Ranger 02
+    plant.create_bay("Bay-Store-1",  [4.0, 2.0, 0.0]); // Lager/Speicher (Agent 6)
+    plant.create_bay("Bay-Gripper-1",[5.0, 2.0, 0.0]); // Zubehör-Platz
+    plant.create_bay("Bay-Human-1",  [6.0, 2.0, 0.0]); // Arbeitsplatz Human Operator
+
+    let plant_arc = Arc::new(RwLock::new(plant));
+
+    // BasyxManager initialisieren
+    let basyx_manager = Arc::new(BasyxManager::new(
+        plant_arc.clone(),
+        "http://localhost:8081/aasServer".to_string()
+    ));
+
+    // Automatische BaSyx-Registrierung im Hintergrund starten
+    let basyx_init = basyx_manager.clone();
+    tokio::spawn(async move {
+        info!("📡 Versuche PlantModel bei BaSyx zu registrieren...");
+        if let Err(e) = basyx_init.register_plant().await {
+            error!("❌ BaSyx-Registrierung fehlgeschlagen: {}", e);
+        }
+    });
 
     // SkillActionManager benötigt den ROS-Node
     let skill_manager = Arc::new(SkillActionManager::new(ros_client.node.clone()));
@@ -126,6 +167,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         resource_manager.clone()
     ));
     
+    // RFID Manager initialisieren
+    let rfid_manager = Arc::new(RfidManager::new(
+        socket_manager.clone(),
+        agent_manager.clone() // Er braucht Zugriff auf die Agents (Bays)
+    ));
+
     // Initialisierung des AppState (SSoT)
     let shared_state = Arc::new(AppState {
         hardware_registry: RwLock::new(HashMap::new()),
@@ -134,6 +181,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         data_config: Arc::new(DataConfigManager::new()),
         http_client: HttpClient::new(),
         socket_manager,
+        inventory_manager,
         resource_manager: resource_manager.clone(), 
         skill_manager,
         path_manager: Arc::new(PathManager::new()),
@@ -145,7 +193,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             operators: HashMap::new(), 
             methods: HashMap::new(),
         }),
+        rfid_manager,
         system_api,
+        plant_model: plant_arc,
+        basyx_manager,
     });
 
     // --- JuSt AnOtHeR lItTlE ROS 2 SETUP ---
@@ -172,18 +223,58 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     ).expect("❌ Failed to create agent_info subscription");
 
-    // Watchdog starten
+    // --- watchdog ---
     let watchdog = Arc::new(Watchdog::new(shared_state.clone()));
     let watchdog_thread = watchdog.clone();
     tokio::spawn(async move {
         watchdog_thread.run().await;
     });
 
-    // Protocol Manager starten
+    // --- Protocol manager ---
     let mut protocol_manager = ProtocolManager::new(shared_state.clone());
     tokio::spawn(async move {
         protocol_manager.run().await;
     });
+
+    // --- RFID manager ---
+    let rfid_m_clone = shared_state.rfid_manager.clone();
+    let rt_rfid = tokio::runtime::Handle::current();
+
+    // --- Inventory manager ---
+    let inv_m_clone = shared_state.inventory_manager.clone();
+    let rt_inv = tokio::runtime::Handle::current();
+
+   // In src/main.rs (Subscriber für detected_items)
+    let _inventory_sub = ros_client.node.create_subscription::<passform_agent_resources::msg::WorldItem, _>(
+        "detected_items",
+        move |msg: passform_agent_resources::msg::WorldItem| {
+            let im = inv_m_clone.clone();
+            rt_inv.spawn(async move {
+                // NUTZE DEN CONVERTER HIER:
+                let new_item = passform_agent_backend::core::types::inventory::WorldItem {
+                    name: msg.part.name,
+                    uid: msg.uuid,
+                    quantity: msg.quantity as i32,
+                    // Hier war der Fehler:
+                    location: passform_agent_backend::RosConverter::location_from_msg(&msg.location),
+                };
+
+                im.upsert_item(new_item).await;
+            });
+        },
+    ).expect("❌ Failed to create inventory subscription");
+
+    // Nutze einen Standard-Typ wie String, falls RfidScan noch nicht existiert
+    let _rfid_sub = ros_client.node.create_subscription::<passform_agent_resources::msg::InfraRfidScan, _>(
+    "rfid_updates",
+    move |msg: passform_agent_resources::msg::InfraRfidScan| {
+            let rm = rfid_m_clone.clone();
+            rt_rfid.spawn(async move {
+                let tag = if msg.is_detected { Some(msg.uid) } else { None };
+                rm.handle_rfid_event(msg.bay_id, tag).await;
+            });
+        },
+    ).expect("❌ Failed to create rfid_scan subscription");
 
     // --- 5. ROLLEN-WEICHE ---
     if role == SystemRole::Master {
@@ -216,6 +307,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .route("/basyx/index.html", axum::routing::any(BasyxManager::proxy_handler))
             .route("/basyx/*path", axum::routing::any(BasyxManager::proxy_handler))
             .route("/aas-api/*path", axum::routing::any(BasyxManager::proxy_handler))
+            .route("/api/inventory/basyx", axum::routing::get(get_inventory_basyx))
+            .route("/api/inventory", axum::routing::get(get_inventory))
             .layer(io_layer)
             .with_state(axum_state);
 
@@ -281,6 +374,20 @@ async fn get_ros_interfaces(AxumState(state): AxumState<Arc<AppState>>) -> Json<
         "srvs": state.resource_manager.available_srvs,
         "actions": state.resource_manager.available_actions,
     }))
+}
+
+async fn get_inventory(AxumState(state): AxumState<Arc<AppState>>) -> Json<Vec<serde_json::Value>> {
+    let items_guard = state.inventory_manager.items.read().await;
+    let list = items_guard
+        .values()
+        .map(|item| serde_json::to_value(item).unwrap_or_default())
+        .collect();
+    Json(list)
+}
+
+async fn get_inventory_basyx(AxumState(state): AxumState<Arc<AppState>>) -> Json<serde_json::Value> {
+    // Ruft die neue Methode auf, die wir im InventoryManager eingebaut haben
+    Json(state.inventory_manager.get_inventory_basyx_json().await)
 }
 
 async fn handle_planning_request(

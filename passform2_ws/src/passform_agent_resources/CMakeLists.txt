@@ -33,6 +33,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/InfraBayStatus.msg"
   "msg/InfraModule.msg"
   "msg/InfraModuleStatus.msg"
+  "msg/InfraRfidScan.msg"
   "msg/InfraSupply.msg"
   "msg/MatchAward.msg"
   "msg/MatchCFP.msg"

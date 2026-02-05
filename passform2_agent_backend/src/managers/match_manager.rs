@@ -66,7 +66,7 @@ impl MatchManager {
         }
     }
 
-    fn find_agent_at_pos(&self, pos: (i32, i32), agents: &HashMap<String, crate::managers::agent_manager::AgentEntry>) -> Option<String> {
+    fn find_agent_at_pos(&self, pos: (i32, i32), agents: &HashMap<String, crate::core::types::AgentEntry>) -> Option<String> {
         agents.values()
             // KORREKTUR: Vergleich mit Status::Ok statt "active"
             .find(|a| (a.x, a.y) == pos && (a.status == Status::Ok || a.status == Status::Running))

@@ -10,6 +10,8 @@ pub mod resource_manager;
 pub mod skill_manager;
 pub mod socket_io_manager;
 pub mod system_api;
+pub mod rfid_manager;
+pub mod inventory_manager;
 
 // Re-exports für einfacheren Zugriff
 pub use agent_manager::AgentManager;

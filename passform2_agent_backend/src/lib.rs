@@ -2,12 +2,11 @@ pub mod behaviour_tree;
 pub mod managers;
 pub mod ros;
 
-// Hier lag der Hauptfehler: core muss alle Untermodule (util, config, types) deklarieren
 pub mod core {
     pub mod types;
     pub mod config;
-    pub mod util; // Damit sanitize_id und LogLevel gefunden werden
-    pub mod logic; // Falls MatchManager darauf zugreift
+    pub mod util;
+    pub mod logic;
 }
 
 use tokio::sync::RwLock;
@@ -15,28 +14,31 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use reqwest::Client;
 
-// --- RE-EXPORTS DER TYPEN (Wichtig für MatchManager & AgentManager) ---
-// Wir exportieren Status und SkillType direkt auf die oberste Ebene von core::types
-pub use crate::core::types::{Status, ConnectionStatus, SkillType};
+// --- RE-EXPORTS DER TYPEN ---
+pub use crate::core::types::{Status, ConnectionStatus, SkillType, Bay}; // Bay hinzugefügt
+pub use crate::core::types::plant_model::PlantModel;
 
 // --- RE-EXPORTS DER MANAGER ---
 pub use crate::managers::{
     resource_manager::ResourceManager,
     agent_manager::AgentManager,
-    agent_manager::AgentEntry,
     config_manager::ConfigManager as DataConfigManager,
     node_manager::NodeManager,
     path_manager::PathManager,
     skill_manager::SkillActionManager, 
     socket_io_manager::SocketIoManager,
-    system_api::SystemApi as SystemApiManager, 
-    match_manager::MatchManager
+    system_api::SystemApi, // Vereinheitlicht
+    match_manager::MatchManager,
+    rfid_manager::RfidManager,
+    inventory_manager::InventoryManager,
+    basyx_manager::BasyxManager 
 };
 
 // Core, ROS
 pub use crate::core::config::{SystemRole, SystemMode};
 pub use crate::core::config::ConfigManager as InfraConfigManager;
 pub use crate::ros::ros_client::RosClient;
+pub use crate::ros::RosConverter;
 
 // BehaviourTree
 pub use crate::behaviour_tree::WorldState;
@@ -46,9 +48,11 @@ pub use crate::behaviour_tree::HTNPlanner;
 
 pub struct AppState {
     pub world_state: RwLock<WorldState>,
+    pub system_api: Arc<crate::managers::system_api::SystemApi>,
+    pub resource_manager: Arc<ResourceManager>,
+    pub ros_client: Arc<RosClient>,
     pub planner: Arc<HTNPlanner>,
     pub hardware_registry: RwLock<HashMap<String, serde_json::Value>>,
-    pub resource_manager: Arc<ResourceManager>,
     pub agent_manager: Arc<AgentManager>,
     pub infra_config: Arc<InfraConfigManager>,
     pub http_client: Client,
@@ -58,6 +62,9 @@ pub struct AppState {
     pub path_manager: Arc<PathManager>,
     pub node_manager: Arc<NodeManager>,
     pub data_config: Arc<DataConfigManager>,
-    pub system_api: Arc<crate::managers::system_api::SystemApi>,
-    pub ros_client: Arc<RosClient>,
+    pub rfid_manager: Arc<RfidManager>,
+    pub inventory_manager: Arc<InventoryManager>,
+    // --- NEU: Die fehlenden Bausteine für den Digital Twin ---
+    pub plant_model: Arc<RwLock<PlantModel>>,
+    pub basyx_manager: Arc<BasyxManager>,
 }

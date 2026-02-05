@@ -6,52 +6,10 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tracing::{warn, error};
 
+use crate::core::types::AgentEntry;
 use crate::managers::socket_io_manager::SocketIoManager;
 use crate::managers::resource_manager::ResourceManager; 
-// Importiere das neue Status-Enum
 use crate::core::types::Status;
-
-// --- DOMAIN MODELS ---
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct AgentEntry {
-    pub agent_id: String,
-    pub module_type: String,
-    pub x: i32,
-    pub y: i32,
-    pub orientation: i32,
-    pub status: Status, // Geändert von String zu Status Enum
-    pub is_dynamic: bool,
-    pub payload: Option<serde_json::Value>,
-    
-    #[serde(skip, default = "Instant::now")]
-    pub last_seen: Instant,
-}
-
-impl AgentEntry {
-    pub fn new(agent_id: String, module_type: String, x: i32, y: i32) -> Self {
-        Self {
-            agent_id: agent_id.clone(),
-            is_dynamic: module_type.to_lowercase() == "ftf" || module_type.to_lowercase() == "ranger",
-            module_type,
-            x,
-            y,
-            orientation: 0,
-            status: Status::Ok, // Initialer Status aus dem Enum
-            payload: None,
-            last_seen: Instant::now(),
-        }
-    }
-
-    pub fn get_signal_strength(&self, timeout_period: f64) -> i32 {
-        let elapsed = self.last_seen.elapsed().as_secs_f64();
-        if elapsed >= timeout_period {
-            0
-        } else {
-            (100.0 * (1.0 - elapsed / timeout_period)) as i32
-        }
-    }
-}
 
 #[derive(Serialize, Clone)]
 pub struct LogEntry {
@@ -81,15 +39,35 @@ impl AgentManager {
         }
     }
 
+    /// Hilfsmethode: Rechnet die Signalstärke in das JSON-Objekt ein (Manager-Logik)
+    fn agent_to_json(agent: &AgentEntry, timeout_period: f64) -> serde_json::Value {
+        let mut val = serde_json::to_value(agent).unwrap_or(serde_json::json!({}));
+        
+        let elapsed = agent.last_seen.elapsed().as_secs_f64();
+        let signal_strength = if elapsed >= timeout_period {
+            0
+        } else {
+            (100.0 * (1.0 - elapsed / timeout_period)) as i32
+        };
+
+        if let Some(obj) = val.as_object_mut() {
+            obj.insert("signal_strength".to_string(), serde_json::json!(signal_strength));
+        }
+        val
+    }
+
     async fn broadcast_update(&self) {
-        let agents_list: Vec<AgentEntry> = {
+        let timeout = 10.0; // Standard-Timeout für Broadcasts
+        let agents_json: Vec<serde_json::Value> = {
             let agents_guard = self.agents.read().await;
-            agents_guard.values().cloned().collect()
+            agents_guard.values()
+                .map(|a| Self::agent_to_json(a, timeout))
+                .collect()
         };
         
         self.socket_manager.emit_event(
             "active_agents",
-            serde_json::json!({ "agents": agents_list })
+            serde_json::json!({ "agents": agents_json })
         ).await;
     }
 
@@ -110,7 +88,6 @@ impl AgentManager {
         }
     }
 
-    /// Synchronisiert ROS-Daten und nutzt das From-Trait für die Status-Konvertierung
     pub async fn sync_from_ros(&self, id: String, m_type: String, x: i32, y: i32, orient: i32, status_code: i32) {
         let m_type_lower = m_type.to_lowercase();
         if !self.resource_manager.agent_configs.contains_key(&m_type_lower) {
@@ -127,7 +104,6 @@ impl AgentManager {
             agent.y = y;
             agent.orientation = orient;
             agent.last_seen = Instant::now();
-            // Automatische Konvertierung von i32 zu Status Enum
             agent.status = Status::from(status_code); 
         }
         self.broadcast_update().await;
@@ -139,20 +115,17 @@ impl AgentManager {
         for (nx, ny) in path {
             {
                 let mut agents = self.agents.write().await;
-                
                 if let Some(ftf) = agents.get_mut(&ftf_id) {
                     ftf.x = nx;
                     ftf.y = ny;
-                    ftf.status = Status::Running; // Nutzt Enum statt String
+                    ftf.status = Status::Running;
                     ftf.last_seen = Instant::now();
                 }
-                // ... (Payload-Logik bleibt gleich)
             }
             self.broadcast_update().await;
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         }
         
-        // Nach Abschluss wieder auf Ok setzen
         if let Some(ftf) = self.agents.write().await.get_mut(&ftf_id) {
             ftf.status = Status::Ok;
             self.broadcast_update().await;
@@ -178,13 +151,7 @@ impl AgentManager {
         
         for a in agents.values() {
             let key = format!("{},{}", a.x, a.y);
-            let mut val = serde_json::to_value(a).unwrap();
-            
-            // Status wird durch Serialize automatisch als Integer oder String (je nach Config) ausgegeben
-            val.as_object_mut().unwrap().insert(
-                "signal_strength".to_string(), 
-                serde_json::json!(a.get_signal_strength(timeout_period))
-            );
+            let val = Self::agent_to_json(a, timeout_period);
             map.insert(key, val);
         }
         serde_json::Value::Object(map)
