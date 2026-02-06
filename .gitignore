@@ -156,3 +156,6 @@ passform2_ws/.cargo
 
 # --- passform2_agent_frontend/coveragetests --- 
 passform2_agent_frontend/.coverage/**/**
+
+# --- X 
+*.ico

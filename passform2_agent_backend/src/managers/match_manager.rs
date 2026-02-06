@@ -68,9 +68,8 @@ impl MatchManager {
 
     fn find_agent_at_pos(&self, pos: (i32, i32), agents: &HashMap<String, crate::core::types::AgentEntry>) -> Option<String> {
         agents.values()
-            // KORREKTUR: Vergleich mit Status::Ok statt "active"
             .find(|a| (a.x, a.y) == pos && (a.status == Status::Ok || a.status == Status::Running))
-            .map(|a| a.agent_id.clone())
+            .and_then(|a| a.agent_id.clone()) // <--- DAS ist der Zaubertrick
     }
 
     async fn assign_task(&self, task_id: &str, agent_id: &str, _path: Vec<(i32, i32)>, cost: f64) {

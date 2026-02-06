@@ -34,6 +34,8 @@ export class ThreeGridScene extends HTMLElement {
     private mouseDownPos = { x: 0, y: 0 };
     private dragThreshold = 5; 
 
+    private isWaitingForSync = false;
+
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
@@ -59,6 +61,27 @@ export class ThreeGridScene extends HTMLElement {
 
         const axes = new THREE.AxesHelper(2);
         this.helperScene.add(axes);
+    }
+
+    set agents(val: any) {
+        if (!val) return;
+        const list = Array.isArray(val) ? val : Object.values(val);
+        
+        // Sobald neue Daten kommen, geben wir die Sperre frei
+        this.isWaitingForSync = false; 
+        this.draggedAgentKey = null; 
+
+        this.updateAgents(list);
+    }
+
+    set bays(val: any) {
+        if (!val) return;
+        this.updateBays(Array.isArray(val) ? val : Object.values(val));
+    }
+
+    set currentPath(val: any) {
+        if (!val) return;
+        this.drawPath(val.path || []);
     }
 
     static get observedAttributes() {
@@ -163,37 +186,41 @@ export class ThreeGridScene extends HTMLElement {
     }
 
     private updateBays(bays: any[]) {
+        if (!bays) return;
+        
         const currentIds = new Set(bays.map(b => b.unique_id));
         
-        // 1. Entferne Bays, die nicht mehr existieren
-        [...this.bayMeshes.keys()].forEach(id => {
+        // 1. Aufräumen: Entferne gelöschte Bays
+        for (const [id, mesh] of this.bayMeshes.entries()) {
             if (!currentIds.has(id)) {
-                this.scene.remove(this.bayMeshes.get(id)!);
+                this.scene.remove(mesh);
                 this.bayMeshes.delete(id);
             }
-        });
+        }
 
-        // 2. Erzeuge oder aktualisiere Bay-Umrandungen
+        // 2. Aktualisieren oder Erstellen
         bays.forEach(bay => {
             let wireframe = this.bayMeshes.get(bay.unique_id);
+            // Wir nehmen die Farbe basierend auf dem belegt-Status
             const color = bay.occupation ? this.occupiedBayColor : this.vacantBayColor;
             
+            // WICHTIG: Koordinaten-Mapping prüfen (bay.x/y oder bay.origin.x/y?)
+            const bx = (Number(bay.x ?? bay.origin?.x) || 0) + 0.5;
+            const bz = (Number(bay.y ?? bay.origin?.y) || 0) + 0.5;
+
             if (!wireframe) {
-                // Erzeuge EdgesGeometry für eine Plane (Umrandung eines Quadrats)
-                const geo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(0.98, 0.98));
-                const mat = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
+                const geo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(0.99, 0.99));
+                const mat = new THREE.LineBasicMaterial({ color: color, linewidth: 4 });
                 wireframe = new THREE.LineSegments(geo, mat);
-                
                 wireframe.rotateX(-Math.PI / 2);
-                // Minimal über dem Boden (0.005), um Z-Fighting zu vermeiden
-                wireframe.position.set(bay.x + 0.5, 0.005, bay.y + 0.5);
+                wireframe.position.set(bx, 0.02, bz); // 0.02 um über dem Boden zu liegen
                 
                 this.scene.add(wireframe);
                 this.bayMeshes.set(bay.unique_id, wireframe);
             } else {
-                // Nur die Farbe anpassen, wenn die Bay bereits existiert
+                // FARB-UPDATE ERZWINGEN:
                 (wireframe.material as THREE.LineBasicMaterial).color.setHex(color);
-                wireframe.position.set(bay.x + 0.5, 0.005, bay.y + 0.5);
+                wireframe.position.set(bx, 0.02, bz);
             }
         });
     }
@@ -238,6 +265,7 @@ export class ThreeGridScene extends HTMLElement {
     private onMouseMove(event: MouseEvent) {
         const coords = this.getMouseCoords(event);
         this.raycaster.setFromCamera(coords, this.camera);
+        
         const intersects = this.raycaster.intersectObjects(Array.from(this.agentMeshes.values()), true);
         
         if (!this.isMouseDown) {
@@ -254,10 +282,14 @@ export class ThreeGridScene extends HTMLElement {
         }
 
         if (this.isDragging && this.draggedAgentKey) {
+            // Wir casten NUR gegen die Boden-Zellen, um die X/Z Ebene zu bestimmen
             const ground = this.raycaster.intersectObjects(this.gridCells.flat());
             if (ground.length > 0) {
                 const mesh = this.agentMeshes.get(this.draggedAgentKey);
                 if (mesh) {
+                    // FIX: Wir ändern NUR x und z. 
+                    // Die Höhe (y) darf während des Ziehens NICHT verändert werden,
+                    // damit das Element nicht auf den Boden "klatscht" oder hüpft.
                     mesh.position.x = ground[0].object.userData.gridX + 0.5;
                     mesh.position.z = ground[0].object.userData.gridY + 0.5;
                 }
@@ -269,29 +301,40 @@ export class ThreeGridScene extends HTMLElement {
         if (this.isDragging && this.draggedAgentKey) {
             const mesh = this.agentMeshes.get(this.draggedAgentKey);
             if (mesh) {
-                // 1. Grid-Koordinaten berechnen
-                const newX = Math.floor(mesh.position.x);
-                const newY = Math.floor(mesh.position.z); // Three.js Z ist unser Grid-Y
-                
-                // 2. Level aus der vertikalen Höhe (Y) ableiten
-                // Da 1 Level = 400mm = 0.4 Three.js Einheiten:
+                // 1. Wir nutzen NICHT den Raycaster (der trifft oft die falsche Stelle/den Agenten selbst)
+                // Stattdessen nehmen wir die Position, an die das Mesh in onMouseMove bereits "gesnappt" ist.
+                // Da das Mesh immer auf .5 liegt (z.B. 1.5, 2.5), liefert Math.floor den exakten Integer.
+                const finalX = Math.floor(mesh.position.x);
+                const finalY = Math.floor(mesh.position.z);
+
+                // 2. Mesh-Position final zentrieren (Sicherheits-Snap)
+                mesh.position.x = finalX + 0.5;
+                mesh.position.z = finalY + 0.5;
+
+                // 3. Level berechnen
                 const level = Math.round(mesh.position.y / 0.4); 
 
-                // 3. Event mit allen 6 Feldern für den Elm-Port feuern
+                // 4. Update-Sperre aktivieren
+                this.isWaitingForSync = true;
+
+                console.log(`✅ Drop abgeschlossen: Agent ${this.draggedAgentKey} fest auf (${finalX}, ${finalY})`);
+                
+                // 5. Event an Elm schicken
                 this.dispatchEvent(new CustomEvent('agent-moved', {
                     detail: { 
                         agentId: this.draggedAgentKey, 
-                        newX: newX, 
-                        newY: newY,
+                        newX: finalX, 
+                        newY: finalY,
                         level: level,
-                        oldX: 0, // Falls du die alten Werte nicht in userData speicherst, 
-                        oldY: 0  // schicken wir 0, um den Port-Decoder zufrieden zu stellen.
+                        oldX: 0, 
+                        oldY: 0
                     },
                     bubbles: true, 
                     composed: true
                 }));
             }
         } else if (this.isMouseDown) {
+            // Einfacher Klick (Selection)
             const coords = this.getMouseCoords(event);
             this.raycaster.setFromCamera(coords, this.camera);
             const ground = this.raycaster.intersectObjects(this.gridCells.flat());
@@ -310,18 +353,27 @@ export class ThreeGridScene extends HTMLElement {
         // Status zurücksetzen
         this.isMouseDown = false;
         this.isDragging = false;
-        this.draggedAgentKey = null;
+        // WICHTIG: draggedAgentKey bleibt gesetzt, bis Elm per Property-Update (set agents) 
+        // neue Daten schickt und isWaitingForSync auf false setzt!
     }
 
     private updateAgents(agents: any[]) {
-        // Hilfsfunktion um die ID sicher zu extrahieren (Elm Maybe Support)
         const getSafeId = (a: any): string => {
-            if (typeof a.agent_id === 'string') return a.agent_id;
-            if (a.agent_id && a.agent_id.a) return String(a.agent_id.a); // Elm Just "ID"
-            return String(a.unique_id || a.id || "unknown");
+            const rawId = a.agent_id?.a || a.agent_id || a.unique_id || a.id;
+            return String(rawId || "unknown");
         };
 
         const currentIds = new Set(agents.map(getSafeId));
+        
+        // --- DIESER TEIL LÖSCHT DIE 3D-OBJEKTE ---
+        for (const [id, mesh] of this.agentMeshes.entries()) {
+            if (!currentIds.has(id)) {
+                this.scene.remove(mesh);
+                this.agentMeshes.delete(id);
+                console.log(`🗑️ 3D: Agent ${id} entfernt.`);
+            }
+        }
+        // ----------------------------------------
         
         // 1. Aufräumen
         for (const [id, mesh] of this.agentMeshes.entries()) {
@@ -333,22 +385,18 @@ export class ThreeGridScene extends HTMLElement {
 
         // 2. Verarbeiten
         agents.forEach(agent => {
-            const id = String(agent.agent_id || agent.unique_id || "");
-            
-            // Wenn dieser Agent gerade gezogen wird, ignorieren wir das Positions-Update von Elm!
-            if (id === this.draggedAgentKey) return; 
+            const id = getSafeId(agent);
+            if (id === this.draggedAgentKey) return;
 
-            const pos = agent.position;
-            if (!pos) return;
+            // --- FIX: Koordinaten strikt auf Gittermitte zwingen ---
+            const gx = Number(agent.position?.x ?? agent.x ?? 0);
+            const gy = Number(agent.position?.y ?? agent.y ?? 0);
+            const glvl = Number(agent.position?.level ?? agent.lvl ?? 0);
 
-            // FLEXIBLE KOORDINATEN: Sucht in .position ODER direkt im agent
-            const x = Number(agent.position?.x ?? agent.x ?? 0);
-            const y = Number(agent.position?.y ?? agent.y ?? 0);
-            const z = Number(agent.position?.z ?? agent.z ?? 0);
-
-            const tx = x + 0.5;
-            const tz = y + 0.5; // Grid-Y ist Three.js Z
-            const ty = z / 1000;
+            // Math.floor stellt sicher, dass wir bei 1.99 oder 1.01 immer die Zelle 1 treffen
+            const tx = Math.floor(gx) + 0.5;
+            const tz = Math.floor(gy) + 0.5; 
+            const ty = (glvl * 0.4) + 0.05; 
 
             let mesh = this.agentMeshes.get(id);
 
@@ -356,12 +404,19 @@ export class ThreeGridScene extends HTMLElement {
                 mesh = this.createAgentMesh(agent);
                 this.scene.add(mesh);
                 this.agentMeshes.set(id, mesh);
-                
-                // WICHTIG: Nutze hier ty (den berechneten Höhenwert), nicht 0.1!
-                mesh.position.set(tx, ty, tz); 
+                mesh.position.set(tx, ty, tz);
             } else {
-                // Beim Bewegen (Lerp) auch ty nutzen
-                mesh.position.lerp(new THREE.Vector3(tx, ty, tz), 0.2);
+                // FIX GEGEN HÜPFEN & VERSATZ:
+                const currentY = mesh.position.y;
+                if (Math.abs(currentY - ty) > 0.1) {
+                    mesh.position.y = ty; 
+                }
+
+                // Ziel-Vektor immer auf die .5 Mitte setzen
+                const targetPos = new THREE.Vector3(tx, mesh.position.y, tz);
+                mesh.position.lerp(targetPos, 0.2);
+                
+                mesh.position.y = THREE.MathUtils.lerp(mesh.position.y, ty, 0.1);
             }
 
             mesh.rotation.y = (Number(agent.orientation) || 0) * (Math.PI / 180);

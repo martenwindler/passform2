@@ -21,7 +21,7 @@ impl PlantModel {
 
     pub fn create_bay(&mut self, bay_id: &str, origin: [f64; 3]) {
         let bay_uuid = Uuid::new_v4().to_string();
-        let bay_name = format!("Bay{}", bay_id);
+        let bay_name = format!("{}", bay_id);
         let new_bay = Bay::new(&bay_uuid, &bay_name, origin, false);
         self.bays.push(new_bay);
     }

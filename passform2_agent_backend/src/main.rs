@@ -3,29 +3,32 @@
 use axum::{extract::State as AxumState, Json, http::Method};
 use socketioxide::{extract::{Data, SocketRef}, SocketIo, SocketIoConfig};
 use std::sync::Arc;
-use tracing::{info, warn, error};
+use tracing::{info, warn}; // 'error' entfernt, da ungenutzt
 use reqwest::Client as HttpClient;
 use tokio::sync::RwLock;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use tower_http::cors::{Any, CorsLayer};
 
-// Library-Importe aus dem Backend-Crate (SSoT)
+// Library-Importe aus dem Backend-Crate
 use passform_agent_backend::{
     AppState, PlantModel, SocketIoManager, SkillActionManager, PathManager, 
-    NodeManager, AgentManager, InventoryManager, InfraConfigManager, DataConfigManager, MatchManager, RfidManager, SystemRole, SystemMode
+    NodeManager, AgentManager, InventoryManager, InfraConfigManager, 
+    MatchManager, RfidManager, SystemRole // DataConfigManager & SystemMode entfernt
 };
 
+// Manager & Utils
 use passform_agent_backend::core::util::watchdog::Watchdog;
 use passform_agent_backend::ros::ros_client::RosClient;
 use passform_agent_backend::managers::{
     resource_manager::ResourceManager,
     protocol_manager::ProtocolManager,
     system_api::SystemApi,
-    basyx_manager::BasyxManager
+    basyx_manager::BasyxManager,
+    config_manager::ConfigManager,
 };
 
-// Behavior Tree & HTN Planner Importe
+// Behavior Tree & HTN
 use passform_agent_backend::behaviour_tree::skills::SkillLibrary;
 use passform_agent_backend::behaviour_tree::{NodeStatus, WorldState, HTNPlanner};
 
@@ -77,6 +80,49 @@ fn setup_socket_handlers(io: &SocketIo, state: Arc<AppState>) {
             });
         });
 
+        let s_for_config = s.clone();
+        socket.on("push_config", move |socket: SocketRef, Data(data): Data<serde_json::Value>| {
+            let s_config = s_for_config.clone();
+            tokio::spawn(async move {
+                info!("💾 SSoT Update via Socket empfangen. Speichere...");
+                
+                if s_config.data_config.save_config(&data) {
+                    // 1. RAM komplett leeren (Wichtig gegen Zombies!)
+                    {
+                        let mut am_guard = s_config.agent_manager.agents.write().await;
+                        am_guard.clear();
+                    }
+
+                    // 2. Neuaufbau aus dem JSON
+                    if let Some(agents_array) = data.get("agents").and_then(|v| v.as_array()) {
+                        for a in agents_array {
+                            let id = get_val_str(a, &["agent_id", "id", "unique_id"]);
+                            if id.is_empty() { continue; }
+
+                            let pos = a.get("position").unwrap_or(a);
+                            let x = get_val_i64(pos, &["x"]);
+                            let y = get_val_i64(pos, &["y"]);
+                            let lvl = get_val_i64(pos, &["level", "lvl"]);
+                            let orient = get_val_i64(a, &["orientation"]); // <--- NEU: Orientation mitnehmen
+                            let m_type = get_val_str(a, &["module_type", "type"]);
+                            
+                            s_config.agent_manager.sync_from_ros(id, m_type, x, y, orient, lvl).await;
+                        }
+                    }
+
+                    // 3. Globaler Broadcast des neuen RAM-Zustands
+                    let final_agents = s_config.agent_manager.agents.read().await;
+                    let list: Vec<_> = final_agents.values().cloned().collect();
+                    let _ = s_config.socket_manager.io.emit("active_agents", serde_json::json!({ "agents": list }));
+
+                    let _ = socket.emit("system_log", serde_json::json!({
+                        "message": "SSoT & RAM synchronisiert",
+                        "level": "success"
+                    }));
+                }
+            });
+        });
+
         // Skill Library & BT Sync
         let lib = SkillLibrary::from_path(&s.resource_manager.skills_path);
         let skills_json = serde_json::to_value(&lib.skills).unwrap_or_default();
@@ -105,100 +151,86 @@ async fn get_system_status(state: tauri::State<'_, Arc<AppState>>) -> Result<ser
     Ok(serde_json::json!({ "status": "active", "mode": mode.to_string(), "ros": "connected" }))
 }
 
-// --- MAIN ---
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
     info!("🚀 PassForm 2 Core & Tauri App starten...");
 
-    // 1. Infrastruktur-Config laden
+    // 1. Basis-Infrastruktur & ROS 2
     let infra_config = Arc::new(InfraConfigManager::new().expect("❌ Config Error"));
     let role = infra_config.get_role().await;
-
-    // 2. Pfade & Ressourcen-Setup
     let resource_path = PathBuf::from("../passform2_ws/src/passform_agent_resources");
     let resource_manager = Arc::new(ResourceManager::new(resource_path.clone()));
-
-    // 3. ROS 2 Initialisierung
+    
     let ros_context = rclrs::Context::new(std::env::args(), rclrs::InitOptions::default())?;
     let ros_client = Arc::new(RosClient::new(&ros_context)?);
 
-    // 4. Manager & Layer Setup
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST])
-        .allow_headers(Any);
+    // 2. ConfigManager & SSoT laden
+    // Wir laden die Daten ganz am Anfang, damit alle anderen Manager sie nutzen können.
+    let config_manager = Arc::new(ConfigManager::new());
+    let ssot_data = config_manager.load_config();
+    info!("📂 SSoT geladen: {} Agenten, {} Buchten gefunden.", ssot_data.agents.len(), ssot_data.bays.len());
 
-    let (layer, io) = SocketIo::builder()
-        .with_config(SocketIoConfig::default())
-        .build_layer();
-
-    let socket_manager = Arc::new(SocketIoManager::new(io.clone()));
-    let system_api = Arc::new(SystemApi::new());
-    let inventory_manager = Arc::new(InventoryManager::new(socket_manager.clone()));
-
+    // 3. PlantModel mit SSoT-Buchten initialisieren
     let mut plant = PlantModel::new(
         Some("plant_model_master_01".to_string()), 
         Some("PassForM_Production_Line".to_string())
     );
 
-    // Beispielhafte Buchten hinzufügen (kann auch aus einer Config kommen)
-    // Reihe 1: Positionen X: 1.0 bis 4.0 | Y: 1.0
-    plant.create_bay("Bay-Tisch-1", [1.0, 1.0, 0.0]);
-    plant.create_bay("Bay-Tisch-2", [2.0, 1.0, 0.0]);
-    plant.create_bay("Bay-Tisch-3", [3.0, 1.0, 0.0]);
-    plant.create_bay("Bay-Tisch-4", [4.0, 1.0, 0.0]);
-
-    // Reihe 2: Positionen X: 1.0 bis 4.0 | Y: 2.0
-    plant.create_bay("Bay-Tisch-5", [1.0, 2.0, 0.0]);
-    plant.create_bay("Bay-Tisch-6", [2.0, 2.0, 0.0]);
-    plant.create_bay("Bay-Tisch-7", [3.0, 2.0, 0.0]);
-    plant.create_bay("Bay-Tisch-8", [4.0, 2.0, 0.0]);
-
+    for bay_val in ssot_data.bays {
+        let name = bay_val["name"].as_str().unwrap_or("Unbekannte Bucht");
+        let x = bay_val["x"].as_f64().unwrap_or(0.0);
+        let y = bay_val["y"].as_f64().unwrap_or(0.0);
+        plant.create_bay(name, [x, y, 0.0]);
+    }
     let plant_arc = Arc::new(RwLock::new(plant));
 
-    // BasyxManager initialisieren
-    let basyx_manager = Arc::new(BasyxManager::new(
-        plant_arc.clone(),
-        "http://localhost:8081/aasServer".to_string()
-    ));
+    // 4. Socket & API Setup
+    let (layer, io) = SocketIo::builder()
+        .with_config(SocketIoConfig::default())
+        .build_layer();
+    let socket_manager = Arc::new(SocketIoManager::new(io.clone()));
+    let system_api = Arc::new(SystemApi::new());
+    let inventory_manager = Arc::new(InventoryManager::new(socket_manager.clone()));
 
-    // Automatische BaSyx-Registrierung im Hintergrund starten
-    let basyx_init = basyx_manager.clone();
-    tokio::spawn(async move {
-        info!("📡 Versuche PlantModel bei BaSyx zu registrieren...");
-        if let Err(e) = basyx_init.register_plant().await {
-            error!("❌ BaSyx-Registrierung fehlgeschlagen: {}", e);
-        }
-    });
+    // --- CORS DEFINITION ---
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST])
+        .allow_headers(Any);
+    // ---
 
-    // 1. Zuerst AgentManager (da SkillManager ihn braucht)
+    // 5. AgentManager & SSoT-Agenten laden
     let agent_manager = Arc::new(AgentManager::new(
         socket_manager.clone(), 
         resource_manager.clone(),
         plant_arc.clone()
     ));
 
-    // 2. Dann SkillActionManager (nutzt jetzt die Variable agent_manager)
+    // 6. Abhängige Manager (Skill, RFID, Basyx)
     let skill_manager = Arc::new(SkillActionManager::new(
         ros_client.node.clone(),
         plant_arc.clone(),
-        agent_manager.clone(), // Jetzt existiert die Variable!
+        agent_manager.clone(),
         resource_manager.clone()
     ));
     
-    // RFID Manager initialisieren
     let rfid_manager = Arc::new(RfidManager::new(
         socket_manager.clone(),
-        agent_manager.clone() // Er braucht Zugriff auf die Agents (Bays)
+        agent_manager.clone()
     ));
 
-    // Initialisierung des AppState (SSoT)
+    let basyx_manager = Arc::new(BasyxManager::new(
+        plant_arc.clone(),
+        "http://localhost:8081/aasServer".to_string()
+    ));
+
+    // 7. Globaler AppState (SSoT-Zentrale)
     let shared_state = Arc::new(AppState {
         hardware_registry: RwLock::new(HashMap::new()),
         agent_manager,
         infra_config,
-        data_config: Arc::new(DataConfigManager::new()),
+        data_config: config_manager.clone(), // Dein ConfigManager für späteres Speichern
         http_client: HttpClient::new(),
         socket_manager,
         inventory_manager,
@@ -231,13 +263,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         move |msg: passform_agent_resources::msg::AgentInfo| {
             let am = am_clone.clone();
             rt_handle.spawn(async move {
+                // Wir berechnen das Level aus Z (angenommen 400 Einheiten pro Level)
+                // Falls Z flach ist, ist das Level einfach 0.
+                let level = (msg.position.z / 400.0).round() as i32;
+
                 am.sync_from_ros(
                     msg.agent_id,
                     msg.module_type,
                     msg.position.x as i32,
                     msg.position.y as i32,
                     msg.orientation as i32,
-                    0, // status_code (0 = Status::Ok)
+                    level, // <--- Berechnetes Level statt msg.position.level
                 ).await;
             });
         },
@@ -315,7 +351,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- 6. Axum Server Task ---
     let axum_state = shared_state.clone();
     let io_layer = layer.clone(); 
-    let cors_layer = cors.clone(); // Klon für den Thread
+    let cors_layer = cors.clone();
 
     tokio::spawn(async move {
         let app = axum::Router::new()
@@ -342,6 +378,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         axum::serve(listener, app).await.unwrap();
     });
 
+    // =========================================================================
+    // 🚀 INITIALISIERUNG: SOCKETS -> AGENTEN -> PROTOCOLS
+    // =========================================================================
+
+    // 1. Zuerst die Sockets registrieren (Verhindert den "Namespace not found" Panic)
+    setup_socket_handlers(&io, shared_state.clone());
+    info!("✅ Socket.io Namespace '/' registriert.");
+
+    // 2. Jetzt die Agenten aus der SSoT laden
+    // 2. Jetzt die Agenten aus der SSoT laden
+    let am_init = shared_state.agent_manager.clone();
+    let agents_to_load = ssot_data.agents.clone();
+    tokio::spawn(async move {
+        for a in &agents_to_load { 
+            let id = get_val_str(a, &["agent_id", "id", "unique_id"]);
+            if id.is_empty() { continue; } 
+
+            let m_type = get_val_str(a, &["module_type", "type"]).replace("Station", "Tisch");
+            
+            let pos = a.get("position").unwrap_or(a);
+            let x = get_val_i64(pos, &["x"]);
+            let y = get_val_i64(pos, &["y"]);
+            let lvl = get_val_i64(pos, &["level", "lvl"]);
+            let orient = get_val_i64(a, &["orientation"]);
+
+            am_init.sync_from_ros(id, m_type, x, y, orient, lvl).await;
+        }
+        info!("✅ {} Agenten aus SSoT erfolgreich registriert.", agents_to_load.len());
+    });
+
+    // 3. Optional: Protocol Manager (MQTT) starten oder auskommentiert lassen
+    /*
+    let mut protocol_manager = ProtocolManager::new(shared_state.clone());
+    tokio::spawn(async move {
+        protocol_manager.run().await;
+    });
+    */
+    warn!("⚠️ ProtocolManager (MQTT) ist aktuell deaktiviert.");
+
+    let cors_layer = cors.clone();
+
     // 7. BT Test Logic
     let skill_lib = SkillLibrary::from_path(&resource_manager.skills_path);
     if let Some(complex_skill) = skill_lib.skills.iter().find(|s| s.skill_type == "CUSTOM") {
@@ -356,7 +433,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 8. Tauri App Run
-    setup_socket_handlers(&io, shared_state.clone());
     let tauri_state = shared_state.clone();
     tauri::Builder::default()
         .manage(tauri_state)
@@ -432,4 +508,18 @@ async fn handle_planning_request(
         Ok(plan) => Json(serde_json::json!({ "status": "success", "plan": plan })),
         Err(e) => Json(serde_json::json!({ "status": "error", "message": e })),
     }
+}
+
+fn get_val_str(v: &serde_json::Value, keys: &[&str]) -> String {
+    for k in keys {
+        if let Some(s) = v.get(k).and_then(|v| v.as_str()) { return s.to_string(); }
+    }
+    "".to_string()
+}
+
+fn get_val_i64(v: &serde_json::Value, keys: &[&str]) -> i32 {
+    for k in keys {
+        if let Some(n) = v.get(k).and_then(|v| v.as_i64()) { return n as i32; }
+    }
+    0
 }

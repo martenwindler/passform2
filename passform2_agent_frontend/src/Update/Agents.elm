@@ -16,19 +16,17 @@ updateOccupancy agents bays =
     List.map
         (\bay ->
             let
-                posX =
-                    round bay.origin.x
+                -- floor sorgt dafür, dass 2.5 zu 2 wird (passend zum Int-Grid)
+                posX = floor bay.origin.x
+                posY = floor bay.origin.y
 
-                posY =
-                    round bay.origin.y
-
-                -- Wir suchen gezielt nach einem Agenten auf Level 0 (Boden)
-                maybeAgent =
-                    Dict.get ( posX, posY, 0 ) agents
+                -- Suche Agent auf Level 0 an dieser Stelle
+                maybeAgent = Dict.get ( posX, posY, 0 ) agents
             in
             case maybeAgent of
                 Just agent ->
-                    { bay | occupation = True, module_uuid = Maybe.withDefault "Unknown" agent.agent_id }
+                    -- Hier wird die ID des Agenten explizit in die Bay geschrieben
+                    { bay | occupation = True, module_uuid = Maybe.withDefault "" agent.agent_id }
 
                 Nothing ->
                     { bay | occupation = False, module_uuid = "" }
@@ -79,7 +77,7 @@ update msg model =
 
         MoveAgent agentId targetCell ->
             let
-                -- 1. Den Agenten anhand seiner ID im Dictionary finden
+                -- 1. Den Agenten anhand seiner ID finden (egal wo er im Dict steckt)
                 maybeAgent =
                     model.agents
                         |> Dict.values
@@ -89,21 +87,19 @@ update msg model =
             case maybeAgent of
                 Just agent ->
                     let
-                        -- 2. Den alten Key für das Löschen speichern
                         oldKey = ( agent.position.x, agent.position.y, agent.position.level )
 
-                        -- 3. Das neue Level am Zielort (targetCell) bestimmen
-                        -- Wir zählen, wie viele Agenten dort schon stehen
+                        -- 2. Level-Berechnung für das Stacking:
+                        -- Wir schauen, wie viele Agenten (ohne den aktuell bewegten) schon an targetCell (x,y) stehen.
                         newLevel =
                             model.agents
-                                |> Dict.keys
-                                |> List.filter (\( x, y, _ ) -> x == targetCell.x && y == targetCell.y)
-                                |> List.length
+                                |> Dict.filter (\(x, y, _) _ -> x == targetCell.x && y == targetCell.y)
+                                |> Dict.filter (\key _ -> key /= oldKey) -- Den "Self-Count" verhindern
+                                |> Dict.size
 
-                        -- 4. Die neue Z-Höhe berechnen (400mm pro Ebene)
+                        -- 3. Z-Koordinate für ROS/3D berechnen (400mm pro Etage)
                         newZ = newLevel * 400
 
-                        -- 5. Agent-Daten mit neuer Position aktualisieren
                         updatedAgent =
                             { agent | position = 
                                 { x = targetCell.x
@@ -113,20 +109,44 @@ update msg model =
                                 } 
                             }
 
-                        -- 6. Alten Eintrag entfernen und neuen (mit 3D-Key) einfügen
+                        -- 4. Agenten-Map aktualisieren (Verschieben im Dict)
                         newAgents =
                             model.agents
                                 |> Dict.remove oldKey
                                 |> Dict.insert ( targetCell.x, targetCell.y, newLevel ) updatedAgent
+
+                        -- 5. SPATIAL MAPPING: Buchten-Zustand berechnen
+                        -- Wir iterieren über alle Buchten und prüfen, ob auf Level 0 ein Agent steht.
+                        newBays =
+                            model.bays
+                                |> List.map (\bay ->
+                                    let
+                                        occupyingAgent =
+                                            newAgents
+                                                |> Dict.get ( round bay.origin.x, round bay.origin.y, 0 )
+
+                                        isOccupied =
+                                            case occupyingAgent of
+                                                Just _ -> True
+                                                Nothing -> False
+
+                                        agentUuid =
+                                            occupyingAgent 
+                                                |> Maybe.andThen .agent_id 
+                                                |> Maybe.withDefault ""
+                                    in
+                                    { bay | occupation = isOccupied, module_uuid = agentUuid }
+                                )
+
+                        updatedModel = { model | agents = newAgents, bays = newBays }
                     in
-                    ( { model | agents = newAgents }
-                    , Ports.pushConfig (Decoders.encodeFullConfig { model | agents = newAgents })
+                    ( updatedModel
+                    , Ports.pushConfig (Decoders.encodeFullConfig updatedModel) 
                     )
 
                 Nothing ->
-                    -- Falls der Agent nicht gefunden wurde, passiere nichts
                     ( model, Cmd.none )
-                    
+
         HandleGridClick cell ->
             let
                 -- Suche alle Agenten an dieser X/Y-Stelle
@@ -208,15 +228,18 @@ update msg model =
 
         RemoveAgent cell ->
             let
-                -- Gezieltes Löschen auf der jeweiligen Ebene
                 updatedAgents =
                     Dict.remove ( cell.x, cell.y, cell.level ) model.agents
 
                 updatedBays =
                     updateOccupancy updatedAgents model.bays
-
-                newModel =
-                    { model | agents = updatedAgents, bays = updatedBays, activeMenu = Nothing, currentPath = Nothing }
+                    
+                newModel = 
+                    { model 
+                    | agents = updatedAgents
+                    , bays = updatedBays
+                    , activeMenu = Nothing 
+                    }
             in
             ( newModel, Ports.pushConfig (Decoders.encodeFullConfig newModel) )
 

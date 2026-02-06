@@ -1,0 +1,29 @@
+{
+  "name": "Passform 2.0 Control Console",
+  "short_name": "Passform 2.0",
+  "description": "Zentrale Steuerungskonsole für Agentensysteme – BIBA Bremen",
+  "id": "/passform-console",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8F9FA",
+  "theme_color": "#3D405B",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "https://passform.biba.uni-bremen.de/wp-content/uploads/2022/01/cropped-Zeichenflaeche-13@4x-1-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "https://passform.biba.uni-bremen.de/wp-content/uploads/2022/01/cropped-Zeichenflaeche-13@4x-1-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://passform.biba.uni-bremen.de/wp-content/uploads/2022/01/cropped-Zeichenflaeche-13@4x-1-192x192.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

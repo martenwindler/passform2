@@ -11,55 +11,24 @@ import Json.Encode as Encode
 
 moduleTypeDecoder : Decoder ModuleType
 moduleTypeDecoder =
-    string
-        |> Decode.map
-            (\s ->
-                case String.toLower s of
-                    "ftf" ->
-                        FTF
-
-                    "ranger" ->
-                        FTF
-
-                    "conveyeur" ->
-                        Conveyeur
-
-                    "conveyor" ->
-                        Conveyeur
-
-                    "rollen_ns" ->
-                        RollenModul
-
-                    "rollenmodul" ->
-                        RollenModul
-
-                    "mensch" ->
-                        Mensch
-
-                    "human_operator" ->
-                        Mensch
-
-                    "greifer" ->
-                        Greifer
-
-                    "ur5__gripper" ->
-                        Greifer
-
-                    "tisch" ->
-                        Station
-
-                    "station" ->
-                        Station
-
-                    "y-module" ->
-                        Station
-
-                    "ur5" ->
-                        Station
-
-                    _ ->
-                        UnknownModule s
-            )
+    string |> Decode.map (\s ->
+        case String.toLower s of
+            "ftf" -> FTF
+            "ranger" -> FTF
+            "conveyeur" -> Conveyeur
+            "conveyor" -> Conveyeur
+            "rollen_ns" -> RollenModul
+            "rollenmodul" -> RollenModul
+            "mensch" -> Mensch
+            "human_operator" -> Mensch
+            "greifer" -> Greifer
+            "ur5__gripper" -> Greifer
+            "tisch" -> Station
+            "station" -> Station
+            "y-module" -> Station
+            "ur5" -> Station
+            _ -> UnknownModule s
+    )
 
 
 logLevelDecoder : Decoder LogLevel
@@ -144,10 +113,10 @@ decodeRfid =
 gridCellDecoder : Decoder GridCell
 gridCellDecoder =
     Decode.map4 GridCell
-        (Decode.field "x" Decode.int)
-        (Decode.field "y" Decode.int)
+        (Decode.oneOf [ Decode.field "x" Decode.int, Decode.succeed 0 ])
+        (Decode.oneOf [ Decode.field "y" Decode.int, Decode.succeed 0 ])
         (Decode.oneOf [ Decode.field "z" Decode.int, Decode.succeed 0 ])
-        (Decode.oneOf [ Decode.field "level" Decode.int, Decode.succeed 0 ])
+        (Decode.oneOf [ Decode.field "level" Decode.int, Decode.field "lvl" Decode.int, Decode.succeed 0 ])
 
 
 andMap : Decoder a -> Decoder (a -> b) -> Decoder b
@@ -170,22 +139,21 @@ agentModuleDecoder =
 
 -- Ersetze deinen agentMapDecoder in Decoders.elm durch diesen:
 
-agentMapDecoder : Decode.Decoder (Dict (Int, Int, Int) AgentModule)
+agentMapDecoder : Decoder (Dict (Int, Int, Int) AgentModule)
 agentMapDecoder =
-    -- Wir probieren drei Varianten, falls eine scheitert:
     Decode.oneOf
-        [ -- 1. Das Ideal: Ein Objekt mit "agents": [...]
+        [ -- Fall 1: Backend schickt { "agents": [...] }
           Decode.field "agents" decodeAgentListAsDict
-        , -- 2. Fallback: Eine direkte Liste von Agenten [...]
+        , -- Fall 2: Backend schickt direkt eine Liste [...]
           decodeAgentListAsDict
-        , -- 3. Fallback: Ein direktes Dictionary {"0,0": {...}}
+        , -- Fall 3: Backend schickt eine Map { "1,1,0": {...} }
           decodeAgentDictDirectly
         ]
 
 
 -- HILFSFUNKTIONEN FÜR DEN DECODER --
 
-decodeAgentListAsDict : Decode.Decoder (Dict (Int, Int, Int) AgentModule)
+decodeAgentListAsDict : Decoder (Dict (Int, Int, Int) AgentModule)
 decodeAgentListAsDict =
     Decode.list agentDecoder
         |> Decode.map (\list -> 
@@ -193,8 +161,8 @@ decodeAgentListAsDict =
                 |> List.map (\a -> ( (a.position.x, a.position.y, a.position.level), a ))
                 |> Dict.fromList
         )
-
-decodeAgentDictDirectly : Decode.Decoder (Dict (Int, Int, Int) AgentModule)
+        
+decodeAgentDictDirectly : Decoder (Dict (Int, Int, Int) AgentModule)
 decodeAgentDictDirectly =
     Decode.dict agentDecoder
         |> Decode.map (\dict ->
@@ -204,17 +172,18 @@ decodeAgentDictDirectly =
                 |> Dict.fromList
         )
 
+{-| Der zentrale Decoder für ein Agenten-Modul (verarbeitet das flache Rust-Format) -}
 agentDecoder : Decoder AgentModule
 agentDecoder =
     Decode.succeed AgentModule
         |> andMap (Decode.maybe (Decode.field "agent_id" Decode.string))
-        |> andMap (Decode.field "module_type" decodeModuleType)
-        |> andMap decodeFlexiblePosition 
+        |> andMap (Decode.field "module_type" moduleTypeDecoder)
+        |> andMap gridCellDecoder 
         |> andMap (Decode.oneOf [ Decode.field "orientation" Decode.int, Decode.succeed 0 ])
         |> andMap (Decode.oneOf [ Decode.field "is_dynamic" Decode.bool, Decode.succeed False ])
         |> andMap (Decode.oneOf [ Decode.field "payload" (Decode.maybe Decode.string), Decode.succeed Nothing ])
         |> andMap (Decode.oneOf [ Decode.field "signal_strength" Decode.int, Decode.succeed 100 ])
-        |> andMap (Decode.oneOf [ Decode.field "status" hardwareStatusDecoder, Decode.succeed Online ]) 
+        |> andMap (Decode.oneOf [ Decode.field "status" hardwareStatusDecoder, Decode.succeed Online ])
 
 -- Hilfsfunktion: Versucht x/y flach ODER in einem position-Objekt zu finden
 decodeFlexiblePosition : Decoder GridCell
@@ -231,10 +200,10 @@ decodePositionFromFlat = decodeGridCell
 decodeGridCell : Decoder GridCell
 decodeGridCell =
     Decode.map4 GridCell
-        (Decode.field "x" Decode.int)
-        (Decode.field "y" Decode.int)
+        (Decode.oneOf [ Decode.field "x" Decode.int, Decode.succeed 0 ])
+        (Decode.oneOf [ Decode.field "y" Decode.int, Decode.succeed 0 ])
         (Decode.oneOf [ Decode.field "z" Decode.int, Decode.succeed 0 ])
-        (Decode.oneOf [ Decode.field "level" Decode.int, Decode.succeed 0 ])
+        (Decode.oneOf [ Decode.field "level" Decode.int, Decode.field "lvl" Decode.int, Decode.succeed 0 ])
 
 -- Hilfsfunktion um "0,0" zu (0,0) zu machen
 parseKey : String -> (Int, Int)
@@ -389,12 +358,23 @@ encodePlanningData data =
 encodeFullConfig : Model -> Encode.Value
 encodeFullConfig model =
     Encode.object
-        [ ( "agents", encodeAgentMap model.agents )
+        [ ( "config"
+          , Encode.object 
+                [ ( "grid"
+                  , Encode.object 
+                        [ ( "width", Encode.int model.gridWidth )
+                        , ( "height", Encode.int model.gridHeight )
+                        ]
+                  )
+                ]
+          )
+        , ( "agents", encodeAgentMap model.agents )
         , ( "bays", Encode.list encodeBay model.bays )
+        -- inventory und worldState können wir mitschicken, Rust ignoriert sie jetzt
         , ( "inventory", encodeInventory model.inventory )
-        , ( "worldState", encodeInventory model.inventory ) -- Oft identisch mit Inventory, falls kein separater Typ
+        , ( "worldState", encodeInventory model.inventory )
         ]
-
+        
 -- Hilfs-Encoder für das Inventar
 encodeInventory : List WorldItem -> Encode.Value
 encodeInventory items =
@@ -443,7 +423,7 @@ encodeQuaternion q =
 encodeAgent : AgentModule -> Encode.Value
 encodeAgent agent =
     Encode.object
-        [ ( "agent_id", Encode.string (Maybe.withDefault "unknown" agent.agent_id) )
+        [ ( "agent_id", Encode.string (Maybe.withDefault "Unknown-ID" agent.agent_id) )
         , ( "module_type", Encode.string (moduleTypeToString agent.module_type) )
         , ( "x", Encode.int agent.position.x )
         , ( "y", Encode.int agent.position.y )

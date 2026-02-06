@@ -219,41 +219,33 @@ view3D model =
                 AppMode -> "app"
     in
     node "three-grid-scene"
-        [ -- Basis-Konfiguration
+        [ -- 1. Einfache Flags bleiben Attribute (Strings sind hier ok)
           attribute "grid-width" (String.fromInt model.gridWidth)
         , attribute "grid-height" (String.fromInt model.gridHeight)
         , attribute "is-3d" (if model.is3D then "true" else "false")
-        
-        -- Interaktions-Logik
         , attribute "allow-interaction" allowInteraction 
         , attribute "active-layout" layoutModeStr
         
-        -- Daten-Objekte
-        , attribute "agents" (model.agents |> Decoders.encodeAgentMap |> Encode.encode 0)
-        , attribute "path" (model.currentPath |> Maybe.map Decoders.encodePath |> Maybe.withDefault Encode.null |> Encode.encode 0)
+        -- 2. KOMPLEXE DATEN als Property (Kein Encode.encode 0 nötig!)
+        -- Das schickt das echte JS-Objekt direkt an die Three.js Klasse
+        , Html.Attributes.property "agents" (Decoders.encodeAgentMap model.agents)
+        , Html.Attributes.property "bays" (Decoders.encodeBayList model.bays)
+        , Html.Attributes.property "currentPath" (model.currentPath |> Maybe.map Decoders.encodePath |> Maybe.withDefault Encode.null)
         
-        -- NEU: Die Buchten für die Unterlegung (Umrandung)
-        , attribute "bays" (model.bays |> Decoders.encodeBayList |> Encode.encode 0)
-        
-        -- Positionen (Original Inline Logik)
-        , attribute "start-pos" 
+        -- 3. Positionen (Ebenfalls als Property für sauberes Mapping)
+        , Html.Attributes.property "startPos" 
             (model.pathStart 
                 |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) 
                 |> Maybe.withDefault Encode.null 
-                |> Encode.encode 0
             )
-        , attribute "goal-pos" 
+        , Html.Attributes.property "goalPos" 
             (model.pathGoal 
                 |> Maybe.map (\c -> Encode.object [ ( "x", Encode.int c.x ), ( "y", Encode.int c.y ) ]) 
                 |> Maybe.withDefault Encode.null 
-                |> Encode.encode 0
             )
 
         -- --- EVENT LISTENER ---
-        -- 1. Klick auf Zelle
         , Ports.onCellClicked (HandleGridClick >> AgentsMsg)
-
-        -- 2. NEU: Drag & Drop Ende abfangen
         , Html.Events.on "agent-moved" (Decode.at ["detail"] decodeMoveAgent)
         ]
         []
@@ -270,10 +262,10 @@ encodePos maybeCell =
 decodeMoveAgent : Decode.Decoder Msg
 decodeMoveAgent =
     Decode.map2 (\id cell -> AgentsMsg (MoveAgent id cell))
-    (Decode.field "agentId" Decode.string)
-    (Decode.map4 GridCell 
-        (Decode.field "newX" Decode.int) 
-        (Decode.field "newY" Decode.int)
-        (Decode.succeed 0) -- z
-        (Decode.succeed 0) -- level
-    )
+        (Decode.field "agentId" Decode.string)
+        (Decode.map4 GridCell 
+            (Decode.field "newX" Decode.int) 
+            (Decode.field "newY" Decode.int)
+            (Decode.succeed 0) -- z
+            (Decode.field "level" Decode.int) 
+        )

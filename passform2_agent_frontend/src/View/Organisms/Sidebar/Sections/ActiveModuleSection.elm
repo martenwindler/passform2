@@ -93,23 +93,27 @@ viewBayItem bay =
         ]
         [ div [ class "flex flex-col gap-1" ]
             [ div [ class "flex items-center gap-2" ]
-                [ span [ class "font-black text-white text-sm uppercase tracking-tight" ] 
-                    [ text displayName ]
+                [ -- Der statische Name aus Rust (z.B. "Bucht 1")
+                span [ class "font-black text-white text-sm uppercase tracking-tight" ] 
+                    [ text bay.name ] 
                 , if bay.occupation then
                     span [ class "text-[9px] bg-cyan-500 text-black px-1.5 py-0.5 font-black rounded-xs animate-pulse" ] 
-                        [ text "OCCUPIED" ]
-                  else
+                        [ text "\u{00A0}BELEGT" ] 
+                else
                     span [ class "text-[9px] text-white/20 font-bold border border-white/10 px-1.5 py-0.5 rounded-xs" ] 
-                        [ text "VACANT" ]
+                        [ text "\u{00A0}FREI" ]
                 ]
             , if bay.occupation then
+                -- Die dynamische ID des Agenten (enthält Typ & Position)
                 span [ class "agent-coords font-mono text-cyan-400/60 text-[0.7rem] font-bold italic" ] 
-                    [ text ("ID: " ++ bay.module_uuid) ]
-              else
+                    [ text ("ID: " ++ bay.module_uuid) ] 
+            else
+                -- Physische Position der Bucht im Raum
                 span [ class "agent-coords font-mono text-white/20 text-[0.7rem] font-bold" ] 
                     [ text ("POS: " ++ String.fromFloat bay.origin.x ++ " / " ++ String.fromFloat bay.origin.y) ]
             ]
-        , div [ class "w-6 h-6" ] [] 
+        , -- Platzhalter für Interaktions-Buttons (z.B. ein Mülleimer-Icon zum Entfernen)
+        div [ class "w-6 h-6 flex items-center justify-center" ] [] 
         ]
 
 {-| Formatiert den Modultyp -}

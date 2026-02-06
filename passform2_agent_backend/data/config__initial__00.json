@@ -1,0 +1,247 @@
+{
+  "config": {
+    "grid": {
+      "height": 4,
+      "width": 6
+    }
+  },
+  "agents": [
+    {
+      "agent_id": "Station-1-1-L0",
+      "is_dynamic": false,
+      "level": 0,
+      "module_type": "tisch",
+      "orientation": 0,
+      "position": {
+        "level": 0,
+        "x": 1,
+        "y": 1,
+        "z": 0
+      },
+      "signal_strength": 100,
+      "x": 1,
+      "y": 1,
+      "z": 0
+    },
+    {
+      "agent_id": "Station-1-2-L0",
+      "is_dynamic": false,
+      "level": 0,
+      "module_type": "tisch",
+      "orientation": 0,
+      "position": {
+        "level": 0,
+        "x": 1,
+        "y": 2,
+        "z": 0
+      },
+      "signal_strength": 100,
+      "x": 1,
+      "y": 2,
+      "z": 0
+    },
+    {
+      "agent_id": "Greifer-1-2-L1",
+      "is_dynamic": false,
+      "level": 1,
+      "module_type": "greifer",
+      "orientation": 0,
+      "position": {
+        "level": 1,
+        "x": 1,
+        "y": 2,
+        "z": 400
+      },
+      "signal_strength": 100,
+      "x": 1,
+      "y": 2,
+      "z": 400
+    },
+    {
+      "agent_id": "Station-2-1-L0",
+      "is_dynamic": false,
+      "level": 0,
+      "module_type": "tisch",
+      "orientation": 0,
+      "position": {
+        "level": 0,
+        "x": 2,
+        "y": 1,
+        "z": 0
+      },
+      "signal_strength": 100,
+      "x": 2,
+      "y": 1,
+      "z": 0
+    },
+    {
+      "agent_id": "Station-2-2-L0",
+      "is_dynamic": false,
+      "level": 0,
+      "module_type": "tisch",
+      "orientation": 0,
+      "position": {
+        "level": 0,
+        "x": 2,
+        "y": 2,
+        "z": 0
+      },
+      "signal_strength": 100,
+      "x": 2,
+      "y": 2,
+      "z": 0
+    },
+    {
+      "agent_id": "Rollen-2-2-L1",
+      "is_dynamic": false,
+      "level": 1,
+      "module_type": "rollen_ns",
+      "orientation": 0,
+      "position": {
+        "level": 1,
+        "x": 2,
+        "y": 2,
+        "z": 400
+      },
+      "signal_strength": 100,
+      "x": 2,
+      "y": 2,
+      "z": 400
+    },
+    {
+      "agent_id": "Station-3-1-L0",
+      "is_dynamic": false,
+      "level": 0,
+      "module_type": "tisch",
+      "orientation": 0,
+      "position": {
+        "level": 0,
+        "x": 3,
+        "y": 1,
+        "z": 0
+      },
+      "signal_strength": 100,
+      "x": 3,
+      "y": 1,
+      "z": 0
+    },
+    {
+      "agent_id": "Station-3-2-L0",
+      "is_dynamic": false,
+      "level": 0,
+      "module_type": "tisch",
+      "orientation": 0,
+      "position": {
+        "level": 0,
+        "x": 3,
+        "y": 2,
+        "z": 0
+      },
+      "signal_strength": 100,
+      "x": 3,
+      "y": 2,
+      "z": 0
+    },
+    {
+      "agent_id": "Conveyeur-3-2-L1",
+      "is_dynamic": false,
+      "level": 1,
+      "module_type": "conveyeur",
+      "orientation": 0,
+      "position": {
+        "level": 1,
+        "x": 3,
+        "y": 2,
+        "z": 400
+      },
+      "signal_strength": 100,
+      "x": 3,
+      "y": 2,
+      "z": 400
+    },
+    {
+      "agent_id": "Station-4-1-L0",
+      "is_dynamic": false,
+      "level": 0,
+      "module_type": "tisch",
+      "orientation": 0,
+      "position": {
+        "level": 0,
+        "x": 4,
+        "y": 1,
+        "z": 0
+      },
+      "signal_strength": 100,
+      "x": 4,
+      "y": 1,
+      "z": 0
+    }
+  ],
+  "bays": [
+    {
+      "name": "Bucht_1",
+      "occupation": true,
+      "status": "Ok",
+      "unique_id": "e450300f-2e48-4955-af35-91b6853de857",
+      "x": 1,
+      "y": 1
+    },
+    {
+      "name": "Bucht_2",
+      "occupation": true,
+      "status": "Ok",
+      "unique_id": "5409f186-904c-4fee-85db-5c518da633a8",
+      "x": 2,
+      "y": 1
+    },
+    {
+      "name": "Bucht_3",
+      "occupation": true,
+      "status": "Ok",
+      "unique_id": "ececd9a8-5065-4cef-bac5-cd749991537a",
+      "x": 3,
+      "y": 1
+    },
+    {
+      "name": "Bucht_4",
+      "occupation": true,
+      "status": "Ok",
+      "unique_id": "0b237699-8474-4b20-b78a-91c33151f6a8",
+      "x": 4,
+      "y": 1
+    },
+    {
+      "name": "Bucht_5",
+      "occupation": true,
+      "status": "Ok",
+      "unique_id": "cb2a5410-0cd9-429c-b947-0521df40b7a9",
+      "x": 1,
+      "y": 2
+    },
+    {
+      "name": "Bucht_6",
+      "occupation": true,
+      "status": "Ok",
+      "unique_id": "a9976b5f-1c00-4b5a-97af-7bc18aa9fa19",
+      "x": 2,
+      "y": 2
+    },
+    {
+      "name": "Bucht_7",
+      "occupation": true,
+      "status": "Ok",
+      "unique_id": "3022e315-3e36-405f-be7b-26aec9cc3ba5",
+      "x": 3,
+      "y": 2
+    },
+    {
+      "name": "Bucht_8",
+      "occupation": false,
+      "status": "Ok",
+      "unique_id": "913d4e7a-c41d-41d5-aa6f-0cad0be87aef",
+      "x": 4,
+      "y": 2
+    }
+  ],
+  "last_update": "2026-02-06T21:22:40.764498198+01:00"
+}

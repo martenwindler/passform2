@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use tracing::{warn, error, info};
 
 use crate::core::types::AgentEntry;
-use crate::core::types::plant_model::PlantModel; // NEU
+use crate::core::types::plant_model::PlantModel; 
 use crate::managers::socket_io_manager::SocketIoManager;
 use crate::managers::resource_manager::ResourceManager; 
 use crate::core::types::Status;
@@ -21,7 +21,7 @@ pub struct LogEntry {
 
 pub struct AgentManager {
     pub agents: RwLock<HashMap<String, AgentEntry>>,
-    pub plant: Arc<RwLock<PlantModel>>, // NEU: Zugriff auf das Layout
+    pub plant: Arc<RwLock<PlantModel>>, 
     pub logs: RwLock<VecDeque<LogEntry>>,
     pub socket_manager: Arc<SocketIoManager>,
     pub resource_manager: Arc<ResourceManager>,
@@ -32,7 +32,7 @@ impl AgentManager {
     pub fn new(
         socket_manager: Arc<SocketIoManager>, 
         resource_manager: Arc<ResourceManager>,
-        plant: Arc<RwLock<PlantModel>> // NEU
+        plant: Arc<RwLock<PlantModel>> 
     ) -> Self {
         Self {
             agents: RwLock::new(HashMap::new()),
@@ -64,7 +64,6 @@ impl AgentManager {
         let threshold = 0.5; // 50cm Toleranzbereich
 
         for bay in plant_guard.bays.iter_mut() {
-            // Distanzberechnung (Euklidisch)
             let dx = x - bay.origin[0];
             let dy = y - bay.origin[1];
             let distance = (dx * dx + dy * dy).sqrt();
@@ -76,7 +75,6 @@ impl AgentManager {
                     bay.module_uuid = agent_id.to_string();
                 }
             } else if bay.module_uuid == agent_id {
-                // Agent war hier, ist aber jetzt weg
                 info!("💨 Agent {} hat Bay {} verlassen", agent_id, bay.name);
                 bay.occupation = false;
                 bay.module_uuid = String::new();
@@ -86,10 +84,7 @@ impl AgentManager {
 
     async fn broadcast_update(&self) {
         let timeout = 10.0;
-        let agents_json: Vec<serde_json::Value> = {
-            let agents_guard = self.agents.read().await;
-            agents_guard.values().map(|a| Self::agent_to_json(a, timeout)).collect()
-        };
+        let agents_json = self.get_active_agents_json(timeout).await;
         
         self.socket_manager.emit_event(
             "active_agents",
@@ -97,12 +92,13 @@ impl AgentManager {
         ).await;
     }
 
-    pub async fn add_agent(&self, id: String, m_type: String, x: i32, y: i32) {
+    pub async fn add_agent(&self, id: String, m_type: String, x: i32, y: i32, lvl: i32) {
         let m_type_lower = m_type.to_lowercase();
         if self.resource_manager.agent_configs.contains_key(&m_type_lower) {
             {
                 let mut agents = self.agents.write().await;
-                let new_agent = AgentEntry::new(id.clone(), m_type, x, y);
+                // KORREKTUR: AgentEntry::new mit 5 Parametern aufrufen
+                let new_agent = AgentEntry::new(id.clone(), m_type, x, y, lvl);
                 agents.insert(id.clone(), new_agent);
             }
             self.update_spatial_mapping(&id, x as f64, y as f64).await;
@@ -113,23 +109,37 @@ impl AgentManager {
         }
     }
 
-    pub async fn sync_from_ros(&self, id: String, m_type: String, x: i32, y: i32, orient: i32, status_code: i32) {
+    pub async fn sync_from_ros(&self, id: String, m_type: String, x: i32, y: i32, orient: i32, lvl: i32) {
         {
             let mut agents = self.agents.write().await;
             let agent = agents.entry(id.clone()).or_insert_with(|| {
-                AgentEntry::new(id.clone(), m_type, x, y)
+                // KORREKTUR: AgentEntry::new mit 5 Parametern aufrufen
+                AgentEntry::new(id.clone(), m_type, x, y, lvl)
             });
             
             agent.x = x;
             agent.y = y;
+            agent.level = lvl; 
+            agent.z = (lvl * 400) as f64;
             agent.orientation = orient;
             agent.last_seen = Instant::now();
-            agent.status = Status::from(status_code); 
         }
         
-        // Räumliche Prüfung bei jedem ROS-Update
         self.update_spatial_mapping(&id, x as f64, y as f64).await;
         self.broadcast_update().await;
+    }
+
+    /// Zentrale Methode für den JSON-Export (wichtig für Elm-Dictionary Mapping)
+    pub async fn get_active_agents_json(&self, timeout_period: f64) -> serde_json::Value {
+        let agents = self.agents.read().await;
+        let mut map = serde_json::Map::new();
+        for a in agents.values() {
+            // FALSCH: format!("{},{}", a.x, a.y) 
+            // RICHTIG:
+            let key = format!("{},{},{}", a.x, a.y, a.level); 
+            map.insert(key, Self::agent_to_json(a, timeout_period));
+        }
+        serde_json::Value::Object(map)
     }
 
     pub async fn execute_mission(&self, ftf_id: String, path: Vec<(i32, i32)>, _start_pos: (i32, i32), _goal_pos: (i32, i32)) {
@@ -167,15 +177,5 @@ impl AgentManager {
         if logs.len() > self.max_logs {
             logs.pop_front();
         }
-    }
-
-    pub async fn get_active_agents_json(&self, timeout_period: f64) -> serde_json::Value {
-        let agents = self.agents.read().await;
-        let mut map = serde_json::Map::new();
-        for a in agents.values() {
-            let key = format!("{},{}", a.x, a.y);
-            map.insert(key, Self::agent_to_json(a, timeout_period));
-        }
-        serde_json::Value::Object(map)
     }
 }

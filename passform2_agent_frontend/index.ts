@@ -49,6 +49,9 @@ const sendSafe = (portName: string, data: any) => {
 /**
  * Holt statische/initiale Daten vom Backend via HTTP
  */
+/**
+ * Holt statische/initiale Daten vom Backend via HTTP
+ */
 const fetchInitialData = async (url: string) => {
     const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
     console.log("📥 JS: Starte Initial-Fetch von API Endpunkten auf", baseUrl);
@@ -62,31 +65,26 @@ const fetchInitialData = async (url: string) => {
             sendSafe('initialBaysReceiver', bays);
         }
 
-        // 2. Inventar laden
+        // 2. Agenten laden (SSoT)
+        const agentsResponse = await fetch(`${baseUrl}/api/agents`);
+        if (agentsResponse.ok) {
+            const agents = await agentsResponse.json();
+            console.log("📡 API: Agents empfangen:", agents);
+            sendSafe('activeAgentsReceiver', agents);
+        }
+
+        // 3. Inventar laden
         const invResponse = await fetch(`${baseUrl}/api/inventory`);
         if (invResponse.ok) {
             const inventory = await invResponse.json();
             sendSafe('inventoryReceiver', inventory);
         }
 
-        // 3. Hardware Specs & Interfaces laden
-        const specsResponse = await fetch(`${baseUrl}/api/resources/specs`);
-        if (specsResponse.ok) {
-            const specs = await specsResponse.json();
-            sendSafe('specsReceiver', specs);
-        }
-        
-        const interResponse = await fetch(`${baseUrl}/api/resources/interfaces`);
-        if (interResponse.ok) {
-            const interfaces = await interResponse.json();
-            sendSafe('rosInterfacesReceiver', interfaces);
-        }
-
         console.log("✅ JS: Alle Initial-Daten erfolgreich synchronisiert.");
     } catch (err) {
-        console.error("❌ JS: Fehler beim Initial-Fetch (Backend evtl. nicht erreichbar):", err);
-    }
-};
+        console.error("❌ JS: Fehler beim Initial-Fetch:", err);
+    } // <-- Hier muss der catch-Block sauber enden
+}; // <-- Und hier endet die Pfeil-Funktion
 
 // --- SOCKET.IO LOGIK ---
 
@@ -111,10 +109,14 @@ const setupMainSocket = (url: string) => {
     console.log(`🔌 SOCKET: Verbindungsversuch zu ${socketUrl}...`);
     
     socket = io(socketUrl, {
-        transports: ['polling', 'websocket'],
+        transports: ['websocket', 'polling'], // WebSocket bevorzugen
         reconnection: true,
+        reconnectionAttempts: 5,
         path: "/socket.io/",
-        forceNew: true 
+        forceNew: true,
+        // Diese Option ist wichtig, wenn du Credentials (Cookies/Auth) nutzt, 
+        // passt aber vor allem zum tower-http CORS Setup im Backend.
+        withCredentials: true 
     });
 
     socket.on('connect', () => {
@@ -192,9 +194,20 @@ subscribeSafe('connectToBackend', (url: string) => {
     setupMainSocket(fixedUrl);
 });
 
-subscribeSafe('pushConfig', (configData: any) => {
-    if (socket?.connected) {
-        socket.emit('push_config', configData);
+subscribeSafe('pushConfig', (fullConfig: any) => {
+    console.log("📤 JS: Elm bittet um SSoT-Speicherung...", fullConfig);
+    
+    if (socket && socket.connected) {
+        // Wir senden das gesamte Objekt an Rust
+        socket.emit('push_config', fullConfig);
+        console.log("🚀 JS: Daten erfolgreich an Socket 'push_config' übergeben.");
+    } else {
+        console.error("❌ JS: Speichern fehlgeschlagen - Socket ist nicht verbunden!");
+        // Optional: Elm über den Fehler informieren
+        sendSafe('systemLogReceiver', {
+            message: "Verbindungsfehler: Konfiguration konnte nicht gespeichert werden.",
+            level: "error"
+        });
     }
 });
 

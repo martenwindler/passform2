@@ -1,3 +1,5 @@
+// passform2_agent_backend/src/managers/config_manager.rs
+
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
@@ -5,20 +7,27 @@ use serde_json::{json, Value};
 use tracing::{info, error, warn};
 use chrono::Local;
 
-// --- DATENSTRUKTUR FÖR DE SSOT ---
+// --- DATENSTRUKTUR FÜR DIE SSOT ---
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SSoTData {
     pub config: Value,
     pub agents: Vec<Value>,
+    pub bays: Vec<Value>,
     pub last_update: Option<String>,
+}
+
+fn default_config() -> Value {
+    serde_json::json!({"grid": {"width": 10, "height": 10}})
 }
 
 impl Default for SSoTData {
     fn default() -> Self {
+        // Hier definieren wir den "Werkszustand", falls keine Datei existiert
         Self {
             config: json!({"grid": {"width": 10, "height": 10}}),
-            agents: vec![],
+            agents: vec![], // Wird beim ersten Start durch das System befüllt
+            bays: vec![],   // Wird beim ersten Start durch das System befüllt
             last_update: None,
         }
     }
@@ -32,11 +41,11 @@ pub struct ConfigManager {
 
 impl ConfigManager {
     pub fn new() -> Self {
-        // Dynamische Pfadfindung: Wi kiekt, wo dat Executable liggt oder bruukt dat aktuelle Verzeichnis
-        // In Rust is dat sekerer, den Pfad relativ to de Cargo-Root oder Executable to setten
+        // "current_dir" ist der Ordner, von dem aus du "cargo run" startest
         let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        path.push("data");
-        path.push("config.json");
+        
+        path.push("data"); // Ordnername
+        path.push("config__initial__00.json"); 
 
         let manager = Self { file_path: path };
         manager.ensure_data_dir();
@@ -52,7 +61,7 @@ impl ConfigManager {
         }
     }
 
-    /// Lädt de SSoT Datei (Ersatz för load_config)
+    /// Lädt die SSoT Datei
     pub fn load_config(&self) -> SSoTData {
         if !self.file_path.exists() {
             warn!("⚠️ SSoT Datei nich funnen ({:?}), nimm Defaults.", self.file_path);
@@ -79,9 +88,14 @@ impl ConfigManager {
         }
     }
 
-    /// Schrifft den Tostand op de Platt (Ersatz för save_to_ssot)
-    pub fn save_to_ssot(&self, mut data: SSoTData) -> bool {
-        data.last_update = Some(Local::now().to_rfc3339());
+    /// Speichert den aktuellen Zustand (Agenten & Bays) zurück in die JSON
+    pub fn save_state(&self, agents: Vec<Value>, bays: Vec<Value>) -> bool {
+        let data = SSoTData {
+            config: json!({"grid": {"width": 10, "height": 10}}),
+            agents,
+            bays,
+            last_update: Some(Local::now().to_rfc3339()),
+        };
 
         match serde_json::to_string_pretty(&data) {
             Ok(content) => {
@@ -89,12 +103,32 @@ impl ConfigManager {
                     error!("❌ Kun de SSoT nich schrieven: {}", e);
                     false
                 } else {
-                    info!("💾 SSoT erfolgreich op Festplatt spiekert.");
+                    info!("💾 SSoT (Agents & Bays) erfolgreich spiekert.");
                     true
                 }
             }
             Err(e) => {
-                error!("❌ Serialisierungs-Fehler bi SSoT: {}", e);
+                error!("❌ Serialisierungs-Fehler: {}", e);
+                false
+            }
+        }
+    }
+
+    // Nimmt ein komplettes JSON-Value (vom Frontend), validiert es gegen SSoTData und schreibt es sicher auf die Festplatte.
+    pub fn save_config(&self, full_data: &Value) -> bool {
+        match serde_json::from_value::<SSoTData>(full_data.clone()) {
+            Ok(mut data) => {
+                data.last_update = Some(Local::now().to_rfc3339());
+                if let Ok(content) = serde_json::to_string_pretty(&data) {
+                    if fs::write(&self.file_path, content).is_ok() {
+                        info!("💾 SSoT-Datei erfolgreich aktualisiert ({} Agenten).", data.agents.len());
+                        return true;
+                    }
+                }
+                false
+            }
+            Err(e) => {
+                error!("❌ SSoT-Mapping fehlgeschlagen (Struktur-Konflikt): {}", e);
                 false
             }
         }
