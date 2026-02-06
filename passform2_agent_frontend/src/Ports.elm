@@ -86,8 +86,7 @@ port nfcStatusReceiver : (Decode.Value -> msg) -> Sub msg
 port hardwareUpdateReceiver : (Decode.Value -> msg) -> Sub msg
 
 -- Empfängt Agenten-Bewegungen aus der 3D-View
-port onAgentMoved : ({ agentId : String, oldX : Int, oldY : Int, newX : Int, newY : Int } -> msg) -> Sub msg
-
+port onAgentMoved : ({ agentId : String, oldX : Int, oldY : Int, newX : Int, newY : Int, level : Int } -> msg) -> Sub msg
 
 -- --- EVENT-HELPER FÜR DIE 3D-VIEW ---
 
@@ -99,23 +98,25 @@ onCellClicked toMsg =
 
 -- --- INTERNE DECODER ---
 
-{-| Zerlegt das CustomEvent "agent-moved" für Drag & Drop Updates -}
-decodeAgentMove : Decode.Decoder { agentId : String, oldX : Int, oldY : Int, newX : Int, newY : Int }
+{-| Zerlegt das CustomEvent "agent-moved" - jetzt inklusive Level -}
+decodeAgentMove : Decode.Decoder { agentId : String, oldX : Int, oldY : Int, newX : Int, newY : Int, level : Int }
 decodeAgentMove =
     Decode.at [ "detail" ] <|
-        Decode.map5 (\id ox oy nx ny -> { agentId = id, oldX = ox, oldY = oy, newX = nx, newY = ny })
+        Decode.map6 (\id ox oy nx ny lvl -> { agentId = id, oldX = ox, oldY = oy, newX = nx, newY = ny, level = lvl })
             (Decode.field "agentId" Decode.string)
             (Decode.field "oldX" Decode.int)
             (Decode.field "oldY" Decode.int)
             (Decode.field "newX" Decode.int)
             (Decode.field "newY" Decode.int)
+            (Decode.field "level" Decode.int)
 
 {-| Zerlegt das CustomEvent "cell-clicked" aus der ThreeGridScene -}
 decodeCellClick : Decode.Decoder GridCell
 decodeCellClick =
-    -- WICHTIG: CustomEvents legen Daten in "detail" ab
     Decode.at [ "detail" ]
-        (Decode.map2 GridCell
+        (Decode.map4 GridCell
             (Decode.field "x" Decode.int)
             (Decode.field "y" Decode.int)
+            (Decode.succeed 0) -- Klick kommt vom Boden -> z = 0
+            (Decode.succeed 0) -- Klick kommt vom Boden -> level = 0
         )

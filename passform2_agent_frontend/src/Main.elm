@@ -162,7 +162,7 @@ subscriptions model =
         
         -- 6. Interaktion aus der 3D-View
         , Ports.onAgentMoved (\d -> 
-            AgentsMsg (MoveAgent d.agentId { x = d.newX, y = d.newY })
+            AgentsMsg (MoveAgent d.agentId { x = d.newX, y = d.newY, z = 0, level = 0 })
           )
         ]
 
@@ -230,7 +230,7 @@ view3D model =
         
         -- Daten-Objekte
         , attribute "agents" (model.agents |> Decoders.encodeAgentMap |> Encode.encode 0)
-        , attribute "path" (Decoders.encodePath model.currentPath |> Encode.encode 0)
+        , attribute "path" (model.currentPath |> Maybe.map Decoders.encodePath |> Maybe.withDefault Encode.null |> Encode.encode 0)
         
         -- NEU: Die Buchten für die Unterlegung (Umrandung)
         , attribute "bays" (model.bays |> Decoders.encodeBayList |> Encode.encode 0)
@@ -270,8 +270,10 @@ encodePos maybeCell =
 decodeMoveAgent : Decode.Decoder Msg
 decodeMoveAgent =
     Decode.map2 (\id cell -> AgentsMsg (MoveAgent id cell))
-        (Decode.field "agentId" Decode.string)
-        (Decode.map2 GridCell 
-            (Decode.field "newX" Decode.int) 
-            (Decode.field "newY" Decode.int)
-        )
+    (Decode.field "agentId" Decode.string)
+    (Decode.map4 GridCell 
+        (Decode.field "newX" Decode.int) 
+        (Decode.field "newY" Decode.int)
+        (Decode.succeed 0) -- z
+        (Decode.succeed 0) -- level
+    )

@@ -12,10 +12,6 @@ import View.Atoms.Button as Button
 Zusammengeführte Sektion für Buchten (Bays) und aktive Agenten.
 Nutzt Keyed-Nodes für Stabilität gegen Virtual-DOM-Fehler.
 -}
--- In View.Organisms.Sidebar.Sections.ActiveModuleSection.elm
-
--- In src/View/Organisms/Sidebar/Sections/ActiveModuleSection.elm
-
 view : Model -> Html Msg
 view model =
     div [ class "active-module-section flex flex-col h-full space-y-6" ]
@@ -23,7 +19,6 @@ view model =
           div [ class "sidebar-section flex flex-col min-h-0" ]
             [ h3 [ class "text-info text-[0.8rem] uppercase tracking-widest mb-3 border-b border-white/10 pb-2 flex justify-between" ] 
                 [ text "Anlagen-Layout (Bays)"
-                -- Hier die Korrektur: Klammern hinzugefügt
                 , span [ class "opacity-50" ] [ text (" (" ++ String.fromInt (List.length model.bays) ++ ")") ]
                 ]
             , div [ class "bay-list" ] 
@@ -38,7 +33,6 @@ view model =
         , div [ class "sidebar-section flex flex-col min-h-0" ]
             [ h3 [ class "text-warning text-[0.8rem] uppercase tracking-widest mb-3 border-b border-white/10 pb-2 flex justify-between" ] 
                 [ text "Aktive Agenten"
-                -- Hier ebenfalls: Klammern um die Anzahl der Agenten
                 , span [ class "opacity-50" ] [ text (" (" ++ String.fromInt (Dict.size model.agents) ++ ")") ]
                 ]
             , if Dict.isEmpty model.agents then
@@ -54,14 +48,34 @@ view model =
         ]
 
 {-| Hilfsfunktion für Keyed Rendering: Erzeugt (Key, Html) Tupel -}
-viewKeyedAgentItem : ( ( Int, Int ), AgentModule ) -> ( String, Html Msg )
-viewKeyedAgentItem ( ( x, y ), agent ) =
+viewKeyedAgentItem : ( ( Int, Int, Int ), AgentModule ) -> ( String, Html Msg )
+viewKeyedAgentItem ( ( x, y, l ), agent ) =
     let
-        -- Eindeutiger Key aus ID und Position
-        idStr = Maybe.withDefault "unknown" agent.agent_id
-        key = idStr ++ "-" ++ String.fromInt x ++ "-" ++ String.fromInt y
+        agentId = Maybe.withDefault "Unknown" agent.agent_id
+        -- Eindeutiger Key für Elm: kombiniert ID, Position und Ebene
+        idKey = agentId ++ "-" ++ String.fromInt x ++ "-" ++ String.fromInt y ++ "-" ++ String.fromInt l
     in
-    ( key, viewAgentItem agent )
+    ( idKey
+    , div [ class "agent-item group flex justify-between items-center p-3 mb-2 bg-white/5 border border-white/5 rounded-sm transition-all hover:bg-white/10" ]
+        [ div [ class "flex flex-col gap-1" ]
+            [ div [ class "flex items-center gap-2" ]
+                [ span [ class "font-black text-white text-sm uppercase tracking-tight" ] 
+                    [ text (formatModuleType agent.module_type) ]
+                , if l > 0 then
+                    span [ class "text-[9px] bg-cyan-500 text-black px-1 font-black rounded-xs" ] [ text ("LVL " ++ String.fromInt l) ]
+                  else
+                    text ""
+                , if agent.is_dynamic then 
+                    span [ class "text-[9px] bg-warning text-black px-1 font-black rounded-xs" ] [ text "MOBIL" ] 
+                  else text ""
+                ]
+            , span [ class "agent-coords font-mono text-white/40 text-[0.7rem] font-bold" ] 
+                [ text (agentId ++ " @ " ++ String.fromInt x ++ "/" ++ String.fromInt y) ]
+            ]
+        , div [ class "opacity-0 group-hover:opacity-100 transition-opacity duration-200" ]
+            [ Button.iconDelete (AgentsMsg (RemoveAgent agent.position)) ]
+        ]
+    )
 
 {-| Einzelne Bucht (Bay) im sauberen Look -}
 viewBayItem : Bay -> Html Msg
@@ -69,7 +83,7 @@ viewBayItem bay =
     let
         displayName =
             if String.startsWith "BayBay_" bay.name then
-                String.dropLeft 3 bay.name
+                String.dropLeft 6 bay.name -- Korrigiert auf 6 für "BayBay_"
             else
                 bay.name
     in
@@ -83,10 +97,10 @@ viewBayItem bay =
                     [ text displayName ]
                 , if bay.occupation then
                     span [ class "text-[9px] bg-cyan-500 text-black px-1.5 py-0.5 font-black rounded-xs animate-pulse" ] 
-                        [ text " (OCCUPIED)" ]
+                        [ text "OCCUPIED" ]
                   else
                     span [ class "text-[9px] text-white/20 font-bold border border-white/10 px-1.5 py-0.5 rounded-xs" ] 
-                        [ text " (VACANT)" ]
+                        [ text "VACANT" ]
                 ]
             , if bay.occupation then
                 span [ class "agent-coords font-mono text-cyan-400/60 text-[0.7rem] font-bold italic" ] 
@@ -96,26 +110,6 @@ viewBayItem bay =
                     [ text ("POS: " ++ String.fromFloat bay.origin.x ++ " / " ++ String.fromFloat bay.origin.y) ]
             ]
         , div [ class "w-6 h-6" ] [] 
-        ]
-
-
-{-| Einzelner Agent -}
-viewAgentItem : AgentModule -> Html Msg
-viewAgentItem agent =
-    div [ class "agent-item group flex justify-between items-center p-3 mb-2 bg-white/5 border border-white/5 rounded-sm transition-all hover:bg-white/10" ]
-        [ div [ class "flex flex-col gap-1" ]
-            [ div [ class "flex items-center gap-2" ]
-                [ span [ class "font-black text-white text-sm uppercase tracking-tight" ] 
-                    [ text (formatModuleType agent.module_type) ]
-                , if agent.is_dynamic then 
-                    span [ class "text-[9px] bg-warning text-black px-1 font-black rounded-xs" ] [ text "MOBIL" ] 
-                  else text ""
-                ]
-            , span [ class "agent-coords font-mono text-white/40 text-[0.7rem] font-bold" ] 
-                [ text ("LOC: " ++ String.fromInt agent.position.x ++ " / " ++ String.fromInt agent.position.y) ]
-            ]
-        , div [ class "opacity-0 group-hover:opacity-100 transition-opacity duration-200" ]
-            [ Button.iconDelete (AgentsMsg (RemoveAgent agent.position)) ]
         ]
 
 {-| Formatiert den Modultyp -}

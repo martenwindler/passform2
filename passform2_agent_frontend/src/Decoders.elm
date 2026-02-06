@@ -140,11 +140,14 @@ decodeRfid =
 -- --- AGENT DECODERS ---
 
 
+-- Ersetze alle Varianten von gridCellDecoder / decodeCell durch diese Logik:
 gridCellDecoder : Decoder GridCell
 gridCellDecoder =
-    Decode.map2 GridCell
-        (field "x" int)
-        (field "y" int)
+    Decode.map4 GridCell
+        (Decode.field "x" Decode.int)
+        (Decode.field "y" Decode.int)
+        (Decode.oneOf [ Decode.field "z" Decode.int, Decode.succeed 0 ])
+        (Decode.oneOf [ Decode.field "level" Decode.int, Decode.succeed 0 ])
 
 
 andMap : Decoder a -> Decoder (a -> b) -> Decoder b
@@ -152,26 +155,22 @@ andMap decoderA decoderFunction =
     Decode.map2 (\value function -> function value) decoderA decoderFunction
 
 
+-- AgentModuleDecoder anpassen (da jetzt 'status' im Typ steht!)
 agentModuleDecoder : Decoder AgentModule
 agentModuleDecoder =
     Decode.succeed AgentModule
         |> andMap (field "agent_id" (maybe string))
         |> andMap (field "module_type" moduleTypeDecoder)
         |> andMap (field "position" gridCellDecoder)
-        |> andMap
-            (Decode.oneOf
-                [ field "orientation" int
-                , field "orientation" float |> Decode.map round
-                , Decode.succeed 0
-                ]
-            )
+        |> andMap (Decode.oneOf [ field "orientation" int, Decode.succeed 0 ])
         |> andMap (Decode.oneOf [ field "is_dynamic" bool, Decode.succeed False ])
         |> andMap (Decode.oneOf [ field "payload" (maybe string), Decode.succeed Nothing ])
         |> andMap (Decode.oneOf [ field "signal_strength" int, Decode.succeed 100 ])
+        |> andMap (field "status" hardwareStatusDecoder) -- NEU hinzugefügt!
 
 -- Ersetze deinen agentMapDecoder in Decoders.elm durch diesen:
 
-agentMapDecoder : Decode.Decoder (Dict (Int, Int) AgentModule)
+agentMapDecoder : Decode.Decoder (Dict (Int, Int, Int) AgentModule)
 agentMapDecoder =
     -- Wir probieren drei Varianten, falls eine scheitert:
     Decode.oneOf
@@ -186,58 +185,56 @@ agentMapDecoder =
 
 -- HILFSFUNKTIONEN FÜR DEN DECODER --
 
-decodeAgentListAsDict : Decode.Decoder (Dict (Int, Int) AgentModule)
+decodeAgentListAsDict : Decode.Decoder (Dict (Int, Int, Int) AgentModule)
 decodeAgentListAsDict =
     Decode.list agentDecoder
         |> Decode.map (\list -> 
             list 
-                |> List.map (\a -> ( (a.position.x, a.position.y), a ))
+                |> List.map (\a -> ( (a.position.x, a.position.y, a.position.level), a ))
                 |> Dict.fromList
         )
 
-decodeAgentDictDirectly : Decode.Decoder (Dict (Int, Int) AgentModule)
+decodeAgentDictDirectly : Decode.Decoder (Dict (Int, Int, Int) AgentModule)
 decodeAgentDictDirectly =
     Decode.dict agentDecoder
         |> Decode.map (\dict ->
             dict
                 |> Dict.values
-                |> List.map (\a -> ( (a.position.x, a.position.y), a ))
+                |> List.map (\a -> ( (a.position.x, a.position.y, a.position.level), a ))
                 |> Dict.fromList
         )
 
-agentDecoder : Decode.Decoder AgentModule
+agentDecoder : Decoder AgentModule
 agentDecoder =
     Decode.succeed AgentModule
         |> andMap (Decode.maybe (Decode.field "agent_id" Decode.string))
         |> andMap (Decode.field "module_type" decodeModuleType)
-        |> andMap decodeFlexiblePosition -- KORREKTUR: Sucht überall nach x und y
+        |> andMap decodeFlexiblePosition 
         |> andMap (Decode.oneOf [ Decode.field "orientation" Decode.int, Decode.succeed 0 ])
         |> andMap (Decode.oneOf [ Decode.field "is_dynamic" Decode.bool, Decode.succeed False ])
         |> andMap (Decode.oneOf [ Decode.field "payload" (Decode.maybe Decode.string), Decode.succeed Nothing ])
         |> andMap (Decode.oneOf [ Decode.field "signal_strength" Decode.int, Decode.succeed 100 ])
+        |> andMap (Decode.oneOf [ Decode.field "status" hardwareStatusDecoder, Decode.succeed Online ]) 
 
 -- Hilfsfunktion: Versucht x/y flach ODER in einem position-Objekt zu finden
-decodeFlexiblePosition : Decode.Decoder GridCell
+decodeFlexiblePosition : Decoder GridCell
 decodeFlexiblePosition =
     Decode.oneOf
-        [ -- Variante A: { "position": { "x": 1, "y": 1 } }
-          Decode.field "position" (Decode.map2 GridCell (Decode.field "x" Decode.int) (Decode.field "y" Decode.int))
-        , -- Variante B: { "x": 1, "y": 1 }
-          Decode.map2 GridCell (Decode.field "x" Decode.int) (Decode.field "y" Decode.int)
+        [ Decode.field "position" decodeGridCell
+        , decodeGridCell
         ]
 
 -- Neue Hilfsfunktion, um x/y flach in ein GridCell zu verwandeln
-decodePositionFromFlat : Decode.Decoder GridCell
-decodePositionFromFlat =
-    Decode.map2 GridCell
-        (Decode.field "x" Decode.int)
-        (Decode.field "y" Decode.int)
+decodePositionFromFlat : Decoder GridCell
+decodePositionFromFlat = decodeGridCell
 
-decodeGridCell : Decode.Decoder GridCell
+decodeGridCell : Decoder GridCell
 decodeGridCell =
-    Decode.map2 GridCell
+    Decode.map4 GridCell
         (Decode.field "x" Decode.int)
         (Decode.field "y" Decode.int)
+        (Decode.oneOf [ Decode.field "z" Decode.int, Decode.succeed 0 ])
+        (Decode.oneOf [ Decode.field "level" Decode.int, Decode.succeed 0 ])
 
 -- Hilfsfunktion um "0,0" zu (0,0) zu machen
 parseKey : String -> (Int, Int)
@@ -250,11 +247,8 @@ parseKey str =
         _ ->
             ( 0, 0 )
 
-decodeCell : Decode.Decoder GridCell
-decodeCell =
-    Decode.map2 GridCell
-        (Decode.field "x" Decode.int)
-        (Decode.field "y" Decode.int)
+decodeCell : Decoder GridCell
+decodeCell = decodeGridCell
 
 hardwareDeviceDecoder : Decode.Decoder HardwareDevice
 hardwareDeviceDecoder =
@@ -297,7 +291,8 @@ decodePathResult =
     Decode.map3 Path
         (Decode.oneOf [ field "status" int, Decode.succeed 200 ])
         (field "cost" float)
-        (field "path" (list agentModuleDecoder))
+        -- KORREKTUR: Hier stand agentModuleDecoder, es muss gridCellDecoder sein!
+        (field "path" (list gridCellDecoder))
 
 
 planningWeightsDecoder : Decode.Decoder PlanningWeights
@@ -310,13 +305,9 @@ planningWeightsDecoder =
         (Decode.field "hardware_safety_factor" Decode.float)
 
 
-pathDecoder : Decoder Path
+pathDecoder : Decode.Decoder Path
 pathDecoder =
-    Decode.map3 Path
-        (field "status" int)
-        (field "cost" float)
-        (field "path" (list agentModuleDecoder))
-
+    decodePathResult
 
 -- --- ENCODERS ---
 
@@ -337,13 +328,9 @@ encodeCnpAnnouncement model =
           )
         ]
 
-
-encodeAgentMap : Dict (Int, Int) AgentModule -> Encode.Value
+encodeAgentMap : Dict (Int, Int, Int) AgentModule -> Encode.Value
 encodeAgentMap agents =
-    -- WICHTIG: Hier muss eine LISTE erzeugt werden, kein Objekt!
     Encode.list encodeAgent (Dict.values agents)
-
-
 
 encodeAgentModule : AgentModule -> Encode.Value
 encodeAgentModule agent =
@@ -352,6 +339,8 @@ encodeAgentModule agent =
         , ( "module_type", Encode.string (moduleTypeToString agent.module_type) )
         , ( "x", Encode.int agent.position.x )
         , ( "y", Encode.int agent.position.y )
+        , ( "z", Encode.int agent.position.z )      -- NEU
+        , ( "level", Encode.int agent.position.level ) -- NEU
         , ( "position", encodeGridCell agent.position )
         , ( "orientation", Encode.int agent.orientation )
         , ( "is_dynamic", Encode.bool agent.is_dynamic )
@@ -359,24 +348,22 @@ encodeAgentModule agent =
         , ( "signal_strength", Encode.int agent.signal_strength )
         ]
 
-
 encodeGridCell : GridCell -> Encode.Value
 encodeGridCell cell =
     Encode.object
         [ ( "x", Encode.int cell.x )
         , ( "y", Encode.int cell.y )
+        , ( "z", Encode.int cell.z )
+        , ( "level", Encode.int cell.level )
         ]
 
-
-encodePath : Maybe Path -> Encode.Value
-encodePath maybePath =
-    case maybePath of
-        Just p ->
-            Encode.list encodeAgentModule p.path
-
-        Nothing ->
-            Encode.list identity []
-
+encodePath : Path -> Encode.Value
+encodePath p =
+    Encode.object
+        [ ( "status", Encode.int p.status )
+        , ( "cost", Encode.float p.cost )
+        , ( "path", Encode.list encodeGridCell p.path ) 
+        ]
 
 encodeWeights : PlanningWeights -> Encode.Value
 encodeWeights w =
@@ -398,19 +385,59 @@ encodePlanningData data =
         , ( "isRanger", Encode.bool data.isRanger )
         ]
 
+-- Encoder für die gesamte Konfiguration
+encodeFullConfig : Model -> Encode.Value
 encodeFullConfig model =
     Encode.object
         [ ( "agents", encodeAgentMap model.agents )
-        , ( "config"
-          , Encode.object
-                [ ( "grid"
-                  , Encode.object
-                        [ ( "width", Encode.int model.gridWidth )
-                        , ( "height", Encode.int model.gridHeight )
-                        ]
-                  )
-                ]
-          )
+        , ( "bays", Encode.list encodeBay model.bays )
+        , ( "inventory", encodeInventory model.inventory )
+        , ( "worldState", encodeInventory model.inventory ) -- Oft identisch mit Inventory, falls kein separater Typ
+        ]
+
+-- Hilfs-Encoder für das Inventar
+encodeInventory : List WorldItem -> Encode.Value
+encodeInventory items =
+    Encode.list encodeWorldItem items
+
+encodeWorldItem : WorldItem -> Encode.Value
+encodeWorldItem item =
+    Encode.object
+        [ ( "name", Encode.string item.name )
+        , ( "uid", Encode.string item.uid )
+        , ( "quantity", Encode.int item.quantity )
+        , ( "location", encodeWorldLocation item.location )
+        ]
+
+encodeWorldLocation : WorldLocation -> Encode.Value
+encodeWorldLocation loc =
+    Encode.object
+        [ ( "frame_id", Encode.string loc.frame_id )
+        , ( "pose", encodePose loc.pose )
+        ]
+
+encodePose : Pose -> Encode.Value
+encodePose pose =
+    Encode.object
+        [ ( "position", encodePoint pose.position )
+        , ( "orientation", encodeQuaternion pose.orientation )
+        ]
+
+encodePoint : Point -> Encode.Value
+encodePoint p =
+    Encode.object
+        [ ( "x", Encode.float p.x )
+        , ( "y", Encode.float p.y )
+        , ( "z", Encode.float p.z )
+        ]
+
+encodeQuaternion : Quaternion -> Encode.Value
+encodeQuaternion q =
+    Encode.object
+        [ ( "x", Encode.float q.x )
+        , ( "y", Encode.float q.y )
+        , ( "z", Encode.float q.z )
+        , ( "w", Encode.float q.w )
         ]
 
 encodeAgent : AgentModule -> Encode.Value
@@ -420,6 +447,9 @@ encodeAgent agent =
         , ( "module_type", Encode.string (moduleTypeToString agent.module_type) )
         , ( "x", Encode.int agent.position.x )
         , ( "y", Encode.int agent.position.y )
+        , ( "z", Encode.int agent.position.z )
+        , ( "level", Encode.int agent.position.level )
+        , ( "position", encodeGridCell agent.position )
         , ( "orientation", Encode.int agent.orientation )
         , ( "is_dynamic", Encode.bool agent.is_dynamic )
         , ( "signal_strength", Encode.int agent.signal_strength )
@@ -441,16 +471,18 @@ decodeOriginAsPoint =
             )
 
 {-| Der Haupt-Decoder für die Bays -}
+-- Bay Decoder anpassen
 decodeBay : Decoder Bay
 decodeBay =
     Decode.succeed Bay
         |> andMap (field "unique_id" string)
         |> andMap (field "name" string)
-        |> andMap (field "origin" decodeOriginAsPoint) -- Nutzt den Array-zu-Record Wandler
+        |> andMap (field "origin" decodeOriginAsPoint)
         |> andMap (field "is_virtual" bool)
         |> andMap (field "status" hardwareStatusDecoder)
         |> andMap (field "occupation" bool)
         |> andMap (field "module_uuid" string)
+        |> andMap (Decode.oneOf [ field "level" int, Decode.succeed 0 ])
 
 {-| Hilfsdecoder für das [x, y, z] Array aus Rust -}
 decodeOrigin : Decoder { x : Float, y : Float, z : Float }

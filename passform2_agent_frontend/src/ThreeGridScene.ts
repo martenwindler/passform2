@@ -76,7 +76,19 @@ export class ThreeGridScene extends HTMLElement {
                 case 'agents': 
                     if (!this.isDragging && newVal) {
                         const parsed = JSON.parse(newVal);
-                        const list = Array.isArray(parsed) ? parsed : (parsed.agents || []);
+                        
+                        // KORREKTUR: Wir stellen sicher, dass wir immer ein Array von Agenten haben,
+                        // egal ob Elm ein Dict (Objekt) oder eine Liste (Array) schickt.
+                        let list: any[] = [];
+                        if (Array.isArray(parsed)) {
+                            list = parsed;
+                        } else if (typeof parsed === 'object') {
+                            // Falls es das Haupt-Modell ist, nimm .agents, sonst das Objekt selbst
+                            const agentsSource = parsed.agents || parsed;
+                            list = Object.values(agentsSource);
+                        }
+
+                        console.log("3D Scene: Verarbeite", list.length, "Agenten");
                         this.updateAgents(list);
                     }
                     break;
@@ -257,11 +269,26 @@ export class ThreeGridScene extends HTMLElement {
         if (this.isDragging && this.draggedAgentKey) {
             const mesh = this.agentMeshes.get(this.draggedAgentKey);
             if (mesh) {
+                // 1. Grid-Koordinaten berechnen
                 const newX = Math.floor(mesh.position.x);
-                const newY = Math.floor(mesh.position.z);
+                const newY = Math.floor(mesh.position.z); // Three.js Z ist unser Grid-Y
+                
+                // 2. Level aus der vertikalen Höhe (Y) ableiten
+                // Da 1 Level = 400mm = 0.4 Three.js Einheiten:
+                const level = Math.round(mesh.position.y / 0.4); 
+
+                // 3. Event mit allen 6 Feldern für den Elm-Port feuern
                 this.dispatchEvent(new CustomEvent('agent-moved', {
-                    detail: { agentId: this.draggedAgentKey, newX, newY },
-                    bubbles: true, composed: true
+                    detail: { 
+                        agentId: this.draggedAgentKey, 
+                        newX: newX, 
+                        newY: newY,
+                        level: level,
+                        oldX: 0, // Falls du die alten Werte nicht in userData speicherst, 
+                        oldY: 0  // schicken wir 0, um den Port-Decoder zufrieden zu stellen.
+                    },
+                    bubbles: true, 
+                    composed: true
                 }));
             }
         } else if (this.isMouseDown) {
@@ -270,66 +297,135 @@ export class ThreeGridScene extends HTMLElement {
             const ground = this.raycaster.intersectObjects(this.gridCells.flat());
             if (ground.length > 0) {
                 this.dispatchEvent(new CustomEvent('cell-clicked', {
-                    detail: { x: ground[0].object.userData.gridX, y: ground[0].object.userData.gridY },
-                    bubbles: true, composed: true
+                    detail: { 
+                        x: ground[0].object.userData.gridX, 
+                        y: ground[0].object.userData.gridY 
+                    },
+                    bubbles: true, 
+                    composed: true
                 }));
             }
         }
+
+        // Status zurücksetzen
         this.isMouseDown = false;
         this.isDragging = false;
         this.draggedAgentKey = null;
     }
 
     private updateAgents(agents: any[]) {
-        const currentIds = new Set(agents.map((a: any) => a.agent_id));
-        [...this.agentMeshes.keys()].forEach(id => {
+        // Hilfsfunktion um die ID sicher zu extrahieren (Elm Maybe Support)
+        const getSafeId = (a: any): string => {
+            if (typeof a.agent_id === 'string') return a.agent_id;
+            if (a.agent_id && a.agent_id.a) return String(a.agent_id.a); // Elm Just "ID"
+            return String(a.unique_id || a.id || "unknown");
+        };
+
+        const currentIds = new Set(agents.map(getSafeId));
+        
+        // 1. Aufräumen
+        for (const [id, mesh] of this.agentMeshes.entries()) {
             if (!currentIds.has(id)) {
-                this.scene.remove(this.agentMeshes.get(id)!);
+                this.scene.remove(mesh);
                 this.agentMeshes.delete(id);
             }
-        });
+        }
 
+        // 2. Verarbeiten
         agents.forEach(agent => {
-            let mesh = this.agentMeshes.get(agent.agent_id);
-            const tx = (agent.x ?? agent.position?.x ?? 0) + 0.5;
-            const tz = (agent.y ?? agent.position?.y ?? 0) + 0.5;
+            const id = String(agent.agent_id || agent.unique_id || "");
+            
+            // Wenn dieser Agent gerade gezogen wird, ignorieren wir das Positions-Update von Elm!
+            if (id === this.draggedAgentKey) return; 
+
+            const pos = agent.position;
+            if (!pos) return;
+
+            // FLEXIBLE KOORDINATEN: Sucht in .position ODER direkt im agent
+            const x = Number(agent.position?.x ?? agent.x ?? 0);
+            const y = Number(agent.position?.y ?? agent.y ?? 0);
+            const z = Number(agent.position?.z ?? agent.z ?? 0);
+
+            const tx = x + 0.5;
+            const tz = y + 0.5; // Grid-Y ist Three.js Z
+            const ty = z / 1000;
+
+            let mesh = this.agentMeshes.get(id);
 
             if (!mesh) {
-                mesh = this.createAgentMesh(agent.module_type, agent.is_dynamic);
+                mesh = this.createAgentMesh(agent);
                 this.scene.add(mesh);
-                this.agentMeshes.set(agent.agent_id, mesh);
-                mesh.position.set(tx, 0.1, tz);
+                this.agentMeshes.set(id, mesh);
+                
+                // WICHTIG: Nutze hier ty (den berechneten Höhenwert), nicht 0.1!
+                mesh.position.set(tx, ty, tz); 
             } else {
-                mesh.position.lerp(new THREE.Vector3(tx, mesh.position.y, tz), 0.2);
+                // Beim Bewegen (Lerp) auch ty nutzen
+                mesh.position.lerp(new THREE.Vector3(tx, ty, tz), 0.2);
             }
-            mesh.rotation.y = (agent.orientation || 0) * (Math.PI / 180);
+
+            mesh.rotation.y = (Number(agent.orientation) || 0) * (Math.PI / 180);
         });
     }
 
-    private createAgentMesh(type: string, isDynamic: boolean): THREE.Object3D {
+    private createAgentMesh(agent: any): THREE.Object3D {
         const group = new THREE.Group();
-        type = type.toLowerCase();
+        // Sicherstellen, dass wir einen String haben und Kleinschreibung nutzen
+        const type = String(agent.module_type || "").toLowerCase();
+        const isDynamic = !!agent.is_dynamic;
+
+        // --- MATERIAL-HELPER (Etwas Glanz macht 3D schöner) ---
+        const material = (color: number) => new THREE.MeshPhongMaterial({ 
+            color: color, 
+            flatShading: true,
+            shininess: 30 
+        });
 
         if (isDynamic || type === 'ftf' || type === 'ranger') {
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.2, 0.8), new THREE.MeshPhongMaterial({ color: 0xffd700 }));
+            // FTF / Roboter (Gelb)
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.2, 0.8), material(0xffd700));
             body.position.set(0, 0.1, 0); 
             group.add(body);
+            
             const eye = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
             eye.position.set(0, 0.2, 0.35); 
             group.add(eye);
+
         } else if (type.includes('greifer')) {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.8), new THREE.MeshPhongMaterial({ color: 0xed8936 }));
-            mesh.position.set(0, 0.3, 0);
-            group.add(mesh);
-        } else if (type.includes('rollen')) {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.15, 0.85), new THREE.MeshPhongMaterial({ color: 0x3182ce }));
+            // Greifer (Orange)
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.15, 0.85), material(0xed8936));
             mesh.position.set(0, 0.075, 0);
             group.add(mesh);
+
+        } else if (type.includes('rollen')) {
+            // Rollenmodul (Blau)
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.15, 0.85), material(0x3182ce));
+            mesh.position.set(0, 0.075, 0);
+            group.add(mesh);
+
+        } else if (type.includes('tisch')) {
+            // TISCH / STATION (Hellgrau statt Bodengrau!)
+            // Wir nehmen 0x718096 (ein bläuliches Hellgrau), damit man ihn auf dem dunklen Boden sieht
+            const top = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.2, 0.9), material(0x718096));
+            top.position.set(0, 0.1, 0);
+            group.add(top);
+
+            // Kleine Füße an den Ecken, damit er wie ein Tisch aussieht
+            const legGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+            const legMat = material(0x2d3748);
+            [[-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]].forEach(p => {
+                const leg = new THREE.Mesh(legGeo, legMat);
+                leg.position.set(p[0], 0.05, p[1]);
+                group.add(leg);
+            });
+
         } else {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 0.8), new THREE.MeshPhongMaterial({ color: 0x718096 }));
+            // Fallback für Unbekanntes (Grau)
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 0.8), material(0x4a5568));
             mesh.position.set(0, 0.15, 0);
             group.add(mesh);
         }
+
         return group;
     }
 

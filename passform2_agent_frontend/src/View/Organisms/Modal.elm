@@ -1,5 +1,6 @@
 module View.Organisms.Modal exposing (view)
 
+import Dict
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
@@ -18,20 +19,31 @@ view model =
         Just menuType ->
             div [ class "modal-overlay" ]
                 [ div [ class "modal-content" ]
-                    [ viewHeader menuType
+                    [ viewHeader model menuType 
                     , div [ class "modal-body" ] [ viewBody model menuType ]
                     , viewFooter
                     ]
                 ]
 
 
-viewHeader : MenuType -> Html Msg
-viewHeader menuType =
+{-| Header mit dynamischer Titelei für Stacking -}
+viewHeader : Model -> MenuType -> Html Msg
+viewHeader model menuType =
     h3 [ class "mb-4" ] 
         [ text <|
             case menuType of
-                SelectionMenu _ ->
-                    "Zell-Konfiguration"
+                SelectionMenu cell ->
+                    let
+                        currentStack = 
+                            model.agents 
+                                |> Dict.keys 
+                                |> List.filter (\(x, y, l) -> x == cell.x && y == cell.y) 
+                                |> List.length
+                    in
+                    if currentStack > 0 then
+                        "Modul stapeln (Ebene " ++ String.fromInt currentStack ++ ")"
+                    else
+                        "Zell-Konfiguration"
 
                 SettingsMenu _ agent ->
                     formatModuleType agent.module_type
@@ -45,7 +57,6 @@ viewBody model menuType =
             div [ class "settings-form" ]
                 [ div [ class "flex flex-col gap-2 mb-4" ]
                     [ label [ class "text-label mb-2 block" ] [ text "Modul hinzufügen" ]
-                    -- FTF Button deaktiviert
                     , button 
                         [ class "btn-ftf btn-full text-button disabled"
                         , disabled True 
@@ -59,13 +70,11 @@ viewBody model menuType =
                     ]
                 
                 , div [ class "flex flex-col gap-2 mt-6 pt-4 border-t border-white/10" ]
-                    [ -- Startpunkt deaktiviert
-                      button 
+                    [ button 
                         [ class "btn-secondary btn-full text-info border-info/20 text-button disabled"
                         , disabled True 
                         ] 
                         [ text "⊕ Als Startpunkt setzen" ]
-                    -- Zielpunkt deaktiviert
                     , button 
                         [ class "btn-secondary btn-full text-success border-success/20 text-button disabled"
                         , disabled True 
@@ -78,6 +87,13 @@ viewBody model menuType =
             let
                 aid = agent.agent_id |> Maybe.withDefault "unnamed"
                 posText = "Position: " ++ String.fromInt cell.x ++ " / " ++ String.fromInt cell.y
+                
+                stackHeight =
+                    model.agents
+                        |> Dict.keys
+                        |> List.filter (\( x, y, l ) -> x == cell.x && y == cell.y)
+                        |> List.length
+
                 maybePi = model.connectedHardware |> List.filter (\hw -> hw.pi_id == "PassForM2-Pi5-Client") |> List.head
 
                 ( piStat, piText, piGlow ) =
@@ -116,18 +132,34 @@ viewBody model menuType =
                         , disabled (not isHardwareReady)
                         ]
                         [ text "ID auf Chip brennen" ]
-                    , button [ class "btn-secondary btn-full text-button", onClick (AgentsMsg (RotateAgent cell)) ] [ text "Modul Drehen" ]
-                    , Button.danger "Modul entfernen" (AgentsMsg (RemoveAgent cell)) True True
+                    , button [ class "btn-secondary btn-full text-button", onClick (AgentsMsg (RotateAgent agent.position)) ] [ text "Modul Drehen" ]
+                    , Button.danger "Modul entfernen" (AgentsMsg (RemoveAgent agent.position)) True True
                     ]
 
+                -- STAPEL OPTION INNERHALB DER SETTINGS
+                , if model.editing && stackHeight < 4 then
+                    div [ class "mt-6 pt-6 border-t border-cyan-500/30" ]
+                        [ div [ class "bg-cyan-500/10 p-4 rounded-sm border border-cyan-500/20" ]
+                            [ div [ class "flex justify-between items-center mb-3" ]
+                                [ span [ class "text-[0.7rem] font-black text-cyan-400 uppercase tracking-widest" ] [ text "Stapel-Option" ]
+                                , span [ class "text-[0.7rem] text-white/40" ] [ text ("Nächste Ebene: " ++ String.fromInt stackHeight) ]
+                                ]
+                            , button 
+                                [ class "w-full py-2 bg-cyan-500 hover:bg-cyan-400 text-black text-[0.8rem] font-black rounded-xs transition-all"
+                                , onClick (AgentsMsg (OpenSelectionMenu cell)) 
+                                ] 
+                                [ text "+ Modul hinzufügen" ]
+                            ]
+                        ]
+                  else
+                    text ""
+
                 , div [ class "flex flex-col gap-2 mt-6 pt-4 border-t border-white/10" ]
-                    [ -- Startpunkt deaktiviert
-                      button 
+                    [ button 
                         [ class "btn-secondary btn-full text-info border-info/20 text-button disabled"
                         , disabled True 
                         ] 
                         [ text "⊕ Als Startpunkt setzen" ]
-                    -- Zielpunkt deaktiviert
                     , button 
                         [ class "btn-secondary btn-full text-success border-success/20 text-button disabled"
                         , disabled True 

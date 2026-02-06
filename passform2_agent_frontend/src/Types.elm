@@ -30,13 +30,11 @@ type alias Model =
     , rosConnected : Bool
     , canConnected : Bool
     , rangerBattery : Maybe Float
-    , agents : Dict (Int, Int) AgentModule
-    -- --- NEU: Digital Twin & Logistics Data ---
+    , agents : Dict (Int, Int, Int) AgentModule
     , bays : List Bay
     , inventory : List WorldItem
-    , worldState : Dict String Decode.Value -- Rohdaten für den Planner
-    -- -----------------------------------------
-    , savedDefault : Dict (Int, Int) AgentModule
+    , worldState : Dict String Decode.Value
+    , savedDefault : Dict (Int, Int, Int) AgentModule
     , logs : List SystemLog
     , pathStart : Maybe GridCell
     , pathGoal : Maybe GridCell
@@ -130,6 +128,7 @@ type AgentsMsg
     | ToggleViewMode
     | CloseMenu
     | OpenMenu Int Int
+    | OpenSelectionMenu GridCell
     | SetCurrentAsDefault
     | LoadDefaultConfig
     | ClearGrid
@@ -143,3 +142,4 @@ type AgentsMsg
     | MoveAgent String GridCell
     | HandleGridClick GridCell
     | SetHoveredCell (Maybe GridCell)
+    

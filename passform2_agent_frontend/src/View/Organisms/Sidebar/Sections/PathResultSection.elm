@@ -47,15 +47,14 @@ view model =
                         ]
         ]
 
-viewPathStep : Int -> AgentModule -> Html Msg
-viewPathStep index module_ =
+viewPathStep : Int -> GridCell -> Html Msg
+viewPathStep index cell =
     div [ class "path-step" ]
-        [ span [ class "step-index" ] 
-            [ text (if index < 9 then "0" ++ String.fromInt (index + 1) else String.fromInt (index + 1)) ]
+        [ span [ class "step-index" ] [ text (String.fromInt (index + 1)) ]
         , span [ class "step-pos" ] 
-            [ text (String.fromInt module_.position.x ++ " : " ++ String.fromInt module_.position.y) ]
+            [ text (String.fromInt cell.x ++ "/" ++ String.fromInt cell.y ++ " (L" ++ String.fromInt cell.level ++ ")") ]
         ]
-
+        
 -- DIESER HELPER FEHLTE:
 canPlan : Model -> Bool
 canPlan model =
