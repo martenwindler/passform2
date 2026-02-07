@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'; // NEU
 
 export class ThreeGridScene extends HTMLElement {
     private renderer: THREE.WebGLRenderer;
@@ -14,7 +15,7 @@ export class ThreeGridScene extends HTMLElement {
     
     private gridCells: THREE.Mesh[][] = [];
     private agentMeshes: Map<string, THREE.Object3D> = new Map();
-    private bayMeshes: Map<string, THREE.LineSegments> = new Map(); // NEU: Speicher für die Buchten-Umrandungen
+    private bayMeshes: Map<string, THREE.LineSegments> = new Map();
     private pathLine: THREE.Line | null = null;
     
     private readonly defaultGroundColor = 0x2d3748;
@@ -34,33 +35,72 @@ export class ThreeGridScene extends HTMLElement {
     private mouseDownPos = { x: 0, y: 0 };
     private dragThreshold = 5; 
 
+    private lastViewMode: string | null = null;
     private isWaitingForSync = false;
+
+    private isTransitioning = false;
+    private readonly transitionSpeed = 0.07; // Geschwindigkeit des Eindrehens
+
+    public controls: OrbitControls;    
 
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
         
+        // 1. Szene & Hintergrund
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x1a202c);
         
+        // 2. Licht-Setup
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
         this.scene.add(ambientLight);
+        
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
         dirLight.position.set(10, 50, 10);
         this.scene.add(dirLight);
 
+        // 3. Kamera & Renderer
         this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-        this.camera.up.set(0, 0, -1); 
+        
+        // WICHTIG: OrbitControls brauchen Y=Oben (0,1,0), um stabil um das Gitter zu kreisen
+        this.camera.up.set(0, 1, 0); 
+        
+        this.renderer = new THREE.WebGLRenderer({ 
+            antialias: true, 
+            alpha: true 
+        });
 
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        // 4. OrbitControls Initialisierung
+        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+        
+        // --- MAUS-KONFIGURATION ---
+        // Wir lassen die LINKE Taste für Elm (Agenten ziehen/klicken) frei!
+        this.controls.mouseButtons = {
+            LEFT: null,                 // Keine Kamera-Drehung mit links
+            MIDDLE: THREE.MOUSE.DOLLY,  // Zoom mit Mausrad
+            RIGHT: THREE.MOUSE.PAN      // Verschieben mit rechts
+        };
+
+        // --- FEEL & PHYSICS ---
+        this.controls.enableDamping = true;   // Sanftes Nachgleiten
+        this.controls.dampingFactor = 0.05;
+        this.controls.screenSpacePanning = false; // Schiebt auf der X/Z Ebene
+        
+        // Verhindert, dass man unter das Gitter gucken kann (optional, aber empfohlen)
+        this.controls.maxPolarAngle = Math.PI / 2.1; 
+
+        // 5. Interaktion & Hilfs-Systeme
         this.raycaster = new THREE.Raycaster();
-
+        
         this.helperScene = new THREE.Scene();
         this.helperCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 100);
         this.helperCamera.position.set(0, 0, 4); 
 
         const axes = new THREE.AxesHelper(2);
         this.helperScene.add(axes);
+
+        // Initialer Sync
+        this.controls.update();
     }
 
     set agents(val: any) {
@@ -228,27 +268,71 @@ export class ThreeGridScene extends HTMLElement {
     private updateCameraFocus() {
         const w = parseInt(this.getAttribute('grid-width') || '6');
         const h = parseInt(this.getAttribute('grid-height') || '4');
-        const is3D = this.getAttribute('is-3d') === 'true';
+        const is3DStr = this.getAttribute('is-3d');
+        const is3D = is3DStr === 'true';
         
         const centerX = w / 2;
         const centerZ = h / 2;
         const dist = Math.max(w, h);
 
-        if (is3D) {
-            this.camera.up.set(0, 1, 0); 
-            this.targetCameraPos.set(centerX + dist, dist, centerZ + dist);
-        } else {
-            this.camera.up.set(0, 0, -1); 
-            this.targetCameraPos.set(centerX, dist * 1.5, centerZ);
+        if (this.controls) {
+            // Fokuspunkt ist immer die Mitte
+            this.controls.target.set(centerX, 0, centerZ);
+
+            // --- 1. SCHRITT: Standard-Ziele definieren ---
+            if (is3D) {
+                // (-) ISO-ANSICHT (+45 Grad Versatz)
+                // Wir starten "frontal" und drehen den Vektor dann um die Y-Achse
+                const isoOffset = new THREE.Vector3(0, dist * 0.8, dist * 1.2);
+                isoOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 4); // Exakt +45 Grad
+                this.targetCameraPos.copy(this.controls.target).add(isoOffset);
+            } else {
+                // 2D-ANSICHT (Flach von oben)
+                this.targetCameraPos.set(centerX, dist * 1.5, centerZ);
+            }
+
+            // --- 2. SCHRITT: Initial-Sonderfall vs. Transition ---
+            if (this.lastViewMode === null) {
+                // BEIM ALLERERSTEN LADEN: 
+                // Falls 3D aktiv ist, erzwingen wir HIER die horizontale Ausrichtung
+                if (is3D) {
+                    this.targetCameraPos.set(centerX, dist * 0.8, centerZ + dist * 1.2);
+                }
+                
+                this.camera.position.copy(this.targetCameraPos);
+                this.lastViewMode = is3DStr;
+                this.controls.update();
+                console.log("3D Scene: Initialzustand horizontal fixiert.");
+            } 
+            else if (this.lastViewMode !== is3DStr) {
+                // BEIM KLICK AUF 2D/3D BUTTON:
+                // Jetzt wird das Ziel (inkl. der -45 Grad für 3D) sanft angefahren
+                this.isTransitioning = true;
+                this.lastViewMode = is3DStr;
+                console.log("3D Scene: Transition in neue Perspektive gestartet.");
+            }
         }
     }
 
     private animate() {
         requestAnimationFrame(() => this.animate());
-        const w = parseInt(this.getAttribute('grid-width') || '6');
-        const h = parseInt(this.getAttribute('grid-height') || '4');
-        this.camera.position.lerp(this.targetCameraPos, this.lerpSpeed);
-        this.camera.lookAt(w / 2, 0, h / 2);
+
+        if (this.controls) {
+            if (this.isTransitioning) {
+                // Sanftes Gleiten zum Ziel
+                this.camera.position.lerp(this.targetCameraPos, this.transitionSpeed);
+
+                // Wenn wir nah genug am Ziel sind, stoppen wir das Gleiten, 
+                // damit die manuelle Steuerung nicht mehr beeinflusst wird.
+                if (this.camera.position.distanceTo(this.targetCameraPos) < 0.1) {
+                    this.isTransitioning = false;
+                    console.log("3D Scene: Transition beendet.");
+                }
+            }
+            
+            this.controls.update(); 
+        }
+
         this.renderer.render(this.scene, this.camera);
     }
 
@@ -482,6 +566,18 @@ export class ThreeGridScene extends HTMLElement {
         }
 
         return group;
+    }
+
+    public rotateCamera(angle: number) {
+        if (this.controls) {
+            // Sobald der User eingreift, brechen wir die automatische Transition ab
+            this.isTransitioning = false;
+
+            const offset = new THREE.Vector3().copy(this.camera.position).sub(this.controls.target);
+            offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+            this.camera.position.copy(this.controls.target).add(offset);
+            this.controls.update();
+        }
     }
 
     private drawPath(nodes: any[]) {

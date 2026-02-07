@@ -49,9 +49,6 @@ const sendSafe = (portName: string, data: any) => {
 /**
  * Holt statische/initiale Daten vom Backend via HTTP
  */
-/**
- * Holt statische/initiale Daten vom Backend via HTTP
- */
 const fetchInitialData = async (url: string) => {
     const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
     console.log("📥 JS: Starte Initial-Fetch von API Endpunkten auf", baseUrl);
@@ -268,6 +265,22 @@ subscribeSafe('importConfigTrigger', () => {
     input.accept = '.json';
     input.onchange = (e: any) => handleFileReading((e.target as HTMLInputElement).files?.[0] as File);
     input.click();
+});
+
+app.ports.rotateCamera.subscribe((angle: number) => {
+    // Wir casten das Element explizit auf unseren Typ oder Any
+    const sceneElement = document.querySelector('three-grid-scene') as any;
+
+    if (sceneElement) {
+        // Falls die Methode direkt am Objekt noch nicht da ist (Timing),
+        // versuchen wir sie aufzurufen.
+        if (typeof sceneElement.rotateCamera === 'function') {
+            sceneElement.rotateCamera(-angle);
+        } else {
+            // DEBUG: Was ist das für ein Objekt?
+            console.warn("🕹️ Element gefunden, aber Methode 'rotateCamera' fehlt noch im Prototyp.");
+        }
+    }
 });
 
 // --- STORAGE & EXPORT ---

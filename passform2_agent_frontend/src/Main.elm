@@ -11,6 +11,7 @@ import Json.Encode as Encode
 import Ports
 import Types exposing (..)
 import Types.Domain exposing (..)
+import Browser.Events
 
 -- LOGIK-IMPORTE (Dispatcher-Zielmodule)
 import Update.Planning as Planning
@@ -164,6 +165,9 @@ subscriptions model =
         , Ports.onAgentMoved (\d -> 
             AgentsMsg (MoveAgent d.agentId { x = d.newX, y = d.newY, z = 0, level = 0 })
           )
+
+        , if model.activeLayout == AppMode then Browser.Events.onKeyDown keyDecoder else Sub.none
+
         ]
 
 {-| 
@@ -268,4 +272,20 @@ decodeMoveAgent =
             (Decode.field "newY" Decode.int)
             (Decode.succeed 0) -- z
             (Decode.field "level" Decode.int) 
+        )
+
+keyDecoder : Decode.Decoder Msg
+keyDecoder =
+    Decode.field "key" Decode.string
+        |> Decode.map (\key ->
+            -- Das loggt JEDE Taste, die du drückst
+            let _ = Debug.log "Gedrückte Taste" key in
+            case key of
+                "ArrowLeft" -> SystemMsg (RotateCamera 0.1)
+                "a"         -> SystemMsg (RotateCamera 0.1)
+                "A"         -> SystemMsg (RotateCamera 0.1)
+                "ArrowRight" -> SystemMsg (RotateCamera -0.1)
+                "d"          -> SystemMsg (RotateCamera -0.1)
+                "D"          -> SystemMsg (RotateCamera -0.1)
+                _            -> NoOp
         )

@@ -88,6 +88,7 @@ type SystemMsg
     | ResetToLanding            
     | HandleWorldState Decode.Value
     | EnterAppMode              -- Der explizite Wechsel ins Gitter
+    | RotateCamera Float        -- NEU: Kamera-Rotation für Three.js
 
 
 type PlanningMsg
@@ -143,4 +144,3 @@ type AgentsMsg
     | MoveAgent String GridCell
     | HandleGridClick GridCell
     | SetHoveredCell (Maybe GridCell)
-    

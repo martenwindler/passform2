@@ -91,6 +91,9 @@ port hardwareUpdateReceiver : (Decode.Value -> msg) -> Sub msg
 -- Empfängt Agenten-Bewegungen aus der 3D-View
 port onAgentMoved : ({ agentId : String, oldX : Int, oldY : Int, newX : Int, newY : Int, level : Int } -> msg) -> Sub msg
 
+{-| Schickt einen Rotationswert (z.B. 0.1 oder -0.1) an Three.js -}
+port rotateCamera : Float -> Cmd msg
+
 -- --- EVENT-HELPER FÜR DIE 3D-VIEW ---
 
 onCellClicked : (GridCell -> msg) -> Attribute msg
