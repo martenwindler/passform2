@@ -6,42 +6,33 @@ import Html.Events exposing (onClick)
 import Types exposing (..)
 import Types.Domain exposing (..)
 
+{-|
+    Die Navbar ist die zentrale Steuerung am oberen Bildschirmrand.
+    Das Logo führt nun zurück zur Landing Page.
+-}
 view : Model -> Html Msg
 view model =
     nav [ class "navbar blue-look" ]
-        [ -- 1. Links: Logo und Titel (Bleiben immer da)
-          div [ class "navbar-section" ]
+        [ -- 1. Links: Logo und Titel (Klickbar für Rückkehr zur Landing Page)
+          div 
+            [ class "navbar-section cursor-pointer"
+            , onClick (SystemMsg ResetToLanding) -- Hier wird der Reset ausgelöst
+            ]
             [ img [ src "src/assets/images/logo.png", class "navbar-logo", alt "Logo" ] []
             , span [ class "navbar-title text-h3 hidden sm:inline ml-3 text-white" ] [ text "Passform 2.0" ]
             ]
         
-        , -- 2. Mitte: Status-Pille (AKTUELL DEAKTIVIERT)
+        , -- 2. Mitte: Status-Anzeigen (Platzhalter für spätere Integration)
           div [ class "navbar-center hidden md:flex" ]
-            [ {- 
-              div [ class "status-pill combined-status" ]
-                [ viewIndicator "REST" (if model.connected then Online else Error)
-                , div [ class "status-divider" ] [] 
-                , viewIndicator "ROS" (if model.rosConnected then Online else Error)
-                , div [ class "status-divider" ] []
-                , viewIndicator 
-                    (case model.mode of
-                        Simulation -> "SIM"
-                        Hardware -> "HW"
-                    )
-                    (case model.mode of
-                        Hardware -> Online
-                        Simulation -> Standby
-                    )
-                ]
-              -}
+            [ -- Hier können später Status-Pillen wieder aktiviert werden
             ]
 
-        , -- 3. Rechts: Actions (Werden im LandingMode ausgeblendet)
+        , -- 3. Rechts: Aktionen (Kontextabhängig)
           viewActions model
         ]
 
--- src/View/Organisms/Navbar.elm
 
+{-| Zeigt Aktions-Buttons nur an, wenn wir uns im AppMode befinden. -}
 viewActions : Model -> Html Msg
 viewActions model =
     case model.activeLayout of
@@ -51,7 +42,7 @@ viewActions model =
                 [ viewProjectLink ]
 
         AppMode ->
-            -- In der App: Volle Action-Bar
+            -- In der App: Volle Action-Bar inklusive Modus-Switch
             div [ class "navbar-actions" ]
                 [ button 
                     [ class "btn-mode-switch text-button"
@@ -69,8 +60,10 @@ viewActions model =
                 , viewProjectLink
                 ]
 
+
 -- --- HELPER ---
 
+{-| Kleine Status-Indikatoren für REST, ROS etc. -}
 viewIndicator : String -> HardwareStatus -> Html Msg
 viewIndicator label status =
     div [ class "indicator-group" ]
@@ -78,6 +71,8 @@ viewIndicator label status =
         , span [ class "indicator-label text-label text-white" ] [ text label ]
         ]
 
+
+{-| Mapping von Status-Typen auf CSS-Farben -}
 statusToClass : HardwareStatus -> String
 statusToClass status =
     case status of
@@ -86,7 +81,8 @@ statusToClass status =
         Error -> "offline"
         _ -> "offline"
 
-{-| Extrahiert, damit wir den Link nicht doppelt schreiben müssen -}
+
+{-| Externer Link zur BIBA Projektseite -}
 viewProjectLink : Html Msg
 viewProjectLink =
     a 

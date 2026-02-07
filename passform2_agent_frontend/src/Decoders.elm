@@ -368,11 +368,15 @@ encodeFullConfig model =
                   )
                 ]
           )
-        , ( "agents", encodeAgentMap model.agents )
+        -- WICHTIG: Rust erwartet hier eine flache Liste [ {agent}, {agent} ]
+        , ( "agents", Encode.list encodeAgent (Dict.values model.agents) )
+        
+        -- Ebenfalls eine flache Liste der Buchten
         , ( "bays", Encode.list encodeBay model.bays )
-        -- inventory und worldState können wir mitschicken, Rust ignoriert sie jetzt
-        , ( "inventory", encodeInventory model.inventory )
-        , ( "worldState", encodeInventory model.inventory )
+        
+        -- Diese Felder werden von Rust dank #[serde(default)] ignoriert oder als Extra-Daten behalten
+        , ( "inventory", Encode.list encodeWorldItem model.inventory )
+        , ( "last_update", Encode.null ) -- Rust füllt das selbst aus
         ]
         
 -- Hilfs-Encoder für das Inventar
@@ -420,19 +424,24 @@ encodeQuaternion q =
         , ( "w", Encode.float q.w )
         ]
 
+-- Hilfs-Encoder für einen einzelnen Agenten (muss alle Felder aus Rust SSoTData matchen)
 encodeAgent : AgentModule -> Encode.Value
 encodeAgent agent =
     Encode.object
         [ ( "agent_id", Encode.string (Maybe.withDefault "Unknown-ID" agent.agent_id) )
         , ( "module_type", Encode.string (moduleTypeToString agent.module_type) )
-        , ( "x", Encode.int agent.position.x )
-        , ( "y", Encode.int agent.position.y )
-        , ( "z", Encode.int agent.position.z )
-        , ( "level", Encode.int agent.position.level )
-        , ( "position", encodeGridCell agent.position )
+        , ( "position"
+          , Encode.object 
+                [ ( "x", Encode.int agent.position.x )
+                , ( "y", Encode.int agent.position.y )
+                , ( "z", Encode.int agent.position.z )
+                , ( "level", Encode.int agent.position.level )
+                ]
+          )
         , ( "orientation", Encode.int agent.orientation )
         , ( "is_dynamic", Encode.bool agent.is_dynamic )
         , ( "signal_strength", Encode.int agent.signal_strength )
+        , ( "status", Encode.string "Online" ) -- Rust erwartet einen String für HardwareStatus
         ]
 
 

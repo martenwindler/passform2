@@ -44,16 +44,12 @@ update msg model =
                         finalAgents =
                             if model.isDragging then
                                 model.agents
-
                             else
                                 newAgentsDict
 
-                        newLayout =
-                            if model.activeLayout == LandingMode && not (Dict.isEmpty newAgentsDict) then
-                                AppMode
-
-                            else
-                                model.activeLayout
+                        -- WICHTIG: Wir entfernen hier den automatischen Wechsel zu AppMode.
+                        -- Das Layout ändert sich nur noch durch explizite System-Messages
+                        -- (wie NewProject oder einen erfolgreichen Import).
 
                         newBays =
                             updateOccupancy finalAgents model.bays
@@ -61,7 +57,6 @@ update msg model =
                     ( { model
                         | agents = finalAgents
                         , bays = newBays
-                        , activeLayout = newLayout
                         , loading = False
                         , isDragging = False
                       }
@@ -69,10 +64,7 @@ update msg model =
                     )
 
                 Err error ->
-                    let
-                        _ =
-                            Debug.log "❌ ELM: Decoder Fehler bei UpdateAgents" (Decode.errorToString error)
-                    in
+                    -- Fehler-Logging bleibt gleich...
                     ( { model | loading = False }, Cmd.none )
 
         MoveAgent agentId targetCell ->

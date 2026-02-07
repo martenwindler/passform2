@@ -10,14 +10,69 @@
     -webkit-backdrop-filter: blur(12px);
 
     .navbar-section {
-        @apply flex items-center z-10;
+        @apply flex items-center z-10 relative transition-all duration-200;
+        padding: 0.25rem 0.5rem;
+        border-radius: 8px;
+        
+        // Der gewünschte Pointer-Cursor für die ganze Sektion
+        cursor: pointer !important; 
+
+        // --- TOOLTIP BASIS (Versteckt!) ---
+        &::after, &::before {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none;
+            transition: all 0.25s ease-out;
+            @apply absolute left-1/2 z-[1100];
+            
+            // Startposition: 80px rechts und 10px nach oben versetzt
+            transform: translateX(calc(-50% + 80px)) translateY(-10px);
+        }
+
+        // --- HOVER LOGIK ---
+        &:hover {
+            @apply bg-white/5;
+            
+            .navbar-logo {
+                transform: scale(1.05);
+                filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.4)) !important;
+            }
+
+            // Tooltip einblenden
+            &::after, &::before {
+                opacity: 1 !important;
+                visibility: visible !important;
+                // Zielposition: 80px rechts, aber translateY auf 0 (slidet runter)
+                transform: translateX(calc(-50% + 80px)) translateY(0);
+            }
+        }
+
         .navbar-logo {
-            @apply h-[35px];
+            @apply h-[35px] transition-transform duration-300;
             filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.25)) !important;
         }
+
         .navbar-title {
             @apply m-0 text-white;
             text-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+        }
+
+        // --- TOOLTIP STYLING ---
+        &::after {
+            content: "Zum Hauptmenü";
+            @apply bg-slate-800 text-white text-[10px] px-3 py-1.5 rounded-md shadow-xl;
+            bottom: -45px;
+            white-space: nowrap;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        // --- TOOLTIP PFEIL ---
+        &::before {
+            content: "";
+            bottom: -15px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: transparent transparent #1e293b transparent;
         }
     }
 
@@ -38,7 +93,6 @@
             .status-dot-small {
                 @apply w-2 h-2 rounded-full block shrink-0;
                 
-                // HIER DER KRÄFTIGE GLOW ZURÜCK
                 &.online {
                     background-color: #48bb78 !important;
                     box-shadow: 0 0 12px #48bb78, 0 0 5px rgba(72, 187, 120, 0.6) !important;
@@ -61,25 +115,31 @@
     }
 
     .navbar-actions {
-        // HIER DER ABSTANDS-FIX FÜR DIE BUTTONS
+        // Sicherstellen, dass die Actions als Flex-Container laufen
+        @apply flex items-center z-10;
         display: flex !important;
-        align-items: center !important;
-        gap: 0.75rem !important; // Stabile 12px Lücke zwischen den Pillen
-        z-index: 10;
+        gap: 1rem !important; // Das erzeugt den stabilen Abstand zwischen den Buttons
         
         .btn-mode-switch, 
-        .btn-view-toggle {
+        .btn-view-toggle,
+        .link-pill { // .link-pill ist für den Projekt-Link
             @apply bg-white/5 text-white/80 border border-white/10 
                    py-1.5 px-4 rounded-full transition-all duration-200 
                    cursor-pointer inline-flex items-center 
                    justify-center whitespace-nowrap;
             
-            margin: 0 !important; // Margin killen, damit nur GAP zählt
+            // Wichtig: Margins auf 0 setzen, damit nur das GAP den Abstand steuert
+            margin: 0 !important; 
             text-decoration: none !important;
 
             &:hover {
-                @apply bg-white/10 border-info/50 text-white -translate-y-px shadow-sm;
-                transform: scale(1.03);
+                @apply bg-white/10 border-white/30 text-white shadow-sm;
+                transform: translateY(-1px) scale(1.03);
+            }
+
+            // Falls du Icons in den Buttons hast
+            i, span {
+                @apply flex items-center;
             }
         }
     }

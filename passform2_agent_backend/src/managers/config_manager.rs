@@ -11,23 +11,33 @@ use chrono::Local;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SSoTData {
+    /// Konfiguration (Grid-Größe etc.) - Fallback auf Default bei Fehlen
+    #[serde(default = "default_config_val")]
     pub config: Value,
+    
+    /// Liste der Agenten - Fallback auf leere Liste
+    #[serde(default)]
     pub agents: Vec<Value>,
+    
+    /// Liste der Buchten - Fallback auf leere Liste
+    #[serde(default)]
     pub bays: Vec<Value>,
+    
+    /// Zeitstempel der letzten Änderung
+    #[serde(default)]
     pub last_update: Option<String>,
 }
 
-fn default_config() -> Value {
-    serde_json::json!({"grid": {"width": 10, "height": 10}})
+fn default_config_val() -> Value {
+    json!({"grid": {"width": 10, "height": 10}})
 }
 
 impl Default for SSoTData {
     fn default() -> Self {
-        // Hier definieren wir den "Werkszustand", falls keine Datei existiert
         Self {
-            config: json!({"grid": {"width": 10, "height": 10}}),
-            agents: vec![], // Wird beim ersten Start durch das System befüllt
-            bays: vec![],   // Wird beim ersten Start durch das System befüllt
+            config: default_config_val(),
+            agents: vec![],
+            bays: vec![],
             last_update: None,
         }
     }
@@ -36,99 +46,132 @@ impl Default for SSoTData {
 // --- MANAGER ---
 
 pub struct ConfigManager {
-    pub file_path: PathBuf,
+    pub initial_path: PathBuf,
+    pub session_path: PathBuf,
 }
 
 impl ConfigManager {
     pub fn new() -> Self {
-        // "current_dir" ist der Ordner, von dem aus du "cargo run" startest
-        let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let mut base_path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         
-        path.push("data"); // Ordnername
-        path.push("config__initial__00.json"); 
+        // PFAD-FIX: Wenn wir im Root des Projekts sind, müssen wir in den Backend-Ordner wechseln
+        if base_path.join("passform2_agent_backend").exists() {
+            base_path.push("passform2_agent_backend");
+        }
+        
+        base_path.push("data");
 
-        let manager = Self { file_path: path };
+        let manager = Self {
+            initial_path: base_path.join("config__initial__00.json"),
+            session_path: base_path.join("config__session__00.json"),
+        };
+        
         manager.ensure_data_dir();
         manager
     }
 
+    /// Stellt sicher, dass der Datenordner existiert
     fn ensure_data_dir(&self) {
-        if let Some(parent) = self.file_path.parent() {
+        if let Some(parent) = self.initial_path.parent() {
             if !parent.exists() {
                 info!("📁 Erstelle Daten-Verzeichnis: {:?}", parent);
-                fs::create_dir_all(parent).expect("Kunn dat Verzeichnis nich erstellen!");
+                let _ = fs::create_dir_all(parent);
             }
         }
     }
 
-    /// Lädt die SSoT Datei
+    /// Lädt die Konfiguration. Priorität: Session > Initial > Default.
     pub fn load_config(&self) -> SSoTData {
-        if !self.file_path.exists() {
-            warn!("⚠️ SSoT Datei nich funnen ({:?}), nimm Defaults.", self.file_path);
+        let path_to_load = if self.session_path.exists() {
+            info!("🔄 Lade aktive Session: {:?}", self.session_path);
+            &self.session_path
+        } else {
+            info!("🏠 Lade Initial-Stand: {:?}", self.initial_path);
+            &self.initial_path
+        };
+
+        if !path_to_load.exists() {
+            warn!("⚠️ Keine Konfigurationsdatei gefunden unter {:?}", path_to_load);
             return SSoTData::default();
         }
 
-        match fs::read_to_string(&self.file_path) {
-            Ok(content) => {
-                match serde_json::from_str::<SSoTData>(&content) {
-                    Ok(data) => {
-                        info!("📖 SSoT erfolgreich ut {:?} laaden.", self.file_path);
-                        data
-                    }
-                    Err(e) => {
-                        error!("❌ JSON-Fehler in SSoT: {}", e);
-                        SSoTData::default()
-                    }
-                }
-            }
+        match fs::read_to_string(path_to_load) {
+            Ok(content) => serde_json::from_str::<SSoTData>(&content).unwrap_or_else(|e| {
+                error!("❌ JSON-Parse-Fehler in {:?}: {}", path_to_load, e);
+                SSoTData::default()
+            }),
             Err(e) => {
-                error!("❌ Fehlgriff bi't Leesen vun de SSoT: {}", e);
+                error!("❌ Lesefehler bei {:?}: {}", path_to_load, e);
                 SSoTData::default()
             }
         }
     }
 
-    /// Speichert den aktuellen Zustand (Agenten & Bays) zurück in die JSON
-    pub fn save_state(&self, agents: Vec<Value>, bays: Vec<Value>) -> bool {
-        let data = SSoTData {
-            config: json!({"grid": {"width": 10, "height": 10}}),
-            agents,
-            bays,
-            last_update: Some(Local::now().to_rfc3339()),
-        };
-
-        match serde_json::to_string_pretty(&data) {
-            Ok(content) => {
-                if let Err(e) = fs::write(&self.file_path, content) {
-                    error!("❌ Kun de SSoT nich schrieven: {}", e);
-                    false
-                } else {
-                    info!("💾 SSoT (Agents & Bays) erfolgreich spiekert.");
+    /// "Neues Projekt": Löscht die Arbeitskopie (Session)
+    pub fn reset_session(&self) -> bool {
+        if self.session_path.exists() {
+            match fs::remove_file(&self.session_path) {
+                Ok(_) => {
+                    info!("🗑️ Session-Datei erfolgreich gelöscht.");
                     true
                 }
+                Err(e) => {
+                    error!("❌ Fehler beim Löschen der Session: {}", e);
+                    false
+                }
+            }
+        } else {
+            true
+        }
+    }
+
+    /// Schreibt Daten in die config__session__00.json (Arbeitsbereich)
+    pub fn save_config(&self, full_data: &Value) -> bool {
+        match serde_json::from_value::<SSoTData>(full_data.clone()) {
+            Ok(mut data) => {
+                data.last_update = Some(Local::now().to_rfc3339());
+                self.write_to_file(&self.session_path, &data)
             }
             Err(e) => {
-                error!("❌ Serialisierungs-Fehler: {}", e);
+                error!("❌ SSoT-Mapping Fehler (Session): {}", e);
                 false
             }
         }
     }
 
-    // Nimmt ein komplettes JSON-Value (vom Frontend), validiert es gegen SSoTData und schreibt es sicher auf die Festplatte.
-    pub fn save_config(&self, full_data: &Value) -> bool {
+    /// REWRITE-FUNKTION: Schreibt Daten permanent in die config__initial__00.json
+    pub fn save_as_initial(&self, full_data: &Value) -> bool {
         match serde_json::from_value::<SSoTData>(full_data.clone()) {
             Ok(mut data) => {
                 data.last_update = Some(Local::now().to_rfc3339());
-                if let Ok(content) = serde_json::to_string_pretty(&data) {
-                    if fs::write(&self.file_path, content).is_ok() {
-                        info!("💾 SSoT-Datei erfolgreich aktualisiert ({} Agenten).", data.agents.len());
-                        return true;
-                    }
+                if self.write_to_file(&self.initial_path, &data) {
+                    info!("👑 GOLDEN MASTER AKTUALISIERT: {:?}", self.initial_path);
+                    true
+                } else {
+                    false
                 }
-                false
             }
             Err(e) => {
-                error!("❌ SSoT-Mapping fehlgeschlagen (Struktur-Konflikt): {}", e);
+                error!("❌ SSoT-Mapping Fehler (Master Rewrite): {}", e);
+                false
+            }
+        }
+    }
+
+    /// Private Hilfsfunktion zum sauberen Schreiben auf Festplatte
+    fn write_to_file(&self, path: &PathBuf, data: &SSoTData) -> bool {
+        match serde_json::to_string_pretty(data) {
+            Ok(content) => {
+                if let Err(e) = fs::write(path, content) {
+                    error!("❌ Fehler beim Schreiben der Datei {:?}: {}", path, e);
+                    false
+                } else {
+                    info!("💾 Datei erfolgreich gespeichert: {:?}", path);
+                    true
+                }
+            }
+            Err(e) => {
+                error!("❌ Serialisierungs-Fehler: {}", e);
                 false
             }
         }

@@ -3,18 +3,19 @@
 use axum::{extract::State as AxumState, Json, http::Method};
 use socketioxide::{extract::{Data, SocketRef}, SocketIo, SocketIoConfig};
 use std::sync::Arc;
-use tracing::{info, warn}; // 'error' entfernt, da ungenutzt
+use tracing::{info, warn, error};
 use reqwest::Client as HttpClient;
 use tokio::sync::RwLock;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use tower_http::cors::{Any, CorsLayer};
+use serde_json::{json, Value};
 
 // Library-Importe aus dem Backend-Crate
 use passform_agent_backend::{
     AppState, PlantModel, SocketIoManager, SkillActionManager, PathManager, 
     NodeManager, AgentManager, InventoryManager, InfraConfigManager, 
-    MatchManager, RfidManager, SystemRole // DataConfigManager & SystemMode entfernt
+    MatchManager, RfidManager, SystemRole
 };
 
 // Manager & Utils
@@ -35,42 +36,37 @@ use passform_agent_backend::behaviour_tree::{NodeStatus, WorldState, HTNPlanner}
 // --- SOCKET.IO HANDLER ---
 fn setup_socket_handlers(io: &SocketIo, state: Arc<AppState>) {
     io.ns("/", move |socket: SocketRef| {
-        let s = state.clone();
         info!("🔗 Socket verbunden: {} | Transport: {:?}", socket.id, socket.transport_type());
 
         // 1. Initial Sync
-        let sync_state = s.clone();
+        let s = state.clone();
         let sync_socket = socket.clone();
         tokio::spawn(async move {
-            let mode = sync_state.infra_config.settings.read().await.current_mode;
+            let mode = s.infra_config.settings.read().await.current_mode;
             let _ = sync_socket.emit("mode", mode.to_string());
             
-            let current_world = sync_state.world_state.read().await;
+            let current_world = s.world_state.read().await;
             let _ = sync_socket.emit("world_state", serde_json::json!(current_world.0));
 
-            // In main.rs -> setup_socket_handlers -> Initial Sync Block
-            let plant_guard = sync_state.plant_model.read().await;
+            let plant_guard = s.plant_model.read().await;
             let _ = sync_socket.emit("initial_bays", serde_json::json!(plant_guard.bays));
 
-            let agents_guard = sync_state.agent_manager.agents.read().await;
+            let agents_guard = s.agent_manager.agents.read().await;
             let agents_list: Vec<_> = agents_guard.values().cloned().collect();
             let _ = sync_socket.emit("active_agents", serde_json::json!({ "agents": agents_list }));
 
-            // Innerhalb von tokio::spawn im Socket-Handler:
-            let items_guard = sync_state.inventory_manager.items.read().await;
+            let items_guard = s.inventory_manager.items.read().await;
             let items_list: Vec<_> = items_guard.values().cloned().collect();
             let _ = sync_socket.emit("inventory_update", serde_json::json!({ "items": items_list }));
 
-            let _ = sync_socket.emit("hardware_specs", serde_json::json!(sync_state.resource_manager.hardware_specs));
-            
+            let _ = sync_socket.emit("hardware_specs", serde_json::json!(s.resource_manager.hardware_specs));
             let _ = sync_socket.emit("socket_status", true);
-
         });
 
         // 2. Hardware Update Event
-        let s_for_update = s.clone(); 
+        let s_hw = state.clone(); 
         socket.on("pi_hardware_update", move |socket: SocketRef, Data(data): Data<serde_json::Value>| {
-            let s_inner = s_for_update.clone();
+            let s_inner = s_hw.clone();
             let sid = socket.id.to_string();
             tokio::spawn(async move {
                 let mut registry = s_inner.hardware_registry.write().await;
@@ -80,64 +76,156 @@ fn setup_socket_handlers(io: &SocketIo, state: Arc<AppState>) {
             });
         });
 
-        let s_for_config = s.clone();
+        // 3. Push Config (SSoT Update)
+        let s_push = state.clone();
         socket.on("push_config", move |socket: SocketRef, Data(data): Data<serde_json::Value>| {
-            let s_config = s_for_config.clone();
+            let s_config = s_push.clone();
             tokio::spawn(async move {
                 info!("💾 SSoT Update via Socket empfangen. Speichere...");
-                
                 if s_config.data_config.save_config(&data) {
-                    // 1. RAM komplett leeren (Wichtig gegen Zombies!)
                     {
                         let mut am_guard = s_config.agent_manager.agents.write().await;
                         am_guard.clear();
                     }
-
-                    // 2. Neuaufbau aus dem JSON
                     if let Some(agents_array) = data.get("agents").and_then(|v| v.as_array()) {
                         for a in agents_array {
                             let id = get_val_str(a, &["agent_id", "id", "unique_id"]);
                             if id.is_empty() { continue; }
-
                             let pos = a.get("position").unwrap_or(a);
                             let x = get_val_i64(pos, &["x"]);
                             let y = get_val_i64(pos, &["y"]);
                             let lvl = get_val_i64(pos, &["level", "lvl"]);
-                            let orient = get_val_i64(a, &["orientation"]); // <--- NEU: Orientation mitnehmen
+                            let orient = get_val_i64(a, &["orientation"]);
                             let m_type = get_val_str(a, &["module_type", "type"]);
-                            
                             s_config.agent_manager.sync_from_ros(id, m_type, x, y, orient, lvl).await;
                         }
                     }
-
-                    // 3. Globaler Broadcast des neuen RAM-Zustands
                     let final_agents = s_config.agent_manager.agents.read().await;
                     let list: Vec<_> = final_agents.values().cloned().collect();
                     let _ = s_config.socket_manager.io.emit("active_agents", serde_json::json!({ "agents": list }));
+                    let _ = socket.emit("system_log", serde_json::json!({ "message": "SSoT & RAM synchronisiert", "level": "success" }));
+                }
+            });
+        });
 
+        // 4. Reset Session (Neues Projekt)
+        let s_res = state.clone();
+        socket.on("reset_session", move |socket: SocketRef| {
+            let s_reset = s_res.clone();
+            tokio::spawn(async move {
+                if s_reset.data_config.reset_session() {
+                    let mut am = s_reset.agent_manager.agents.write().await;
+                    am.clear();
+                    let _ = socket.emit("active_agents", serde_json::json!({"agents": []}));
+                    let _ = socket.emit("system_log", serde_json::json!({"message": "Session zurückgesetzt.", "level": "info"}));
+                }
+            });
+        });
+
+        // --- 5. Load Template (Verbessert: Synchronisiert RAM + Datei) ---
+        let s_temp = state.clone();
+        socket.on("load_template", move |socket: SocketRef, Data(template_name): Data<String>| {
+            let s = s_temp.clone();
+            tokio::spawn(async move {
+                info!("📋 Vorlage laden angefordert: {}", template_name);
+                
+                let mut t_path = std::env::current_dir().unwrap_or_default();
+                // Pfad-Check wie im ConfigManager
+                if t_path.join("passform2_agent_backend").exists() {
+                    t_path.push("passform2_agent_backend");
+                }
+                t_path.push("data");
+                t_path.push("templates");
+                t_path.push(format!("{}.json", template_name));
+
+                if t_path.exists() {
+                    let content = std::fs::read_to_string(&t_path).unwrap_or_default();
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                        
+                        // 1. In Session-Datei speichern
+                        s.data_config.save_config(&val);
+                        
+                        // 2. RAM (AgentManager) leeren
+                        {
+                            let mut am_guard = s.agent_manager.agents.write().await;
+                            am_guard.clear();
+                            info!("🧹 RAM für neue Vorlage geleert.");
+                        }
+
+                        // 3. Neue Agenten aus der Vorlage in den RAM laden
+                        if let Some(agents_array) = val.get("agents").and_then(|v| v.as_array()) {
+                            for a in agents_array {
+                                let id = get_val_str(a, &["agent_id", "id", "unique_id"]);
+                                if id.is_empty() { continue; }
+
+                                let pos = a.get("position").unwrap_or(a);
+                                let x = get_val_i64(pos, &["x"]);
+                                let y = get_val_i64(pos, &["y"]);
+                                let lvl = get_val_i64(pos, &["level", "lvl"]);
+                                let orient = get_val_i64(a, &["orientation"]);
+                                let m_type = get_val_str(a, &["module_type", "type"]);
+                                
+                                s.agent_manager.sync_from_ros(id, m_type, x, y, orient, lvl).await;
+                            }
+                        }
+
+                        // 4. Globaler Broadcast des neuen Zustands an alle Frontends
+                        let final_agents = s.agent_manager.agents.read().await;
+                        let list: Vec<_> = final_agents.values().cloned().collect();
+                        let _ = s.socket_manager.io.emit("active_agents", serde_json::json!({ "agents": list }));
+                        
+                        // 5. Buchten ebenfalls synchronisieren (falls in Vorlage vorhanden)
+                        if let Some(bays) = val.get("bays") {
+                            let _ = s.socket_manager.io.emit("initial_bays", bays.clone());
+                        }
+
+                        let _ = socket.emit("system_log", serde_json::json!({
+                            "message": format!("Vorlage '{}' erfolgreich geladen & aktiviert", template_name),
+                            "level": "success"
+                        }));
+                    }
+                } else {
+                    warn!("⚠️ Vorlage nicht gefunden: {:?}", t_path);
                     let _ = socket.emit("system_log", serde_json::json!({
-                        "message": "SSoT & RAM synchronisiert",
-                        "level": "success"
+                        "message": "Vorlage konnte nicht gefunden werden.",
+                        "level": "error"
                     }));
                 }
             });
         });
 
-        // Skill Library & BT Sync
-        let lib = SkillLibrary::from_path(&s.resource_manager.skills_path);
+        // --- PERSIST TO MASTER (Rewrite Golden Master) ---
+        let s_persist = state.clone();
+        socket.on("persist_to_master", move |socket: SocketRef, Data(data): Data<serde_json::Value>| {
+            let s = s_persist.clone();
+            tokio::spawn(async move {
+                info!("👑 Request: Session permanent in Golden Master (Initial) schreiben...");
+                if s.data_config.save_as_initial(&data) {
+                    let _ = socket.emit("system_log", serde_json::json!({
+                        "message": "Layout erfolgreich als Standard gespeichert!",
+                        "level": "success"
+                    }));
+                } else {
+                    error!("❌ Rewrite in Golden Master fehlgeschlagen.");
+                }
+            });
+        });
+
+        // Skills & Disconnect
+        let s_lib = state.clone();
+        let lib = SkillLibrary::from_path(&s_lib.resource_manager.skills_path);
         let skills_json = serde_json::to_value(&lib.skills).unwrap_or_default();
         let _ = socket.emit("available_skills", skills_json);
 
-        // 3. Disconnect Event
-        let s_for_dc = s.clone();
+        let s_dc = state.clone();
         socket.on_disconnect(move |socket: SocketRef| {
-            let s_dc = s_for_dc.clone();
+            let s_disconnect = s_dc.clone();
             let sid = socket.id.to_string();
             tokio::spawn(async move {
-                let mut registry = s_dc.hardware_registry.write().await;
+                let mut registry = s_disconnect.hardware_registry.write().await;
                 if registry.remove(&sid).is_some() {
                     let update: Vec<_> = registry.values().cloned().collect();
-                    let _ = s_dc.socket_manager.io.emit("hardware_update", serde_json::json!(update));
+                    let _ = s_disconnect.socket_manager.io.emit("hardware_update", serde_json::json!(update));
                 }
             });
         });
@@ -386,7 +474,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_socket_handlers(&io, shared_state.clone());
     info!("✅ Socket.io Namespace '/' registriert.");
 
-    // 2. Jetzt die Agenten aus der SSoT laden
     // 2. Jetzt die Agenten aus der SSoT laden
     let am_init = shared_state.agent_manager.clone();
     let agents_to_load = ssot_data.agents.clone();

@@ -157,13 +157,32 @@ const setupMainSocket = (url: string) => {
     });
 };
 
-// --- INITIALISIERUNG ---
+// --- INITIALISIERUNG & GLOBAL EVENTS ---
 
-// 1. Socket starten
+// 1. Haupt-Socket zum Rust-Backend starten
 setupMainSocket(backendIP);
 
-// 2. REST Daten sofort laden (nicht nur auf Socket-Connect warten)
+// 2. Initiale Daten laden (Buchten, Agenten etc.)
 fetchInitialData(backendIP);
+
+// 3. GLOBAL DRAG & DROP PROTECTION
+// Verhindert, dass der Browser die JSON-Datei einfach im Fenster öffnet
+window.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+}, false);
+
+window.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Wenn eine Datei auf das Fenster gezogen wird, verarbeiten wir sie
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+        console.log("📥 JS: Datei via Drag & Drop empfangen");
+        handleFileReading(files[0]);
+    }
+}, false);
 
 // --- FILE READER LOGIK ---
 
@@ -208,6 +227,13 @@ subscribeSafe('pushConfig', (fullConfig: any) => {
             message: "Verbindungsfehler: Konfiguration konnte nicht gespeichert werden.",
             level: "error"
         });
+    }
+});
+
+subscribeSafe('persistToMaster', (fullConfig: any) => {
+    if (socket?.connected) {
+        socket.emit('persist_to_master', fullConfig);
+        console.log("👑 JS: Persistenz-Befehl an Master gesendet");
     }
 });
 

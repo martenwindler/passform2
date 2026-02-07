@@ -34,6 +34,9 @@ port savePlanningWeights : Decode.Value -> Cmd msg
 
 port pushConfig : Encode.Value -> Cmd msg
 
+-- NEU: Schreibt die aktuellen Session-Daten permanent in den Golden Master (initial_00.json)
+port persistToMaster : Encode.Value -> Cmd msg
+
 -- Universeller Port für Socket.io Emits
 port socketEmitPort : ( String, Encode.Value ) -> Cmd msg
 

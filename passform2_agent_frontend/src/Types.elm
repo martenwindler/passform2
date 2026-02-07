@@ -79,14 +79,15 @@ type Msg
 -- --- DOMÄNEN-SPEZIFISCHE MESSAGES ---
 
 type SystemMsg
-    = NewProject                
+    = NewProject                -- Startet mit leerem Gitter
+    | SelectTemplate String     -- Lädt eine vordefinierte JSON
     | OpenFileBrowser           
     | DragOver                  
     | FileDropped Decode.Value  
     | FileSelected Decode.Value 
     | ResetToLanding            
-    -- NEU: Weltzustand für HTN Planner
     | HandleWorldState Decode.Value
+    | EnterAppMode              -- Der explizite Wechsel ins Gitter
 
 
 type PlanningMsg
