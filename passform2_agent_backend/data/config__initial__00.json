@@ -166,7 +166,7 @@
       "name": "Bucht_1",
       "occupation": true,
       "status": "Ok",
-      "unique_id": "cdf90c31-2e68-48e1-b4b7-9b7d4dbd859a",
+      "unique_id": "4b5d9a3a-e29b-41ad-b648-376d1819bd9c",
       "x": 1,
       "y": 1
     },
@@ -174,7 +174,7 @@
       "name": "Bucht_2",
       "occupation": true,
       "status": "Ok",
-      "unique_id": "80134305-f4fe-4ffe-8cbf-6965b03b2b10",
+      "unique_id": "061507a2-2845-4029-92ea-9aea1bf03e6b",
       "x": 2,
       "y": 1
     },
@@ -182,7 +182,7 @@
       "name": "Bucht_3",
       "occupation": true,
       "status": "Ok",
-      "unique_id": "63c422ca-1f71-40e0-a5cf-4a1cced9212d",
+      "unique_id": "74d93796-eca0-4957-be32-5042ae8da14a",
       "x": 3,
       "y": 1
     },
@@ -190,7 +190,7 @@
       "name": "Bucht_4",
       "occupation": true,
       "status": "Ok",
-      "unique_id": "afa6b4d1-a124-4dbd-805a-c38fb049ca27",
+      "unique_id": "a4f6cf7e-fe55-44a2-a3b8-1c3861f5f95d",
       "x": 4,
       "y": 1
     },
@@ -198,7 +198,7 @@
       "name": "Bucht_5",
       "occupation": true,
       "status": "Ok",
-      "unique_id": "09291ac5-335c-4264-aeb1-f9f2ec3fdc83",
+      "unique_id": "b2816a3d-ad12-437f-8643-b3d65fdf4122",
       "x": 1,
       "y": 2
     },
@@ -206,7 +206,7 @@
       "name": "Bucht_6",
       "occupation": true,
       "status": "Ok",
-      "unique_id": "bd4eaf84-9e95-4292-b432-e1b05377e0d2",
+      "unique_id": "e2c29380-cdb2-4bc7-8e82-4e8d5f553edc",
       "x": 2,
       "y": 2
     },
@@ -214,7 +214,7 @@
       "name": "Bucht_7",
       "occupation": true,
       "status": "Ok",
-      "unique_id": "7ecb74a7-ebb7-4ba8-aa08-23d79857ff07",
+      "unique_id": "e1594a5e-4466-4945-8e00-384696b86296",
       "x": 3,
       "y": 2
     },
@@ -222,10 +222,10 @@
       "name": "Bucht_8",
       "occupation": true,
       "status": "Ok",
-      "unique_id": "98ffeb25-addd-4f9c-b344-207c5c822b2a",
+      "unique_id": "7f1dffaf-eb89-4a57-8eb0-e87f041aad64",
       "x": 4,
       "y": 2
     }
   ],
-  "last_update": "2026-02-07T12:41:24.057727910+01:00"
+  "last_update": "2026-02-12T21:34:43.800246670+01:00"
 }
